@@ -1,0 +1,2 @@
+ALTER TABLE `actionItems` ADD `documentId` int;--> statement-breakpoint
+ALTER TABLE `actionItems` ADD CONSTRAINT `actionItems_documentId_documents_id_fk` FOREIGN KEY (`documentId`) REFERENCES `documents`(`id`) ON DELETE no action ON UPDATE no action;

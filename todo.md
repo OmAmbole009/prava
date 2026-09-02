@@ -1,0 +1,105 @@
+# SaaS Foundation Delivery Checklist
+
+- [x] Upgrade the project to support secure user accounts and persistent data.
+- [x] Apply and verify the initial database schema for workspace persistence.
+- [x] Run a browser-level OAuth sign-in and logout check, including session clearing after logout.
+- [x] Replace foundation placeholders in the schema, database helpers, and procedures.
+- [x] Establish the data model for businesses, memberships, and onboarding.
+- [x] Restrict dashboard summaries to verified records and surface revenue, expenses, cash, GST, receivables, and payables.
+- [x] Add a controlled server-side write path for future verified financial-summary ingestion.
+- [x] Define and document the chosen visual identity and brand system.
+- [x] Build the premium public marketing experience and interactive product demonstration.
+- [x] Implement authentication, business onboarding, protected routes, and workspace isolation.
+- [x] Create the initial dashboard shell and core overview experience.
+- [x] Validate responsive behavior, type safety, and build output.
+- [x] Complete browser-independent accessibility validation for onboarding and dashboard controls, focus treatment, and reduced-motion behavior.
+- [x] Deliver a checkpointed first SaaS foundation with clear follow-on modules.
+- [x] Create a concise delivery handoff with sequenced follow-on product modules.
+- [x] Add tenant-scoped models for workflow tasks, document records, accounting entries, GST preparation, reviews, actions, and audit events.
+- [x] Restrict uploads to supported invoice-like documents until bank-statement and receipt-specific extraction workflows are implemented.
+- [x] Complete GST preparation with task-level navigation for mandatory business-profile and GSTIN requirements, reconciliation items, review actions, and explicit prepared-versus-submitted states.
+- [x] Implement GST reconciliation generation with matched, missing, duplicate, mismatch, and needs-review outcomes, including logged resolution actions.
+- [x] Add controlled task state transitions for preparation, submission pending, and official submission confirmation without faking filing status.
+- [x] Add database-backed plan, subscription, entitlement, and usage-metering foundations with server-side premium-operation checks.
+- [x] Wire Action Center review items directly into document review and resolve or retain action items based on the audited review outcome.
+- [x] Add an audited document-review screen that shows extracted fields and review reasons, supports corrections, and refreshes task state.
+- [x] Add a service-level regression proving document approval updates the linked review action while save-for-review leaves it open.
+- [x] Document the deferred browser-visible Action Center verification, which requires a user-owned workspace and source document and must not be simulated.
+- [x] Add administrator plan-management and subscription-management foundations with audited actions.
+- [x] Document Razorpay checkout and verified webhook activation as credential-gated follow-up work; the provider is intentionally not activated.
+- [x] Add focused entitlement-enforcement regression coverage for allowed, feature-disabled, and usage-limited operations.
+- [x] Add a real-persistence non-production integration harness for the document-review, GST-preparation, reconciliation, and action-resolution service sequence.
+- [x] Record the final automated and real-persistence document-to-GST validation, with browser-visible verification retained as a documented external follow-up.
+- [x] Create the integration activation roadmap and save the final checkpointed vertical-slice handoff.
+- [x] Complete and document route loading, bundle weight, imported-module, dependency, hero-asset, and expensive-render audit findings.
+- [x] Split heavy public and protected modules so the landing page and authenticated workspace load only the code they need.
+- [x] Add smooth, accessible scroll-driven reveal and progression effects to the public product narrative.
+- [x] Improve motion, feedback, loading, and empty states across financial workflow screens without blocking core actions.
+- [x] Extend the credential-free workflow with structured bank-statement intake preparation and cash-reconciliation task support.
+- [x] Revalidate performance, responsive behavior, accessibility, tests, type safety, and production build.
+- [x] Deliver a checkpointed optimized Prava product update with credential-gated integrations clearly documented.
+- [x] Diagnose and eliminate public and protected-route 404 responses, including missing static assets and navigation fallbacks.
+- [x] Reduce perceived route-loading latency and prevent avoidable runtime request failures across public and workspace experiences.
+- [x] Apply a focused visual-polish pass to navigation, loading surfaces, cards, controls, and transitions while preserving accessibility.
+- [x] Revalidate route reliability, responsive rendering, console/network health, automated tests, type safety, and production build.
+- [x] Save and deliver a checkpointed reliability and UI-polish update.
+- [x] Verify and preserve the requested OmAmbole administrator identity through the existing OAuth-backed user model.
+- [x] Add a clear, role-gated administration entry point for the requested administrator account.
+- [x] Validate that administrator access remains protected, audited, and unavailable to ordinary workspace members.
+- [x] Save and deliver a checkpointed administrator-access update.
+- [x] Add audited administrator invitations that prepare secure join links without fabricating invited users.
+- [x] Add secret-backed administrator password rotation with current-password confirmation and audit records.
+- [x] Add searchable, filterable administrator audit history for access, invitations, and configuration actions.
+- [x] Validate administrator sign-in, logout, session renewal, role boundaries, responsive UI, tests, type safety, and production build.
+- [x] Save and deliver a checkpointed enhanced administrator console.
+- [x] Complete a production-readiness audit covering security controls, error boundaries, reliability, accessibility, operating procedures, and release gaps.
+- [x] Add prioritized production hardening: reusable resilient UI states, server-safe request protections, health observability, and operational administration improvements.
+- [x] Improve production UX polish across onboarding, workspace navigation, actionable empty states, and recovery journeys.
+- [x] Write an operator-ready production runbook that preserves real payment, authorized filing, and professional-review boundaries.
+- [x] Revalidate protected/public flows, security boundaries, responsive behavior, logs, automated tests, type safety, and production build.
+- [x] Save and deliver a checkpointed production-readiness release.
+- [x] Defer live Razorpay activation until a production account, credentials, and verified webhook configuration are available; do not simulate payments.
+- [x] Preserve the live Razorpay order, checkout, signature-verification, webhook, and audited-subscription roadmap as an inactive credential-gated follow-up.
+- [x] Implement a provider-neutral authorized GST-submission adapter boundary with explicit reviewer approval, authorization checks, idempotency, audited provider responses, and truthful submission states.
+- [x] Defer merchant UPI ID, legal payee verification, and a server-verifiable payment-status source until the owner elects to activate Google Pay/UPI QR.
+- [x] Preserve a secure inactive Google Pay/UPI state; never render an unverified QR or treat a QR scan, app redirect, or user claim as payment confirmation.
+- [x] Add payment and filing operations UI with clear live-status, failure, retry, and professional-review boundaries.
+- [x] Validate inactive payment safeguards, GST submission state transitions, role isolation, responsive UI, tests, type safety, and production build; defer live-secret and webhook-signature verification until credentials exist.
+- [x] Add service-level regression coverage for GST submission request creation, independent approval, provider dispatch failure, and official confirmation transitions.
+- [x] Add authorization regression coverage proving members and self-approving administrators cannot approve authorized GST submission requests.
+- [x] Visually verify the updated Billing and GST submission-gate interfaces at desktop and mobile widths and record the findings.
+- [x] Create and remove a non-financial ephemeral workspace fixture to visually verify the actual GST independent-approval surface at desktop and mobile widths.
+- [x] Re-verify the final desktop GST independent-approval surface after disabling the retired direct-submission control, then remove its ephemeral fixture.
+- [x] Save and deliver a checkpointed secure payment-and-submission foundation update.
+- [x] Add a role-gated GST submission administration view with accessible status, period, workspace, and provider filters plus search.
+- [x] Add audited CSV export and browser-printable PDF export for GST submission records, without exposing cross-tenant source data.
+- [x] Add approval and rejection notification records with in-app delivery and credential-gated email dispatch; never claim email delivery without a configured sender.
+- [x] Create and validate a reusable `gst-submission-operations` skill covering request, independent review, dispatch, failure, export, notification, and activation boundaries.
+- [x] Revalidate authorization, exports, notification safeguards, responsive UI, tests, type safety, and production build.
+- [x] Save and deliver a checkpointed GST administration enhancement.
+
+## Remaining recommended integrations and operations
+
+- [x] Add configuration-ready email delivery administration that keeps unsent records suppressed until a verified sender is configured.
+- [x] Add configuration-ready authorized GST provider administration without enabling filing or claiming government submission.
+- [x] Add credential-gated Razorpay activation preparation with verified webhook and payment-status safeguards; do not simulate payments.
+- [x] Improve integration status, setup guidance, and operational observability for email, GST provider, Razorpay, and UPI boundaries.
+- [x] Add tests for integration configuration guards, delivery suppression, provider readiness, and payment verification safeguards.
+- [x] Revalidate responsive UI, authorization, tests, type safety, production build, and fresh logs.
+- [x] Save and deliver a checkpoint for the expanded recommendation set.
+
+- [x] Add administrator-managed non-secret email delivery metadata and readiness validation with audit records; keep credentials external and delivery suppressed until complete.
+- [x] Add administrator-managed non-secret GST provider readiness metadata with validated fields and audit records; keep live dispatch disabled.
+- [x] Add administrator-managed Razorpay activation-preparation metadata with webhook prerequisites and audit records; keep checkout disabled.
+- [x] Create the post-reset checkpoint for the expanded recommendation-set changes.
+
+## Global market expansion
+
+- [ ] Remove India-only positioning and region-specific copy from public and authenticated experiences.
+- [ ] Add country, locale, currency, timezone, and tax-region preferences to workspace onboarding and profile settings.
+- [ ] Persist country-aware financial display preferences with server-side validation and workspace isolation.
+- [ ] Adapt currency, number, date, fiscal-period, tax, and payment guidance to the selected country without inventing legal or filing capabilities.
+- [ ] Add international defaults and fallback behavior for users who have not selected a country.
+- [ ] Add tests for country validation, formatting, persistence authorization, and region-specific safety copy.
+- [ ] Revalidate responsive UI, authorization, tests, type safety, production build, and fresh logs.
+- [ ] Save and deliver a checkpointed global-market update.

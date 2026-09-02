@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Prava">
+  <rect width="64" height="64" rx="18" fill="#163a34"/>
+  <path d="M17 19h30L32 46 17 19Zm7 5 8 14 8-14H24Z" fill="#d7e9b7"/>
+  <path d="M25 42h14" stroke="#b77a43" stroke-width="4" stroke-linecap="round"/>
+</svg>
