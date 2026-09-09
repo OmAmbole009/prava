@@ -18,7 +18,7 @@ if (canonicalPath !== rawPath) {
   window.history.replaceState(window.history.state, "", `${canonicalPath}${window.location.search}${window.location.hash}`);
 }
 
-const workspacePath = /^\/(onboarding|dashboard|tasks(?:\/|$)|documents(?:\/|$)|billing|admin(?:\/|$)|invite(?:\/|$))/.test(canonicalPath);
+const workspacePath = /^\/(onboarding|dashboard|assistant(?:\/|$)|money(?:\/|$)|tax(?:\/|$)|ca-review(?:\/|$)|ca(?:\/|$)|tasks(?:\/|$)|documents(?:\/|$)|billing|admin(?:\/|$)|invite(?:\/|$))/.test(canonicalPath);
 
 if (workspacePath) {
   root.render(<WorkspaceBoot />);

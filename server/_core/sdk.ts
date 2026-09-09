@@ -154,7 +154,7 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "prava-local-dev-session-signing-secret-key-32chars";
     return new TextEncoder().encode(secret);
   }
 

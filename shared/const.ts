@@ -3,6 +3,10 @@ export const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
 export const AXIOS_TIMEOUT_MS = 30_000;
 export const UNAUTHED_ERR_MSG = 'Please login (10001)';
 export const NOT_ADMIN_ERR_MSG = 'You do not have required permission (10002)';
+export const NOT_CA_ERR_MSG = 'Chartered Accountant access is required (10003)';
+
+export const SEED_CA_EMAIL = "ca.verma@prava.internal";
+export const SEED_CA_DEFAULT_PASSWORD = "CAPravaPassword2026!";
 
 // One-time nonce cookie that binds an OAuth login to the browser that started
 // it. The `__Host-` prefix forces the cookie host-only (Secure, Path=/, no

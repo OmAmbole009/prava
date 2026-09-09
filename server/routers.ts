@@ -2,9 +2,28 @@ import { COOKIE_NAME } from "@shared/const";
 import { z } from "zod";
 import { adminLoginSchema, signInLocalAdministrator } from "./adminLogin";
 import { acceptBusinessInvitation, auditLogSchema, createBusinessInvitation, getAdminSecurityOverview, invitationSchema, revokeBusinessInvitation, rotateAdministratorPassword, rotatePasswordSchema, searchAdminAuditLog } from "./adminSecurity";
+import { caLoginSchema, signInCa } from "./caAuth";
+import {
+  assignCaToBusiness,
+  caAssignmentSchema,
+  caDecisionSchema,
+  getAssignedWorkspacesForCa,
+  getCaDashboardStats,
+  getCaProfileForUser,
+  grantCaAccess,
+  grantCaAccessSchema,
+  listAllCas,
+  listCaReviewQueue,
+  resetCaPassword,
+  resetCaPasswordSchema,
+  submitCaDecision,
+  unassignCaFromBusiness,
+  updateCaStatus,
+  updateCaStatusSchema,
+} from "./caManagement";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, caProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createBusinessWithOwner,
   getBusinessForUser,
@@ -50,11 +69,19 @@ import {
 import { businessInputSchema, updateOnboardingSchema, updateBusinessProfileSchema } from "./workspace";
 import { getIntegrationReadiness, integrationSettingsSchema, listIntegrationSettings, saveIntegrationSettings } from "./integrationReadiness";
 
+import { askPrava, askPravaInputSchema, getCaReviewItemsForUser, getSuggestedQuestions } from "./assistant";
+
 export const appRouter = router({
   system: systemRouter,
+  assistant: router({
+    ask: protectedProcedure.input(askPravaInputSchema).mutation(({ ctx, input }) => askPrava(ctx.user.id, input)),
+    suggestedPrompts: protectedProcedure.input(businessIdSchema).query(({ ctx, input }) => getSuggestedQuestions(ctx.user.id, input.businessId)),
+    caReviews: protectedProcedure.input(businessIdSchema).query(({ ctx, input }) => getCaReviewItemsForUser(ctx.user.id, input.businessId)),
+  }),
   auth: router({
     me: publicProcedure.query(({ ctx }) => ctx.user),
     adminLogin: publicProcedure.input(adminLoginSchema).mutation(({ ctx, input }) => signInLocalAdministrator(ctx, input)),
+    caLogin: publicProcedure.input(caLoginSchema).mutation(({ ctx, input }) => signInCa(ctx, input)),
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
       return { success: true } as const;
@@ -125,6 +152,20 @@ export const appRouter = router({
     integrationReadiness: adminProcedure.query(() => getIntegrationReadiness()),
     integrationSettings: adminProcedure.query(() => listIntegrationSettings()),
     updateIntegrationSettings: adminProcedure.input(integrationSettingsSchema).mutation(({ ctx, input }) => saveIntegrationSettings(ctx.user.id, input)),
+    // CA Management (Admin only)
+    listCas: adminProcedure.query(() => listAllCas()),
+    grantCaAccess: adminProcedure.input(grantCaAccessSchema).mutation(({ ctx, input }) => grantCaAccess(ctx.user.id, input)),
+    updateCaStatus: adminProcedure.input(updateCaStatusSchema).mutation(({ ctx, input }) => updateCaStatus(ctx.user.id, input)),
+    resetCaPassword: adminProcedure.input(resetCaPasswordSchema).mutation(({ ctx, input }) => resetCaPassword(ctx.user.id, input)),
+    assignCaToBusiness: adminProcedure.input(caAssignmentSchema).mutation(({ ctx, input }) => assignCaToBusiness(ctx.user.id, input)),
+    unassignCaFromBusiness: adminProcedure.input(z.object({ caUserId: z.number().int().positive(), businessId: z.number().int().positive() })).mutation(({ ctx, input }) => unassignCaFromBusiness(ctx.user.id, input.caUserId, input.businessId)),
+  }),
+  ca: router({
+    dashboard: caProcedure.query(({ ctx }) => getCaDashboardStats(ctx.user.id)),
+    profile: caProcedure.query(({ ctx }) => getCaProfileForUser(ctx.user.id)),
+    workspaces: caProcedure.query(({ ctx }) => getAssignedWorkspacesForCa(ctx.user.id)),
+    reviewQueue: caProcedure.query(({ ctx }) => listCaReviewQueue(ctx.user.id)),
+    submitDecision: caProcedure.input(caDecisionSchema).mutation(({ ctx, input }) => submitCaDecision(ctx.user.id, input)),
   }),
   invitations: router({
     accept: protectedProcedure.input(z.object({ token: z.string().min(20).max(256) })).mutation(({ ctx, input }) => acceptBusinessInvitation(ctx.user, input.token)),
@@ -132,3 +173,4 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+

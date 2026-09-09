@@ -239,7 +239,11 @@ export default function Home() {
     <footer className="border-t border-[#dcd3c2] bg-[#f7f3e9] py-8">
       <div className="container flex flex-col gap-4 text-xs text-[#627269] sm:flex-row sm:items-center sm:justify-between">
         <PravaMark className="text-[#153832]" />
-        <p>© 2026 Prava. Global finance operations, built with care.</p>
+        <div className="flex items-center gap-4">
+          <p>© 2026 Prava. Global finance operations, built with care.</p>
+          <a href="/ca/login" className="font-semibold text-[#153832] underline hover:text-[#0b221e]">CA Portal</a>
+          <a href="/admin/login" className="font-semibold text-[#153832] underline hover:text-[#0b221e]">Admin</a>
+        </div>
         <p>Tax and compliance guidance is informational; professional review may be required.</p>
       </div>
     </footer>

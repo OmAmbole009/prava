@@ -24,7 +24,23 @@ import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
 import { countryOptions, profileForCountry, type CountryCode } from "@shared/locale";
-import { Building2, ClipboardCheck, CreditCard, Globe, KeyRound, LayoutDashboard, LogOut, PanelLeft, ReceiptText, ShieldCheck } from "lucide-react";
+import {
+  Building2,
+  ClipboardCheck,
+  CreditCard,
+  FileText,
+  Globe,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  PanelLeft,
+  Receipt,
+  ReceiptText,
+  ShieldCheck,
+  Sparkles,
+  UserCheck,
+  WalletCards,
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -92,10 +108,15 @@ function CountryCurrencySwitcher() {
 }
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
-  { icon: ClipboardCheck, label: "Action center", path: "/tasks" },
+  { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
+  { icon: Sparkles, label: "Ask Prava", path: "/assistant" },
+  { icon: WalletCards, label: "Money", path: "/money" },
+  { icon: FileText, label: "Documents", path: "/documents" },
+  { icon: ClipboardCheck, label: "Tasks", path: "/tasks" },
+  { icon: Receipt, label: "Tax", path: "/tax" },
+  { icon: UserCheck, label: "CA Review", path: "/ca-review" },
+  { icon: Building2, label: "Business Profile", path: "/onboarding" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
-  { icon: Building2, label: "Business profile", path: "/onboarding" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -171,7 +192,7 @@ export default function DashboardLayout({
 
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
-  user: { name?: string | null; email?: string | null; role?: "user" | "admin" };
+  user: { name?: string | null; email?: string | null; role?: string | null };
   logout: () => Promise<void>;
   setSidebarWidth: (width: number) => void;
 };
@@ -256,26 +277,91 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
+              {user?.role === "ca" ? (
+                <>
+                  <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      aria-current={isActive ? "page" : undefined}
-                      className={`h-10 transition-all font-normal`}
+                      isActive={location === "/ca/dashboard"}
+                      onClick={() => setLocation("/ca/dashboard")}
+                      tooltip="CA Review Desk"
+                      aria-current={location === "/ca/dashboard" ? "page" : undefined}
+                      className="h-10 transition-all font-normal"
                     >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
-                      <span>{item.label}</span>
+                      <UserCheck className={`h-4 w-4 ${location === "/ca/dashboard" ? "text-primary" : ""}`} />
+                      <span>CA Review Desk</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                );
-              })}
-              {user?.role === "admin" ? <><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/billing"} onClick={() => setLocation("/admin/billing")} tooltip="Administration" aria-current={location === "/admin/billing" ? "page" : undefined} className="h-10 transition-all font-normal"><ShieldCheck className={`h-4 w-4 ${location === "/admin/billing" ? "text-primary" : ""}`} /><span>Administration</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/gst"} onClick={() => setLocation("/admin/gst")} tooltip="GST submissions" aria-current={location === "/admin/gst" ? "page" : undefined} className="h-10 transition-all font-normal"><ReceiptText className={`h-4 w-4 ${location === "/admin/gst" ? "text-primary" : ""}`} /><span>GST submissions</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/security"} onClick={() => setLocation("/admin/security")} tooltip="Access & audit" aria-current={location === "/admin/security" ? "page" : undefined} className="h-10 transition-all font-normal"><ShieldCheck className={`h-4 w-4 ${location === "/admin/security" ? "text-primary" : ""}`} /><span>Access & audit</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/integrations"} onClick={() => setLocation("/admin/integrations")} tooltip="Integration readiness" aria-current={location === "/admin/integrations" ? "page" : undefined} className="h-10 transition-all font-normal"><KeyRound className={`h-4 w-4 ${location === "/admin/integrations" ? "text-primary" : ""}`} /><span>Integration readiness</span></SidebarMenuButton></SidebarMenuItem></> : null}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location === "/tax"}
+                      onClick={() => setLocation("/tax")}
+                      tooltip="Tax & Statutory Filings"
+                      aria-current={location === "/tax" ? "page" : undefined}
+                      className="h-10 transition-all font-normal"
+                    >
+                      <Receipt className={`h-4 w-4 ${location === "/tax" ? "text-primary" : ""}`} />
+                      <span>Tax & Filings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location === "/documents"}
+                      onClick={() => setLocation("/documents")}
+                      tooltip="Client Documents"
+                      aria-current={location === "/documents" ? "page" : undefined}
+                      className="h-10 transition-all font-normal"
+                    >
+                      <FileText className={`h-4 w-4 ${location === "/documents" ? "text-primary" : ""}`} />
+                      <span>Documents</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location === "/tasks"}
+                      onClick={() => setLocation("/tasks")}
+                      tooltip="Tasks Checklist"
+                      aria-current={location === "/tasks" ? "page" : undefined}
+                      className="h-10 transition-all font-normal"
+                    >
+                      <ClipboardCheck className={`h-4 w-4 ${location === "/tasks" ? "text-primary" : ""}`} />
+                      <span>Tasks</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location === "/assistant"}
+                      onClick={() => setLocation("/assistant")}
+                      tooltip="Ask Prava"
+                      aria-current={location === "/assistant" ? "page" : undefined}
+                      className="h-10 transition-all font-normal"
+                    >
+                      <Sparkles className={`h-4 w-4 ${location === "/assistant" ? "text-primary" : ""}`} />
+                      <span>Ask Prava</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              ) : (
+                menuItems.map(item => {
+                  const isActive = location === item.path;
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        onClick={() => setLocation(item.path)}
+                        tooltip={item.label}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`h-10 transition-all font-normal`}
+                      >
+                        <item.icon
+                          className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                        />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })
+              )}
+              {user?.role === "admin" ? <><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/cas"} onClick={() => setLocation("/admin/cas")} tooltip="CA Management" aria-current={location === "/admin/cas" ? "page" : undefined} className="h-10 transition-all font-normal"><UserCheck className={`h-4 w-4 ${location === "/admin/cas" ? "text-primary" : ""}`} /><span>CA Management</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/billing"} onClick={() => setLocation("/admin/billing")} tooltip="Administration" aria-current={location === "/admin/billing" ? "page" : undefined} className="h-10 transition-all font-normal"><ShieldCheck className={`h-4 w-4 ${location === "/admin/billing" ? "text-primary" : ""}`} /><span>Administration</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/gst"} onClick={() => setLocation("/admin/gst")} tooltip="GST submissions" aria-current={location === "/admin/gst" ? "page" : undefined} className="h-10 transition-all font-normal"><ReceiptText className={`h-4 w-4 ${location === "/admin/gst" ? "text-primary" : ""}`} /><span>GST submissions</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/security"} onClick={() => setLocation("/admin/security")} tooltip="Access & audit" aria-current={location === "/admin/security" ? "page" : undefined} className="h-10 transition-all font-normal"><ShieldCheck className={`h-4 w-4 ${location === "/admin/security" ? "text-primary" : ""}`} /><span>Access & audit</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton isActive={location === "/admin/integrations"} onClick={() => setLocation("/admin/integrations")} tooltip="Integration readiness" aria-current={location === "/admin/integrations" ? "page" : undefined} className="h-10 transition-all font-normal"><KeyRound className={`h-4 w-4 ${location === "/admin/integrations" ? "text-primary" : ""}`} /><span>Integration readiness</span></SidebarMenuButton></SidebarMenuItem></> : null}
             </SidebarMenu>
           </SidebarContent>
 
@@ -296,7 +382,7 @@ function DashboardLayoutContent({
                     <p className="text-xs text-muted-foreground truncate mt-1.5">
                       {user?.email || "-"}
                     </p>
-                    {user?.role === "admin" ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#cfe4ad]">Administrator</p> : null}
+                    {user?.role === "admin" ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#cfe4ad]">Administrator</p> : user?.role === "ca" ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#cfe4ad]">Chartered Accountant</p> : null}
                   </div>
                 </button>
               </DropdownMenuTrigger>

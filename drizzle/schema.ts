@@ -16,7 +16,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "ca"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -576,6 +576,80 @@ export const auditEvents = mysqlTable(
   table => [index("audit_events_business_created_idx").on(table.businessId, table.createdAt)]
 );
 
+export const caProfiles = mysqlTable(
+  "caProfiles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    fullName: varchar("fullName", { length: 160 }).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    phone: varchar("phone", { length: 32 }),
+    membershipNumber: varchar("membershipNumber", { length: 64 }).notNull(),
+    firmName: varchar("firmName", { length: 160 }),
+    specialization: varchar("specialization", { length: 200 }).default("GST, Tax & Audit").notNull(),
+    status: mysqlEnum("status", ["active", "suspended", "revoked"]).default("active").notNull(),
+    bio: text("bio"),
+    createdByAdminId: int("createdByAdminId").notNull().references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("ca_profiles_user_unique").on(table.userId),
+    uniqueIndex("ca_profiles_email_unique").on(table.email),
+    uniqueIndex("ca_profiles_membership_unique").on(table.membershipNumber),
+  ]
+);
+
+export const caCredentials = mysqlTable(
+  "caCredentials",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    passwordHash: varchar("passwordHash", { length: 128 }).notNull(),
+    passwordSalt: varchar("passwordSalt", { length: 64 }).notNull(),
+    setByAdminId: int("setByAdminId").notNull().references(() => users.id),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("ca_credentials_user_unique").on(table.userId)]
+);
+
+export const caAssignments = mysqlTable(
+  "caAssignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caUserId: int("caUserId").notNull().references(() => users.id),
+    businessId: int("businessId").notNull().references(() => businesses.id),
+    status: mysqlEnum("status", ["active", "unassigned"]).default("active").notNull(),
+    notes: text("notes"),
+    assignedByAdminId: int("assignedByAdminId").notNull().references(() => users.id),
+    assignedAt: timestamp("assignedAt").defaultNow().notNull(),
+  },
+  table => [
+    index("ca_assignments_ca_idx").on(table.caUserId),
+    index("ca_assignments_business_idx").on(table.businessId),
+  ]
+);
+
+export const caAuditObservations = mysqlTable(
+  "caAuditObservations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    businessId: int("businessId").notNull().references(() => businesses.id),
+    taskId: int("taskId").notNull().references(() => operationalTasks.id),
+    caUserId: int("caUserId").notNull().references(() => users.id),
+    decision: mysqlEnum("decision", ["approved", "needs_revision", "rejected"]).notNull(),
+    observationTitle: varchar("observationTitle", { length: 200 }).notNull(),
+    detailedNotes: text("detailedNotes").notNull(),
+    certificateReference: varchar("certificateReference", { length: 128 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("ca_audit_obs_task_idx").on(table.taskId),
+    index("ca_audit_obs_business_idx").on(table.businessId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Business = typeof businesses.$inferSelect;
@@ -586,3 +660,8 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type OperationalTask = typeof operationalTasks.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type GsPreparation = typeof gstPreparations.$inferSelect;
+export type CaProfile = typeof caProfiles.$inferSelect;
+export type InsertCaProfile = typeof caProfiles.$inferInsert;
+export type CaAssignment = typeof caAssignments.$inferSelect;
+export type CaAuditObservation = typeof caAuditObservations.$inferSelect;
+

@@ -7,6 +7,11 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AskPrava = lazy(() => import("@/pages/AskPrava"));
+const Money = lazy(() => import("@/pages/Money"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Tax = lazy(() => import("@/pages/Tax"));
+const CaReview = lazy(() => import("@/pages/CaReview"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
 const TaskDetail = lazy(() => import("@/pages/TaskDetail"));
@@ -17,6 +22,9 @@ const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 const AdminSecurity = lazy(() => import("@/pages/AdminSecurity"));
 const AdminGstSubmissions = lazy(() => import("@/pages/AdminGstSubmissions"));
 const AdminIntegrations = lazy(() => import("@/pages/AdminIntegrations"));
+const AdminCaManagement = lazy(() => import("@/pages/AdminCaManagement"));
+const CaLogin = lazy(() => import("@/pages/CaLogin"));
+const CaDashboard = lazy(() => import("@/pages/CaDashboard"));
 const InvitationAcceptance = lazy(() => import("@/pages/InvitationAcceptance"));
 
 function DeferredPage({ component: Component }: { component: React.ComponentType }) {
@@ -30,15 +38,23 @@ export default function WorkspaceApp() {
         <TooltipProvider>
           <Toaster />
           <Switch>
+            <Route path="/ca/login">{() => <DeferredPage component={CaLogin} />}</Route>
+            <Route path="/ca/dashboard">{() => <DeferredPage component={CaDashboard} />}</Route>
             <Route path="/admin/login">{() => <DeferredPage component={AdminLogin} />}</Route>
             <Route path="/admin/security">{() => <DeferredPage component={AdminSecurity} />}</Route>
+            <Route path="/admin/cas">{() => <DeferredPage component={AdminCaManagement} />}</Route>
             <Route path="/admin/gst">{() => <DeferredPage component={AdminGstSubmissions} />}</Route>
             <Route path="/admin/integrations">{() => <DeferredPage component={AdminIntegrations} />}</Route>
             <Route path="/invite/:token">{() => <DeferredPage component={InvitationAcceptance} />}</Route>
             <Route path="/onboarding">{() => <DeferredPage component={Onboarding} />}</Route>
             <Route path="/dashboard">{() => <DeferredPage component={Dashboard} />}</Route>
-            <Route path="/tasks/:taskId">{() => <DeferredPage component={TaskDetail} />}</Route>
+            <Route path="/assistant">{() => <DeferredPage component={AskPrava} />}</Route>
+            <Route path="/money">{() => <DeferredPage component={Money} />}</Route>
             <Route path="/documents/:documentId">{() => <DeferredPage component={DocumentReview} />}</Route>
+            <Route path="/documents">{() => <DeferredPage component={Documents} />}</Route>
+            <Route path="/tax">{() => <DeferredPage component={Tax} />}</Route>
+            <Route path="/ca-review">{() => <DeferredPage component={CaReview} />}</Route>
+            <Route path="/tasks/:taskId">{() => <DeferredPage component={TaskDetail} />}</Route>
             <Route path="/tasks">{() => <DeferredPage component={Tasks} />}</Route>
             <Route path="/billing">{() => <DeferredPage component={Billing} />}</Route>
             <Route path="/admin/billing">{() => <DeferredPage component={AdminBilling} />}</Route>

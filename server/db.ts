@@ -13,13 +13,32 @@ import type { BusinessInput } from "./workspace";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-const inMemoryBusinesses = [
+type InMemoryBusiness = {
+  id: number;
+  name: string;
+  businessType: string;
+  industry: string;
+  gstStatus: "registered" | "not_registered" | "pending";
+  gstin: string;
+  country: string;
+  taxSystem: string;
+  financialYear: string;
+  currency: string;
+  locale: string;
+  timezone: string;
+  onboardingStep: number;
+  onboardingCompletedAt: Date | null;
+  membershipRole: "owner" | "admin" | "member" | "viewer";
+  updatedAt: Date;
+};
+
+const inMemoryBusinesses: InMemoryBusiness[] = [
   {
     id: 1,
     name: "Acme Global Solutions",
     businessType: "Corporation",
     industry: "Technology & Services",
-    gstStatus: "registered" as const,
+    gstStatus: "registered",
     gstin: "US-TAX-98765",
     country: "US",
     taxSystem: "Sales Tax",
@@ -75,7 +94,7 @@ export async function getUserByOpenId(openId: string) {
       name: "Demo Business Owner",
       email: "owner@acme-global.com",
       loginMethod: "local_demo",
-      role: "admin",
+      role: "admin" as const,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
@@ -94,7 +113,7 @@ export async function getUserByEmail(email: string) {
       name: "Demo Business Owner",
       email: email.trim().toLowerCase(),
       loginMethod: "local_demo",
-      role: "admin",
+      role: "admin" as const,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
@@ -162,7 +181,7 @@ export async function getBusinessForUser(businessId: number, userId: number) {
 export async function createBusinessWithOwner(userId: number, input: BusinessInput) {
   const db = await getDb();
   if (!db) {
-    const newBiz = {
+    const newBiz: InMemoryBusiness = {
       id: inMemoryBusinesses.length + 1,
       name: input.name,
       businessType: input.businessType,

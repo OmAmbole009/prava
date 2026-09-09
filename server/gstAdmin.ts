@@ -14,7 +14,15 @@ export const gstAdminSearchSchema = z.object({
 
 export const gstAdminDecisionSchema = z.object({ taskId: z.number().int().positive(), reviewerNote: z.string().trim().min(8).max(1000) });
 
-export type GstAdminRecord = Awaited<ReturnType<typeof listAdminGstSubmissions>>[number];
+export type GstAdminRecord = {
+  request: typeof gstSubmissionRequests.$inferSelect;
+  businessName: string;
+  taskTitle: string;
+  periodStart: Date | null;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  preparation: typeof gstPreparations.$inferSelect | null;
+};
 
 function contains(record: { businessName: string; taskTitle: string; requesterName: string | null; requesterEmail: string | null; request: { providerName: string | null; status: string } }, search?: string) {
   if (!search) return true;
@@ -22,7 +30,7 @@ function contains(record: { businessName: string; taskTitle: string; requesterNa
   return [record.businessName, record.taskTitle, record.requesterName ?? "", record.requesterEmail ?? "", record.request.providerName ?? "", record.request.status].some(value => value.toLowerCase().includes(term));
 }
 
-export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSearchSchema>) {
+export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSearchSchema>): Promise<GstAdminRecord[]> {
   const db = await getDb();
   if (!db) {
     const mockRows: GstAdminRecord[] = [
@@ -34,8 +42,8 @@ export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSear
           requestedByUserId: 1,
           approvedByUserId: 2,
           providerName: "Automated Compliance Gateway",
+          providerSubmissionId: "REF-2026-TAX-00981",
           status: "approved",
-          officialReference: "REF-2026-TAX-00981",
           failureCode: null,
           requesterNote: "Ready for independent administrative review.",
           reviewerNote: "All reconciliation items and invoice calculations verified.",
@@ -43,6 +51,7 @@ export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSear
           createdAt: new Date("2026-08-20T10:30:00Z"),
           updatedAt: new Date("2026-08-20T11:00:00Z"),
           approvedAt: new Date("2026-08-20T11:00:00Z"),
+          dispatchedAt: new Date("2026-08-20T11:02:00Z"),
           submittedAt: new Date("2026-08-20T11:05:00Z"),
         },
         businessName: "Acme Global Solutions",
@@ -54,6 +63,8 @@ export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSear
           id: 1,
           businessId: 1,
           taskId: 1,
+          periodStart: new Date("2026-07-01"),
+          periodEnd: new Date("2026-09-30"),
           status: "prepared",
           salesMinor: 12500000,
           taxableValueMinor: 11000000,
@@ -65,6 +76,7 @@ export async function listAdminGstSubmissions(input: z.infer<typeof gstAdminSear
           documentsRequiringReview: 0,
           officialReference: "REF-2026-TAX-00981",
           preparedAt: new Date("2026-08-20T10:00:00Z"),
+          submittedAt: new Date("2026-08-20T11:05:00Z"),
           createdAt: new Date("2026-08-20T10:00:00Z"),
           updatedAt: new Date("2026-08-20T10:00:00Z"),
         },

@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 
 export default function NotFound() {
   const [location, setLocation] = useLocation();
-  const isWorkspacePath = /^\/(onboarding|dashboard|tasks|documents|billing|admin)/.test(location);
+  const isWorkspacePath = /^\/(onboarding|dashboard|assistant|money|tax|ca-review|tasks|documents|billing|admin|invite)/.test(location);
   const destination = isWorkspacePath ? "/dashboard" : "/";
   const destinationLabel = isWorkspacePath ? "Return to dashboard" : "Return home";
 
