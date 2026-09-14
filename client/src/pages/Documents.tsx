@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { AnimatedList, AnimatedRow, AnimatedSection, FadeInView } from "@/components/AnimatedPage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -70,7 +72,7 @@ export default function Documents() {
     onSuccess: (result) => {
       toast.success(
         result.status === "extracted"
-          ? "Document extracted successfully. Verify the fields to confirm."
+          ? "Document extracted successfully. Double-entry ledger generated."
           : "Document uploaded and flagged for review."
       );
       docsQuery.refetch();
@@ -129,199 +131,196 @@ export default function Documents() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-6xl py-2 space-y-7">
+      <div className="mx-auto max-w-6xl space-y-7 py-2">
         {/* Header */}
-        <div className="flex flex-col gap-4 border-b border-[#dfd6c4] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200/80 dark:border-white/[0.06] pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="prava-kicker">Document Intelligence</span>
-            <h1 className="prava-display mt-2 text-4xl text-[#153832]">
-              Invoices, bills, receipts, and statements in one place.
+            <span className="prava-tag">Document Intelligence Vault</span>
+            <h1 className="font-['Playfair_Display',Georgia,serif] mt-2 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
+              Documents, Invoices & <em className="italic font-normal">Source Evidence</em>
             </h1>
-            <p className="mt-2 text-sm text-[#65766e]">
-              Prava extracts vendor names, tax IDs, line items, and totals. Review and approve each document to turn it into trusted business records.
+            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+              Automated OCR ingestion for PDFs, receipts, and bank statements linked directly to your active ledger.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={uploadDocType}
-              onValueChange={(val: any) => setUploadDocType(val)}
+          <div className="flex flex-wrap gap-2.5">
+            <Button
+              onClick={() => setLocation("/assistant")}
+              size="sm"
+              className="rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-md hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100"
             >
-              <SelectTrigger className="w-36 rounded-full border-[#d8ceb9] bg-[#fffdf8] text-xs font-semibold text-[#24473e]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="invoice">Sales Invoice</SelectItem>
-                <SelectItem value="credit_note">Credit Note</SelectItem>
-                <SelectItem value="debit_note">Debit Note</SelectItem>
-                <SelectItem value="bank_statement">Bank Statement</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Label
-              htmlFor="upload-doc-file"
-              className="inline-flex h-10 cursor-pointer items-center rounded-full bg-[#163a34] px-5 text-sm font-semibold text-[#f7f1e4] hover:bg-[#102b26]"
-            >
-              <FileUp className="mr-2 size-4" />
-              {upload.isPending ? "Extracting…" : "Upload Document"}
-            </Label>
-            <input
-              id="upload-doc-file"
-              type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              disabled={upload.isPending}
-              onChange={onFile}
-              className="sr-only"
-            />
+              <Sparkles className="mr-1.5 size-3.5" />
+              Ask Prava about Docs
+            </Button>
           </div>
         </div>
 
-        {/* Search & Filters */}
+        {/* Upload Station Dropzone */}
+        <div className="prava-panel p-6 border border-slate-200/80 dark:border-white/10">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Drop or Select Document for Ingestion</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Instant extraction of vendor names, tax IDs (GSTIN), invoice numbers, and line-item totals.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="doc-type" className="text-xs text-slate-700 dark:text-slate-300">Type:</Label>
+                <select
+                  id="doc-type"
+                  value={uploadDocType}
+                  onChange={(e) => setUploadDocType(e.target.value as any)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm outline-none cursor-pointer dark:border-white/10 dark:bg-[#080B0F] dark:text-white"
+                >
+                  <option value="invoice">Supplier / Sales Invoice</option>
+                  <option value="receipt">Expense Receipt</option>
+                  <option value="credit_note">Credit Note</option>
+                  <option value="bank_statement">Bank Statement</option>
+                </select>
+              </div>
+
+              <Label
+                htmlFor="file-upload"
+                className={`inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100 cursor-pointer ${
+                  upload.isPending ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                {upload.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Extracting…
+                  </>
+                ) : (
+                  <>
+                    <FileUp className="size-4" />
+                    Upload File
+                  </>
+                )}
+              </Label>
+              <input
+                id="file-upload"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                onChange={onFile}
+                disabled={upload.isPending}
+                className="hidden"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Filter Bar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-[#8b9c93]" />
-            <Input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <input
+              type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by vendor, invoice #, or file name..."
-              className="rounded-full border-[#d8ceb9] bg-[#fffdf8] pl-10 text-xs"
+              placeholder="Search by vendor, invoice number, or file name…"
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 shadow-sm outline-none focus:border-slate-400 dark:border-white/10 dark:bg-[#0D131A] dark:text-white dark:placeholder:text-slate-500"
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Select value={typeFilter} onValueChange={(val: any) => setTypeFilter(val)}>
-              <SelectTrigger className="w-36 rounded-full border-[#d8ceb9] bg-[#fffdf8] text-xs font-medium text-[#2d5044]">
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Document Types</SelectItem>
-                <SelectItem value="invoice">Invoices</SelectItem>
-                <SelectItem value="receipt">Bills & Receipts</SelectItem>
-                <SelectItem value="bank_statement">Bank Statements</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as DocType)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm outline-none cursor-pointer dark:border-white/10 dark:bg-[#0D131A] dark:text-white"
+            >
+              <option value="all">All Document Types</option>
+              <option value="invoice">Invoices</option>
+              <option value="receipt">Receipts</option>
+              <option value="bank_statement">Bank Statements</option>
+            </select>
 
-            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
-              <SelectTrigger className="w-36 rounded-full border-[#d8ceb9] bg-[#fffdf8] text-xs font-medium text-[#2d5044]">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="extracted">Extracted & Verified</SelectItem>
-                <SelectItem value="needs_review">Needs Review</SelectItem>
-                <SelectItem value="uploaded">Uploaded</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm outline-none cursor-pointer dark:border-white/10 dark:bg-[#0D131A] dark:text-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="extracted">Extracted & Linked</option>
+              <option value="needs_review">Needs Review</option>
+              <option value="uploaded">Uploaded</option>
+            </select>
           </div>
         </div>
 
-        {/* Documents Grid / Table */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
+        {/* Documents Table */}
+        <div className="prava-panel overflow-hidden">
           {docsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12 text-sm text-[#708078]">
-              <Loader2 className="mr-2 size-4 animate-spin text-[#62856f]" />
-              Loading documents…
+            <div className="flex items-center justify-center py-12 text-xs text-slate-500 dark:text-slate-400">
+              <Loader2 className="mr-2 size-4 animate-spin text-slate-700 dark:text-white" />
+              Loading documents vault…
             </div>
-          ) : filteredDocs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-[#eee8dc] text-[#557b6d]">
-                <FileSearch className="size-6" />
-              </div>
-              <p className="mt-4 text-sm font-semibold text-[#27473f]">
-                No documents match your filters.
-              </p>
-              <p className="mt-1 text-xs text-[#73827a]">
-                Upload your business invoices, bills, or bank statements to begin extraction.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
+          ) : filteredDocs.length > 0 ? (
+            <div className="divide-y divide-slate-200/80 dark:divide-white/[0.06]">
               {filteredDocs.map((row) => {
                 const doc = row.document;
                 const ext = row.extraction;
-                const isBank = doc.documentType === "bank_statement";
-
                 return (
                   <div
                     key={doc.id}
-                    className="flex flex-col gap-3 rounded-xl border border-[#ece4d6] bg-white p-4 transition hover:border-[#a9c1b3] hover:bg-[#faf7ef] sm:flex-row sm:items-center sm:justify-between"
+                    onClick={() => setLocation(`/documents/${doc.id}`)}
+                    className="flex cursor-pointer items-center justify-between p-4 transition hover:bg-slate-50 dark:hover:bg-white/[0.03] text-xs"
                   >
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e5efe1] text-[#244f3f]">
-                        {isBank ? <Landmark className="size-5" /> : <FileText className="size-5" />}
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-800 dark:bg-white/[0.05] dark:text-white">
+                        <FileText className="size-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-bold text-[#1a3d34]">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-slate-900 dark:text-white truncate max-w-sm">
                             {ext?.vendorName || doc.originalName}
                           </p>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              doc.status === "extracted"
-                                ? "bg-[#e5efe1] text-[#2c5847]"
-                                : doc.status === "needs_review"
-                                ? "bg-[#fae7d4] text-[#8e4c19]"
-                                : "bg-[#eee8dc] text-[#697972]"
-                            }`}
-                          >
-                            {doc.status === "extracted"
-                              ? "Verified"
-                              : doc.status.replaceAll("_", " ")}
-                          </span>
+                          {ext?.invoiceNumber && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-700 dark:bg-white/[0.08] dark:text-slate-300">
+                              #{ext.invoiceNumber}
+                            </span>
+                          )}
                         </div>
-
-                        <p className="mt-1 text-xs text-[#708078]">
-                          {ext?.invoiceNumber ? `Invoice #${ext.invoiceNumber} · ` : ""}
-                          {doc.originalName} · Uploaded{" "}
-                          {new Date(doc.createdAt).toLocaleDateString()}
+                        <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                          {doc.documentType.toUpperCase()} · Uploaded {new Date(doc.createdAt).toLocaleDateString()}
                         </p>
-
-                        {ext?.status === "needs_review" && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#9c591c]">
-                            <AlertCircle className="size-3.5 shrink-0" />
-                            <span>Needs your verification before financial calculations</span>
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-4 sm:justify-end">
+                    <div className="flex items-center gap-6">
                       {ext?.totalMinor !== undefined && ext?.totalMinor !== null && (
                         <div className="text-right">
-                          <p className="text-sm font-bold text-[#163a34]">
+                          <p className="prava-mono font-bold text-slate-900 dark:text-white">
                             {fmt(ext.totalMinor)}
                           </p>
-                          <p className="text-[10px] text-[#718279] uppercase font-semibold">
-                            {ext.invoiceType || "Document"}
-                          </p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">Total Amount</span>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2">
-                        {ext ? (
-                          <Button
-                            size="sm"
-                            onClick={() => setLocation(`/documents/${doc.id}`)}
-                            className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#102b26]"
-                          >
-                            <FileCheck className="mr-1.5 size-3.5" />
-                            Review & Verify
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setLocation(`/documents/${doc.id}`)}
-                            className="rounded-full text-xs font-semibold"
-                          >
-                            View Details
-                          </Button>
-                        )}
+                      <div className="text-right">
+                        <span
+                          className={`inline-block rounded-md px-2 py-0.5 font-mono text-[10px] font-bold ${
+                            doc.status === "extracted"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                          }`}
+                        >
+                          {doc.status.toUpperCase()}
+                        </span>
                       </div>
+
+                      <ExternalLink className="size-4 text-slate-400" />
                     </div>
                   </div>
                 );
               })}
+            </div>
+          ) : (
+            <div className="p-12 text-center text-xs text-slate-500 dark:text-slate-400">
+              <FileSearch className="mx-auto size-8 text-slate-400 mb-2" />
+              No documents matched the selected filters.
             </div>
           )}
         </div>

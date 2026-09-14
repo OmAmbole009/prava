@@ -1,7 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowRight,
@@ -11,6 +10,7 @@ import {
   Loader2,
   Send,
   Sparkles,
+  Terminal,
   User,
   Zap,
 } from "lucide-react";
@@ -79,8 +79,8 @@ export default function AskPrava() {
       const errorMsg: ChatMessage = {
         id: `assistant-err-${Date.now()}`,
         role: "assistant",
-        content: `I ran into an issue retrieving your business information: ${err.message}. Please try again or rephrase your question.`,
-        actions: [{ label: "Back to Dashboard", path: "/dashboard", variant: "outline" }],
+        content: `I encountered an issue querying your business ledger: ${err.message}. Please try rephrasing your question.`,
+        actions: [{ label: "Back to Command Center", path: "/dashboard", variant: "outline" }],
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -113,7 +113,6 @@ export default function AskPrava() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
 
-    // Build history
     const history = messages.slice(-6).map((m) => ({
       role: m.role,
       content: m.content,
@@ -136,186 +135,146 @@ export default function AskPrava() {
       if (!pendingQuery) {
         pendingQuery = sessionStorage.getItem("prava_pending_prompt");
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
 
-    if (pendingQuery && pendingQuery.trim()) {
-      const queryText = pendingQuery.trim();
-      if (businessId > 0 && !askMutation.isPending) {
-        initialHandledRef.current = true;
-        try {
-          sessionStorage.removeItem("prava_pending_prompt");
-          if (window.location.search) {
-            window.history.replaceState({}, "", window.location.pathname);
-          }
-        } catch {}
-        handleSend(queryText);
-      }
+    if (pendingQuery && businessId > 0) {
+      initialHandledRef.current = true;
+      try {
+        sessionStorage.removeItem("prava_pending_prompt");
+      } catch {}
+      handleSend(pendingQuery);
     }
-  }, [businessId, askMutation.isPending]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  }, [businessId]);
 
   return (
     <DashboardLayout>
-      <div className="mx-auto flex h-[calc(100vh-6.5rem)] max-w-5xl flex-col">
+      <div className="mx-auto flex h-[calc(100vh-8.5rem)] max-w-6xl flex-col gap-4 py-1">
         {/* Header */}
-        <div className="flex flex-col gap-2 border-b border-[#dfd6c4] pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-[#163a34] text-[#d9e8be]">
-                <Sparkles className="size-4" />
-              </span>
-              <h1 className="prava-display text-2xl text-[#153832]">Ask Prava</h1>
-              <span className="rounded-full bg-[#e8f1e5] px-2.5 py-0.5 text-[11px] font-semibold text-[#275344]">
-                Business Assistant
-              </span>
+        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] pb-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-white shadow-sm">
+              <Bot className="size-5" />
             </div>
-            <p className="mt-1 text-xs text-[#63746c]">
-              Ask anything about {business?.name || "your business"}’s income, expenses, unpaid invoices, GST, and what needs attention.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold text-slate-900 dark:text-white">Ask Prava AI Co-Pilot</h1>
+                <span className="prava-tag text-[9px]">Active Ledger Grounded</span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                Instant answers referencing double-entry records, invoices, and statutory tax calculations.
+              </p>
+            </div>
           </div>
-          {business && (
-            <div className="flex items-center gap-2 text-xs text-[#708078]">
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              Connected to <strong>{business.name}</strong> data
-            </div>
-          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMessages([])}
+            className="rounded-lg border-slate-200 bg-white text-xs text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:bg-white/[0.08]"
+          >
+            Clear Session
+          </Button>
         </div>
 
-        {/* Chat Stream Area */}
+        {/* Chat History Viewport */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto py-4 space-y-4 pr-1"
+          className="prava-panel flex-1 overflow-y-auto p-4 sm:p-6 border border-slate-200/80 dark:border-white/10 space-y-5"
         >
           {messages.length === 0 ? (
-            <div className="my-auto flex flex-col items-center justify-center py-12 text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-[#e5efe1] text-[#163a34] shadow-sm">
-                <Bot className="size-7" />
+            <div className="flex h-full flex-col items-center justify-center text-center p-6">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-white shadow-sm">
+                <Sparkles className="size-7" />
               </div>
-              <h2 className="prava-display mt-5 text-2xl text-[#153832]">
-                What would you like to know today?
+              <h2 className="font-['Playfair_Display',Georgia,serif] mt-4 text-2xl sm:text-3xl font-normal tracking-tight text-slate-900 dark:text-white">
+                What would you like to know about <em className="italic font-normal">{business?.name || "your business"}</em>?
               </h2>
-              <p className="mt-2 max-w-md text-sm text-[#677870]">
-                I can check your real invoices, calculate your income & expenses, check what is due, or help prepare your GST.
+              <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400 max-w-md">
+                Ask about revenue movements, overdue customer invoices, input tax credit eligibility, or upcoming CA filing reviews.
               </p>
 
-              {suggested.data && suggested.data.length > 0 && (
-                <div className="mt-8 w-full max-w-2xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6d8477]">
-                    Suggested questions
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {suggested.data.map((q, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSend(q)}
-                        disabled={askMutation.isPending}
-                        className="flex items-start gap-2.5 rounded-xl border border-[#dfd6c4] bg-[#fffdf8] p-3.5 text-left text-xs font-medium text-[#24473e] transition hover:border-[#62856f] hover:bg-[#f6f3ea] hover:shadow-sm"
-                      >
-                        <Zap className="mt-0.5 size-3.5 shrink-0 text-[#b77a43]" />
-                        <span>{q}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Suggested Prompts Pill Grid */}
+              <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-2xl">
+                {(suggested.data?.length
+                  ? suggested.data
+                  : [
+                      "How much did we earn this month?",
+                      "Are any supplier bills due this week?",
+                      "What is our estimated GST liability?",
+                      "Summarize my recent expenses by category",
+                    ]
+                ).map((promptText, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSend(promptText)}
+                    className="rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                  >
+                    {promptText} →
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3.5 ${
+                className={`flex gap-3 text-xs ${
                   msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 {msg.role === "assistant" && (
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#163a34] text-[#d9e8be] shadow-sm mt-0.5">
-                    <Sparkles className="size-4" />
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-black">
+                    <Bot className="size-4" />
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 shadow-sm sm:max-w-[75%] ${
+                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 ${
                     msg.role === "user"
-                      ? "bg-[#163a34] text-[#f7f1e4]"
-                      : "border border-[#dfd6c4] bg-[#fffdf8] text-[#1c3831]"
+                      ? "rounded-tr-none bg-slate-900 text-white dark:bg-white/[0.12] dark:border dark:border-white/20 dark:text-white shadow-sm"
+                      : "rounded-tl-none border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-white/[0.08] dark:bg-[#0A0F16] dark:text-[#E2E8F0]"
                   }`}
                 >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none text-[#24453c] leading-relaxed">
-                      <Streamdown>{msg.content}</Streamdown>
-                    </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                      {msg.content}
-                    </p>
-                  )}
+                  <div className="leading-relaxed prose-sm dark:prose-invert">
+                    <Streamdown>{msg.content}</Streamdown>
+                  </div>
 
-                  {/* Context Data Snapshot Pills */}
-                  {msg.dataSnapshot && (
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-[#ece4d6] pt-3">
-                      {msg.dataSnapshot.revenue && (
-                        <span className="rounded-lg bg-[#f0f5ee] px-2.5 py-1 text-[11px] font-semibold text-[#275344]">
-                          Revenue: {msg.dataSnapshot.revenue}
-                        </span>
-                      )}
-                      {msg.dataSnapshot.expenses && (
-                        <span className="rounded-lg bg-[#fdf3ec] px-2.5 py-1 text-[11px] font-semibold text-[#8b4d24]">
-                          Expenses: {msg.dataSnapshot.expenses}
-                        </span>
-                      )}
-                      {msg.dataSnapshot.cash && (
-                        <span className="rounded-lg bg-[#eaf4fc] px-2.5 py-1 text-[11px] font-semibold text-[#1f5682]">
-                          Cash: {msg.dataSnapshot.cash}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Sources reference */}
+                  {/* Sources Grounding Bar */}
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#708078]">
-                      <span className="font-medium">Sources:</span>
-                      {msg.sources.map((s, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            if (s.documentId) setLocation(`/documents/${s.documentId}`);
-                            else if (s.taskId) setLocation(`/tasks/${s.taskId}`);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md bg-[#efeae0] px-2 py-0.5 text-[11px] font-medium text-[#2d5045] hover:underline"
-                        >
-                          <FileText className="size-3" />
-                          {s.title}
-                        </button>
-                      ))}
+                    <div className="mt-3 border-t border-slate-200 dark:border-white/[0.06] pt-2 text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="font-mono uppercase text-slate-700 dark:text-slate-300 font-semibold">Verified Sources: </span>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {msg.sources.map((s, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() =>
+                              s.documentId
+                                ? setLocation(`/documents/${s.documentId}`)
+                                : s.taskId
+                                ? setLocation(`/tasks/${s.taskId}`)
+                                : null
+                            }
+                            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 font-mono text-[10px] text-sky-600 dark:bg-white/[0.06] dark:text-sky-400 hover:opacity-80"
+                          >
+                            <FileText className="size-3" />
+                            {s.title}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Contextual Action Buttons */}
+                  {/* Action Buttons if Present */}
                   {msg.actions && msg.actions.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-[#ece4d6] pt-3">
+                    <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-200 dark:border-white/[0.06]">
                       {msg.actions.map((act, idx) => (
                         <Button
                           key={idx}
                           size="sm"
-                          variant={act.variant || "default"}
                           onClick={() => setLocation(act.path)}
-                          className={`rounded-full text-xs font-semibold ${
-                            act.variant === "outline"
-                              ? "border-[#cbd6cb] text-[#24473e] hover:bg-[#ede9de]"
-                              : "bg-[#163a34] text-[#f7f1e4] hover:bg-[#102b26]"
-                          }`}
+                          className="rounded-lg bg-slate-900 text-[11px] font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100 shadow-sm"
                         >
-                          {act.label}
-                          <ArrowRight className="ml-1.5 size-3.5" />
+                          {act.label} →
                         </Button>
                       ))}
                     </div>
@@ -323,7 +282,7 @@ export default function AskPrava() {
                 </div>
 
                 {msg.role === "user" && (
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#486b5e] text-[#f7f1e4] shadow-sm mt-0.5">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-800 dark:bg-white/10 dark:text-white">
                     <User className="size-4" />
                   </div>
                 )}
@@ -332,48 +291,44 @@ export default function AskPrava() {
           )}
 
           {askMutation.isPending && (
-            <div className="flex items-start gap-3.5">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#163a34] text-[#d9e8be] shadow-sm">
-                <Sparkles className="size-4 animate-spin" />
+            <div className="flex gap-3 text-xs justify-start">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-black">
+                <Bot className="size-4" />
               </div>
-              <div className="flex items-center gap-2 rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] px-4 py-3 text-xs font-medium text-[#65766e]">
-                <Loader2 className="size-3.5 animate-spin text-[#62856f]" />
-                Checking business records & generating answer…
+              <div className="rounded-2xl rounded-tl-none border border-slate-200 bg-white p-4 text-xs text-slate-600 dark:border-white/[0.08] dark:bg-[#0A0F16] dark:text-slate-400 flex items-center gap-2 shadow-sm">
+                <Loader2 className="size-4 animate-spin text-slate-700 dark:text-white" />
+                <span>Consulting double-entry ledger & invoice extractions…</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Input Bar */}
-        <div className="border-t border-[#dfd6c4] pt-3 bg-background">
+        <div className="shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
             }}
-            className="flex items-end gap-2 rounded-2xl border border-[#cfc4b1] bg-[#fffdf8] p-2 shadow-sm focus-within:border-[#62856f] focus-within:ring-2 focus-within:ring-[#62856f]/20"
+            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-300/40 dark:border-white/10 dark:bg-[#0A0F16] dark:focus-within:border-white/30"
           >
-            <Textarea
-              ref={textareaRef}
+            <input
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything (e.g. 'How much did I earn this month?', 'Do I have any unpaid invoices?')"
-              rows={1}
-              className="min-h-10 flex-1 resize-none border-0 bg-transparent px-3 py-2 text-sm text-[#183a33] placeholder:text-[#88978f] focus-visible:ring-0"
+              placeholder="Ask Prava anything about your revenues, tax liabilities, or invoices…"
+              className="flex-1 bg-transparent px-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none dark:text-white dark:placeholder:text-slate-500"
             />
             <Button
               type="submit"
-              size="icon"
               disabled={!input.trim() || askMutation.isPending}
-              className="size-10 shrink-0 rounded-xl bg-[#163a34] text-[#f7f1e4] hover:bg-[#102b26] disabled:opacity-40"
+              size="sm"
+              className="rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white shadow-md hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100"
             >
-              <Send className="size-4" />
+              <Send className="mr-1.5 size-3.5" />
+              Send
             </Button>
           </form>
-          <p className="mt-2 text-center text-[11px] text-[#7a8c83]">
-            Prava uses live workspace data and deterministic logic. High-impact tax or filing actions require your explicit authorization.
-          </p>
         </div>
       </div>
     </DashboardLayout>

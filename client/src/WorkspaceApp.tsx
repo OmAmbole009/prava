@@ -1,3 +1,4 @@
+import CursorTube from "@/components/CursorTube";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -28,14 +29,36 @@ const CaDashboard = lazy(() => import("@/pages/CaDashboard"));
 const InvitationAcceptance = lazy(() => import("@/pages/InvitationAcceptance"));
 
 function DeferredPage({ component: Component }: { component: React.ComponentType }) {
-  return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-[#f7f3e9] px-6 text-center text-[#627269]"><div className="w-full max-w-sm"><div className="mx-auto grid size-11 place-items-center rounded-2xl bg-[#dce8d5] text-[#153832]"><span className="size-4 animate-pulse rounded-full bg-[#72986d]" /></div><p className="mt-4 text-sm font-semibold text-[#24443d]">Opening your workspace</p><p className="mt-1 text-xs leading-5 text-[#65766e]">Loading only the financial tools needed for this view.</p><div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#e5ded0]"><div className="h-full w-2/3 animate-pulse rounded-full bg-[#72986d]" /></div></div></div>}><Component /></Suspense>;
+  return (
+    <Suspense
+      fallback={
+        <div className="grid min-h-screen place-items-center bg-[#07080a] px-6 text-center text-slate-400">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl shadow-2xl">
+            <div className="mx-auto grid size-12 place-items-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+              <span className="size-4 animate-pulse rounded-full bg-white" />
+            </div>
+            <p className="mt-4 font-serif text-lg font-bold text-white">Opening Workspace</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              Initializing telemetry, secure ledgers, and verified compliance tools.
+            </p>
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-white/60 shadow-[0_0_10px_rgba(255,255,255,0.4)]" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <Component />
+    </Suspense>
+  );
 }
 
 export default function WorkspaceApp() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light" switchable={true}>
+      <ThemeProvider defaultTheme="dark" switchable={true}>
         <TooltipProvider>
+          <CursorTube />
           <Toaster />
           <Switch>
             <Route path="/ca/login">{() => <DeferredPage component={CaLogin} />}</Route>

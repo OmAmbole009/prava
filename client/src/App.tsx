@@ -1,3 +1,4 @@
+import CursorTube from "@/components/CursorTube";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -8,6 +9,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable={true}>
+        <CursorTube />
         <Switch>
           <Route path="/" component={Home} />
           <Route component={NotFound} />
@@ -16,3 +18,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+

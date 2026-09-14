@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { AnimatedGrid, AnimatedItem, AnimatedList, AnimatedRow, AnimatedSection, FadeInView } from "@/components/AnimatedPage";
+import { TiltCard } from "@/components/TiltCard";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatMinorAmount } from "@shared/locale";
@@ -23,6 +25,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useState } from "react";
 import { useLocation } from "wouter";
 
@@ -49,15 +52,12 @@ export default function Money() {
   const fmt = (minor: number) => formatMinorAmount(minor, currency, locale);
 
   const summaryData = summary.data;
-
   const revenue = summaryData?.revenueMinor ?? 0;
   const expenses = summaryData?.expensesMinor ?? 0;
   const cash = summaryData?.cashMinor ?? 0;
   const receivables = summaryData?.receivablesMinor ?? 0;
   const payables = summaryData?.payablesMinor ?? 0;
   const taxPosition = summaryData?.gstPositionMinor ?? 0;
-
-  // Derive net profit
   const netIncome = revenue - expenses;
 
   // Filter purchase bills vs sales invoices
@@ -71,338 +71,199 @@ export default function Money() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-6xl py-2 space-y-7">
+      <div className="relative mx-auto max-w-6xl space-y-7 py-2">
+        {/* Decorative orbs */}
+        <div className="pointer-events-none absolute -right-32 -top-20 size-80 rounded-full bg-emerald-400/5 blur-3xl float-glow" />
+        <div className="pointer-events-none absolute -left-20 top-40 size-60 rounded-full bg-sky-400/5 blur-3xl float-glow-slow" />
         {/* Header */}
-        <div className="flex flex-col gap-4 border-b border-[#dfd6c4] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <AnimatedSection className="flex flex-col gap-4 border-b border-slate-200/80 dark:border-white/[0.06] pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="prava-kicker">Money & Finances</span>
-            <h1 className="prava-display mt-2 text-4xl text-[#153832]">
-              Track what came in, what went out, and what’s next.
+            <span className="prava-tag">Financial Intelligence &amp; Ledger</span>
+            <h1 className="font-['Playfair_Display',Georgia,serif] mt-2 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
+              Money, Cashflow &amp; <em className="italic font-normal">Double-Entry Ledger</em>
             </h1>
-            <p className="mt-2 text-sm text-[#65766e]">
-              Plain-language overview of {business?.name || "your business"}’s cashflow, unpaid invoices, and tax reserves.
+            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+              Verified financial signals for {business?.name || "your business"} — cash liquidity, open receivables, and statutory reserves.
             </p>
           </div>
+
           <div className="flex flex-wrap gap-2.5">
             <Button
               onClick={() => setLocation("/assistant")}
-              className="rounded-full bg-[#163a34] text-[#f7f1e4] hover:bg-[#102b26]"
+              size="sm"
+              className="rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-md hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100 btn-magnetic"
             >
-              <Sparkles className="mr-2 size-4 text-[#d9e8be]" />
+              <Sparkles className="mr-1.5 size-3.5" />
               Ask Prava about Money
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setLocation("/documents")}
-              className="rounded-full border-[#cfc4b1] text-[#24473e] hover:bg-[#eee8dc]"
+              className="rounded-xl border-slate-300 bg-white/80 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08] btn-magnetic"
             >
-              <Plus className="mr-2 size-4" />
+              <Plus className="mr-1.5 size-3.5 text-sky-500 dark:text-sky-400" />
               Upload Invoice or Bill
             </Button>
           </div>
-        </div>
+        </AnimatedSection>
 
-        {/* 1. Top Key Figures */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Revenue */}
-          <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6a887c]">
-                Money In (Revenue)
-              </span>
-              <span className="flex size-8 items-center justify-center rounded-xl bg-[#e5efe1] text-[#2c5847]">
-                <TrendingUp className="size-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-3xl font-bold text-[#163a34]">{fmt(revenue)}</p>
-            <p className="mt-2 text-xs text-[#718279]">
-              Verified total from sales invoices and customer receipts.
-            </p>
-          </div>
-
-          {/* Expenses */}
-          <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6146]">
-                Money Out (Expenses)
-              </span>
-              <span className="flex size-8 items-center justify-center rounded-xl bg-[#fbeef4] text-[#8f402c]">
-                <TrendingDown className="size-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-3xl font-bold text-[#163a34]">{fmt(expenses)}</p>
-            <p className="mt-2 text-xs text-[#718279]">
-              Verified total from supplier bills, utilities, and vendor payouts.
-            </p>
-          </div>
-
-          {/* Available Cash */}
-          <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#4f7182]">
-                Available Cash in Bank
-              </span>
-              <span className="flex size-8 items-center justify-center rounded-xl bg-[#e7f1f9] text-[#265377]">
-                <Landmark className="size-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-3xl font-bold text-[#163a34]">{fmt(cash)}</p>
-            <p className="mt-2 text-xs text-[#718279]">
-              Current operating liquidity from reconciled bank statements.
-            </p>
-          </div>
-        </div>
-
-        {/* 2. Secondary Health Metrics */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          {/* Receivables */}
-          <div className="rounded-2xl border border-[#e5decb] bg-[#faf6ec] p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8076]">
-                Money Owed to You
-              </p>
-              <ArrowDownLeft className="size-4 text-[#2d5c4b]" />
-            </div>
-            <p className="mt-3 text-xl font-bold text-[#1e463a]">{fmt(receivables)}</p>
-            <p className="mt-1 text-xs text-[#75847c]">Unpaid invoices issued to customers</p>
-          </div>
-
-          {/* Payables */}
-          <div className="rounded-2xl border border-[#e5decb] bg-[#faf6ec] p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8076]">
-                Money You Owe
-              </p>
-              <ArrowUpRight className="size-4 text-[#9b512c]" />
-            </div>
-            <p className="mt-3 text-xl font-bold text-[#1e463a]">{fmt(payables)}</p>
-            <p className="mt-1 text-xs text-[#75847c]">Pending bills from suppliers & vendors</p>
-          </div>
-
-          {/* Tax Position */}
-          <div className="rounded-2xl border border-[#e5decb] bg-[#faf6ec] p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8076]">
-                Tax to Keep Aside ({business?.taxSystem || "GST"})
-              </p>
-              <Receipt className="size-4 text-[#916b34]" />
-            </div>
-            <p className="mt-3 text-xl font-bold text-[#1e463a]">{fmt(taxPosition)}</p>
-            <p className="mt-1 text-xs text-[#75847c]">Estimated net liability before deductions</p>
-          </div>
-        </div>
-
-        {/* 3. Invoices & Bills Explorer */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Customer Invoices */}
-          <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-[#163a34]">Customer Invoices</h2>
-                <p className="text-xs text-[#72827a]">Invoices billed to clients</p>
+        {/* 1. Top Key Financial Figures */}
+        <AnimatedGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AnimatedItem>
+            <TiltCard className="prava-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Money In (Revenue)
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="size-3.5" />
+                </span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setLocation("/documents")}
-                className="text-xs text-[#2a5546]"
-              >
-                View all ({salesInvoices.length})
-                <ChevronRight className="ml-1 size-3.5" />
-              </Button>
+              <p className="prava-mono mt-3 text-2xl font-bold text-slate-900 dark:text-white">{fmt(revenue)}</p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Verified sales invoices &amp; receipts</p>
+            </TiltCard>
+          </AnimatedItem>
+
+          <AnimatedItem>
+            <TiltCard className="prava-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Money Out (Expenses)
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-red-500/10 text-red-500 dark:text-red-400">
+                  <TrendingDown className="size-3.5" />
+                </span>
+              </div>
+              <p className="prava-mono mt-3 text-2xl font-bold text-slate-900 dark:text-white">{fmt(expenses)}</p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Supplier bills &amp; operating costs</p>
+            </TiltCard>
+          </AnimatedItem>
+
+          <AnimatedItem>
+            <TiltCard className="prava-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Operating Net Profit
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                  <Wallet className="size-3.5" />
+                </span>
+              </div>
+              <p className="prava-mono mt-3 text-2xl font-bold text-sky-600 dark:text-sky-400">{fmt(netIncome)}</p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Margin before tax allocations</p>
+            </TiltCard>
+          </AnimatedItem>
+
+          <AnimatedItem>
+            <TiltCard className="prava-card p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Reconciled Liquidity
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-white">
+                  <Landmark className="size-3.5" />
+                </span>
+              </div>
+              <p className="prava-mono mt-3 text-2xl font-bold text-slate-900 dark:text-white">{fmt(cash)}</p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Available bank funds</p>
+            </TiltCard>
+          </AnimatedItem>
+        </AnimatedGrid>
+
+        {/* 2. Receivables & Payables Side-by-Side Breakdown */}
+        <FadeInView className="grid gap-6 lg:grid-cols-2">
+          {/* Customer Receivables */}
+          <div className="prava-panel p-6">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] pb-4">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Customer Receivables</span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Money Owed To You</h3>
+              </div>
+              <span className="prava-mono text-lg font-bold text-emerald-600 dark:text-emerald-400">{fmt(receivables)}</span>
             </div>
-            <div className="mt-4 space-y-2.5">
-              {salesInvoices.length ? (
-                salesInvoices.slice(0, 4).map((item) => (
-                  <div
-                    key={item.document.id}
-                    onClick={() => setLocation(`/documents/${item.document.id}`)}
-                    className="flex cursor-pointer items-center justify-between rounded-xl border border-[#ece4d6] p-3.5 transition hover:bg-[#f8f4eb]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[#22463c]">
-                        {item.extraction?.vendorName || item.document.originalName}
-                      </p>
-                      <p className="text-xs text-[#72827a]">
-                        {item.extraction?.invoiceNumber || `Doc #${item.document.id}`} ·{" "}
-                        {item.extraction?.invoiceDate
-                          ? new Date(item.extraction.invoiceDate).toLocaleDateString()
-                          : "Date not extracted"}
-                      </p>
+
+            <AnimatedList className="mt-4 space-y-2">
+              {salesInvoices.length > 0 ? (
+                salesInvoices.slice(0, 4).map((doc) => (
+                  <AnimatedRow key={doc.document.id}>
+                    <div
+                      onClick={() => setLocation(`/documents/${doc.document.id}`)}
+                      className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white/70 p-3 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-white/[0.06] dark:bg-[#0A0F16] dark:hover:border-white/20 dark:hover:bg-[#0E1520] text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">{doc.extraction?.vendorName || doc.document.originalName}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">{doc.extraction?.invoiceNumber || "INV"} · {doc.document.status}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="prava-mono font-bold text-slate-900 dark:text-white">{fmt(doc.extraction?.totalMinor || 0)}</p>
+                        <span className="text-[10px] font-semibold text-slate-800 dark:text-white">Inspect →</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-[#163a34]">
-                        {item.extraction?.totalMinor
-                          ? fmt(item.extraction.totalMinor)
-                          : "Needs review"}
-                      </p>
-                      <span
-                        className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          item.document.status === "extracted"
-                            ? "bg-[#e5efe1] text-[#2c5847]"
-                            : "bg-[#fae7d4] text-[#8e4c19]"
-                        }`}
-                      >
-                        {item.document.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                  </div>
+                  </AnimatedRow>
                 ))
               ) : (
-                <div className="rounded-xl border border-dashed border-[#d9cfbb] p-6 text-center text-xs text-[#718279]">
-                  No sales invoices recorded yet. Upload customer invoices in the Documents tab.
-                </div>
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 p-5 text-center text-xs text-slate-500 dark:text-slate-400">No outstanding receivables currently recorded.</div>
               )}
-            </div>
+            </AnimatedList>
           </div>
 
-          {/* Supplier Bills */}
-          <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6">
-            <div className="flex items-center justify-between">
+          {/* Supplier Payables */}
+          <div className="prava-panel p-6">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] pb-4">
               <div>
-                <h2 className="text-lg font-bold text-[#163a34]">Supplier Bills & Expenses</h2>
-                <p className="text-xs text-[#72827a]">Vendor costs and business receipts</p>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400">Supplier Payables</span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Money You Owe</h3>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setLocation("/documents")}
-                className="text-xs text-[#2a5546]"
-              >
-                View all ({purchaseBills.length})
-                <ChevronRight className="ml-1 size-3.5" />
-              </Button>
+              <span className="prava-mono text-lg font-bold text-amber-600 dark:text-amber-400">{fmt(payables)}</span>
             </div>
-            <div className="mt-4 space-y-2.5">
-              {purchaseBills.length ? (
-                purchaseBills.slice(0, 4).map((item) => (
-                  <div
-                    key={item.document.id}
-                    onClick={() => setLocation(`/documents/${item.document.id}`)}
-                    className="flex cursor-pointer items-center justify-between rounded-xl border border-[#ece4d6] p-3.5 transition hover:bg-[#f8f4eb]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[#22463c]">
-                        {item.extraction?.vendorName || item.document.originalName}
-                      </p>
-                      <p className="text-xs text-[#72827a]">
-                        {item.extraction?.invoiceNumber || `Doc #${item.document.id}`} ·{" "}
-                        {item.extraction?.invoiceDate
-                          ? new Date(item.extraction.invoiceDate).toLocaleDateString()
-                          : "Date not extracted"}
-                      </p>
+
+            <AnimatedList className="mt-4 space-y-2">
+              {purchaseBills.length > 0 ? (
+                purchaseBills.slice(0, 4).map((doc) => (
+                  <AnimatedRow key={doc.document.id}>
+                    <div
+                      onClick={() => setLocation(`/documents/${doc.document.id}`)}
+                      className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white/70 p-3 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-white/[0.06] dark:bg-[#0A0F16] dark:hover:border-white/20 dark:hover:bg-[#0E1520] text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">{doc.extraction?.vendorName || doc.document.originalName}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">{doc.extraction?.invoiceNumber || "BILL"} · {doc.document.status}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="prava-mono font-bold text-slate-900 dark:text-white">{fmt(doc.extraction?.totalMinor || 0)}</p>
+                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Inspect →</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-[#163a34]">
-                        {item.extraction?.totalMinor
-                          ? fmt(item.extraction.totalMinor)
-                          : "Needs review"}
-                      </p>
-                      <span
-                        className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          item.document.status === "extracted"
-                            ? "bg-[#e5efe1] text-[#2c5847]"
-                            : "bg-[#fae7d4] text-[#8e4c19]"
-                        }`}
-                      >
-                        {item.document.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                  </div>
+                  </AnimatedRow>
                 ))
               ) : (
-                <div className="rounded-xl border border-dashed border-[#d9cfbb] p-6 text-center text-xs text-[#718279]">
-                  No expense bills recorded yet. Upload supplier bills or receipts to track expenses.
-                </div>
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 p-5 text-center text-xs text-slate-500 dark:text-slate-400">No pending supplier bills recorded.</div>
               )}
-            </div>
+            </AnimatedList>
           </div>
-        </div>
+        </FadeInView>
 
-        {/* 4. Progressive Disclosure: Advanced Ledger for Accountants */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowLedgerDetails(!showLedgerDetails)}
-            className="flex w-full items-center justify-between text-left"
-          >
+        {/* 3. Statutory Tax Reserve Card */}
+        <FadeInView className="prava-panel p-6 border border-amber-400/30 bg-gradient-to-r from-amber-500/[0.05] to-transparent shine-on-hover">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#698477]">
-                Advanced / Accountant Details
-              </p>
-              <h3 className="text-base font-bold text-[#153832]">
-                Detailed General Ledger & Calculation Trace
-              </h3>
-            </div>
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[#efeae0] text-[#335649]">
-              <ChevronDown
-                className={`size-4 transition-transform ${showLedgerDetails ? "rotate-180" : ""}`}
-              />
-            </span>
-          </button>
-
-          {showLedgerDetails && (
-            <div className="mt-5 border-t border-[#ece4d6] pt-5 space-y-4">
-              <p className="text-xs text-[#6e7f77]">
-                Every financial number in Prava is computed deterministically from verified source records and validated double-entry entries.
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-[#e1d8c7] text-[#6d8076]">
-                      <th className="pb-2 font-semibold">Account / Category</th>
-                      <th className="pb-2 font-semibold">Debit / Credit</th>
-                      <th className="pb-2 font-semibold">Verified Status</th>
-                      <th className="pb-2 font-semibold text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#eee8dc]">
-                    <tr>
-                      <td className="py-2.5 font-medium text-[#23473e]">Operating Revenue (Sales)</td>
-                      <td className="py-2.5 text-[#6b7c73]">Credit</td>
-                      <td className="py-2.5">
-                        <span className="rounded bg-[#e5efe1] px-2 py-0.5 text-[10px] font-semibold text-[#2c5847]">
-                          Verified
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right font-semibold text-[#163a34]">{fmt(revenue)}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-medium text-[#23473e]">Cost of Goods & Operating Expenses</td>
-                      <td className="py-2.5 text-[#6b7c73]">Debit</td>
-                      <td className="py-2.5">
-                        <span className="rounded bg-[#e5efe1] px-2 py-0.5 text-[10px] font-semibold text-[#2c5847]">
-                          Verified
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right font-semibold text-[#163a34]">{fmt(expenses)}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-medium text-[#23473e]">Output GST Liability</td>
-                      <td className="py-2.5 text-[#6b7c73]">Credit</td>
-                      <td className="py-2.5">
-                        <span className="rounded bg-[#e5efe1] px-2 py-0.5 text-[10px] font-semibold text-[#2c5847]">
-                          Verified
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right font-semibold text-[#163a34]">{fmt(taxPosition)}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-bold text-[#163a34]">Net Profit / Margin</td>
-                      <td className="py-2.5 text-[#6b7c73]">Summary</td>
-                      <td className="py-2.5">
-                        <span className="rounded bg-[#e5efe1] px-2 py-0.5 text-[10px] font-semibold text-[#2c5847]">
-                          Calculated
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right font-bold text-[#163a34]">{fmt(netIncome)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="flex items-center gap-2">
+                <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+                  <Receipt className="size-4 text-amber-600 dark:text-amber-400" />
+                </motion.div>
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Statutory {business?.taxSystem || "Tax"} Reserve</span>
               </div>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Estimated tax liability isolated from operating cash. Do not spend this reserve.</p>
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-4">
+              <span className="prava-mono text-2xl font-bold text-amber-600 dark:text-amber-400">{fmt(taxPosition)}</span>
+              <Button onClick={() => setLocation("/tax")} size="sm" className="rounded-xl bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700 shadow-sm btn-magnetic">
+                Go to Tax Hub →
+              </Button>
+            </div>
+          </div>
+        </FadeInView>
       </div>
     </DashboardLayout>
   );

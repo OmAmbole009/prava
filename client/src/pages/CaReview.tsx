@@ -40,286 +40,171 @@ export default function CaReview() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-6xl py-2 space-y-7">
+      <div className="mx-auto max-w-6xl space-y-7 py-2">
         {/* Header */}
-        <div className="flex flex-col gap-4 border-b border-[#dfd6c4] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200/80 dark:border-white/[0.06] pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="prava-kicker">Professional Verification</span>
-            <h1 className="prava-display mt-2 text-4xl text-[#153832]">
-              Chartered Accountant & Professional Review
+            <span className="prava-tag-purple">Chartered Accountant Verification Hub</span>
+            <h1 className="font-['Playfair_Display',Georgia,serif] mt-2 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
+              Chartered Accountant & <em className="italic font-normal">Audit Verification</em>
             </h1>
-            <p className="mt-2 text-sm text-[#65766e]">
-              Track the progress of financial returns, audit questions, and tax filings currently in review with your designated in-house CA.
+            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+              Track statutory returns, audit observations, and compliance certificates signed off by your designated in-house CA.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2.5">
             <Button
               onClick={() => setLocation("/assistant")}
-              className="rounded-full bg-[#163a34] text-[#f7f1e4] hover:bg-[#102b26]"
+              size="sm"
+              className="rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-md hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100"
             >
-              <Sparkles className="mr-2 size-4 text-[#d9e8be]" />
+              <Sparkles className="mr-1.5 size-3.5" />
               Ask Prava
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setLocation("/tasks")}
-              className="rounded-full border-[#cfc4b1] text-[#24473e] hover:bg-[#eee8dc]"
+              className="rounded-xl border-slate-300 bg-white/80 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08]"
             >
-              <FileText className="mr-2 size-4" />
-              View Tasks Checklist
+              <FileText className="mr-1.5 size-3.5" />
+              Tasks Checklist
             </Button>
           </div>
         </div>
 
-        {/* Assigned Chartered Accountant Card */}
-        <div className="overflow-hidden rounded-2xl border border-[#cfe0c8] bg-[#f2f8f0] p-6 shadow-sm">
+        {/* Assigned CA Profile Card */}
+        <div className="prava-panel p-6 border border-purple-400/30 bg-gradient-to-r from-purple-500/[0.06] to-transparent">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#163a34] text-[#d9e8be] shadow-sm">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-600 dark:text-purple-400 shadow-sm">
                 <UserCheck className="size-6" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-[#163a34] px-2.5 py-0.5 text-[11px] font-bold text-[#d9e8be]">
+                  <span className="rounded-md bg-purple-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-purple-700 dark:text-purple-300">
                     Assigned Prava CA
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-[#275344]">
-                    <BadgeCheck className="size-3.5" />
+                  <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-slate-900 dark:text-white">
+                    <BadgeCheck className="size-3.5 text-purple-600 dark:text-purple-400" />
                     {assignedCa?.membershipNumber || "ICAI #409212"}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-[#143831]">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   {assignedCa?.fullName || "CA Rajesh Verma, FCA"}
                 </h2>
-                <p className="text-xs text-[#527063]">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
                   {assignedCa?.firmName || "Verma & Associates Chartered Accountants"} ·{" "}
-                  <span className="font-medium text-[#1c473b]">
+                  <span className="text-purple-600 dark:text-purple-400 font-semibold">
                     {assignedCa?.specialization || "GST Filings, Direct Tax & Corporate Audit"}
                   </span>
                 </p>
-                <p className="mt-2 text-xs leading-relaxed text-[#4a6b5c] max-w-2xl">
+                <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400 max-w-2xl">
                   {assignedCa?.bio ||
                     "Designated In-House Chartered Accountant assigned by Prava Administration for statutory verification, input tax credit audits, and official filing certifications."}
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 text-xs text-[#3f6354] shrink-0 border-t sm:border-t-0 sm:border-l border-[#d3e3cd] sm:pl-5 pt-3 sm:pt-0">
-              <span className="font-bold text-[#163a34]">Direct CA Coordination</span>
+            <div className="flex flex-col gap-2 text-xs text-slate-700 dark:text-slate-300 shrink-0 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-white/[0.08] sm:pl-5 pt-3 sm:pt-0">
+              <span className="font-mono text-[10px] uppercase text-slate-400 dark:text-slate-500">Direct Contact</span>
               {assignedCa?.email && (
-                <div className="flex items-center gap-1.5 text-xs text-[#2c5344]">
-                  <Mail className="size-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-mono text-slate-900 dark:text-white">
+                  <Mail className="size-3.5 text-purple-600 dark:text-purple-400" />
                   <span>{assignedCa.email}</span>
                 </div>
               )}
               {assignedCa?.phone && (
-                <div className="flex items-center gap-1.5 text-xs text-[#2c5344]">
-                  <Phone className="size-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-mono text-slate-900 dark:text-white">
+                  <Phone className="size-3.5 text-purple-600 dark:text-purple-400" />
                   <span>{assignedCa.phone}</span>
                 </div>
               )}
-              <span className="mt-1 text-[11px] text-[#69887b]">
+              <span className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                 Status: <strong>Active & Designated</strong>
               </span>
             </div>
           </div>
         </div>
 
-        {/* 1. Items in Review with CA */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#ece4d6] pb-4">
+        {/* Review Queue & Active Workflows */}
+        <div className="prava-panel p-6 border border-slate-200/80 dark:border-white/10">
+          <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] pb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#163a34]">Workflows Submitted to CA</h2>
-              <p className="text-xs text-[#718279]">
-                Returns and statements sent for professional examination
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Workflows Submitted to CA</h3>
+              <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                Statutory returns and calculations currently in review
               </p>
             </div>
-            <span className="rounded-full bg-[#e5efe1] px-3 py-1 text-xs font-bold text-[#2b5847]">
+            <span className="rounded-full bg-slate-100 dark:bg-white/10 px-3 py-1 font-mono text-xs font-bold text-slate-800 dark:text-white">
               {professionalReviews.length} in progress
             </span>
           </div>
 
-          <div className="mt-5 space-y-4">
-            {professionalReviews.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#72837b]">
-                <Clock className="mx-auto mb-2 size-6 text-[#9bb3a6]" />
-                No items are currently in CA review. When you finish a tax preparation checklist, you can click "Request advisor review" to send it here.
-              </div>
-            ) : (
-              professionalReviews.map((rev) => (
+          <div className="mt-4 space-y-3">
+            {professionalReviews.length > 0 ? (
+              professionalReviews.map((item: any) => (
                 <div
-                  key={rev.id}
-                  className="rounded-xl border border-[#ece4d6] bg-white p-5 transition hover:border-[#a8c0b2]"
+                  key={item.id}
+                  onClick={() => setLocation(`/tasks/${item.taskId}`)}
+                  className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white/70 p-4 shadow-sm transition hover:border-purple-400 hover:bg-white dark:border-white/[0.06] dark:bg-[#0A0F16] dark:hover:border-purple-500/50 text-xs"
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <Clock className="size-4 text-amber-500 dark:text-amber-400" />
                     <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-[#193d33]">{rev.taskTitle}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                            rev.status === "completed"
-                              ? "bg-[#e5efe1] text-[#2c5847]"
-                              : rev.status === "declined"
-                              ? "bg-[#fae7d4] text-[#8e4c19]"
-                              : "bg-[#eaf4fc] text-[#1f5682]"
-                          }`}
-                        >
-                          {rev.status === "in_review"
-                            ? "CA Reviewing"
-                            : rev.status.replaceAll("_", " ")}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-[#708078]">
-                        Submitted for review on{" "}
-                        {new Date(rev.createdAt).toLocaleDateString()}
+                      <p className="font-bold text-slate-900 dark:text-white">{item.task?.title || "Filing Review"}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Status: {item.status.toUpperCase()} · Submitted on {new Date(item.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-
-                    <Button
-                      size="sm"
-                      onClick={() => setLocation(`/tasks/${rev.taskId}`)}
-                      className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#102b26]"
-                    >
-                      Open Task Details
-                      <ArrowRight className="ml-1.5 size-3.5" />
-                    </Button>
                   </div>
-
-                  {rev.note && (
-                    <div className="mt-4 rounded-lg bg-[#f8f5ec] p-3 text-xs text-[#4c6d61] flex items-start gap-2">
-                      <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-[#b77a43]" />
-                      <span>
-                        <strong>CA Review Request Note:</strong> {rev.note}
-                      </span>
-                    </div>
-                  )}
+                  <span className="text-xs font-bold text-purple-600 dark:text-purple-400">Inspect Details →</span>
                 </div>
               ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                <CheckCircle2 className="mx-auto size-6 text-emerald-500 dark:text-emerald-400 mb-2" />
+                All workflows have been reviewed. No returns are currently waiting in the CA queue.
+              </div>
             )}
           </div>
         </div>
 
-        {/* 2. Official CA Audit Observations & Sign-off Certificates */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#ece4d6] pb-4">
+        {/* Official CA Observation Records */}
+        <div className="prava-panel p-6 border border-slate-200/80 dark:border-white/10">
+          <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] pb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#163a34]">Official CA Audit Observations & Certificates</h2>
-              <p className="text-xs text-[#718279]">
-                Professional examination findings and statutory sign-offs issued by your assigned Chartered Accountant.
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Official Audit Observations</h3>
+              <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                Signed audit findings and statutory observations from your CA
               </p>
             </div>
-            <span className="rounded-full bg-[#e5efe1] px-3 py-1 text-xs font-bold text-[#2b5847]">
-              {caObservations.length} Certified Records
-            </span>
+            <span className="font-mono text-xs text-purple-600 dark:text-purple-300 font-semibold">Certified Records</span>
           </div>
 
-          <div className="mt-5 space-y-4">
-            {caObservations.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#72837b]">
-                <FileCheck className="mx-auto mb-2 size-6 text-[#9bb3a6]" />
-                No statutory audit observations recorded yet. Observations will appear once your CA approves or reviews a return.
-              </div>
-            ) : (
-              caObservations.map((obs: any) => (
-                <div
-                  key={obs.id}
-                  className="rounded-xl border border-[#d8e5d3] bg-[#f4f9f2] p-5 space-y-2.5"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                          obs.decision === "approved"
-                            ? "bg-[#163a34] text-[#d9e8be]"
-                            : "bg-[#fae7d4] text-[#8e4c19]"
-                        }`}
-                      >
-                        {obs.decision.toUpperCase()}
-                      </span>
-                      <span className="font-bold text-sm text-[#143831]">{obs.observationTitle}</span>
-                    </div>
-                    {obs.certificateReference && (
-                      <span className="font-mono text-xs font-semibold text-[#255845] bg-[#e4f0e0] px-2.5 py-0.5 rounded-full">
-                        Cert Ref: {obs.certificateReference}
-                      </span>
-                    )}
+          <div className="mt-4 space-y-3">
+            {caObservations.length > 0 ? (
+              caObservations.map((obs: any, idx: number) => (
+                <div key={idx} className="rounded-xl border border-slate-200 bg-white/70 p-4 text-xs shadow-sm dark:border-white/[0.06] dark:bg-[#0A0F16]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 dark:text-white">{obs.observationTitle}</span>
+                    <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      {obs.decision.toUpperCase()}
+                    </span>
                   </div>
-                  <p className="text-xs leading-relaxed text-[#3a5d4e]">{obs.detailedNotes}</p>
-                  <p className="text-[11px] text-[#6d8a7c]">
-                    Issued by Assigned Chartered Accountant on {new Date(obs.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 3. Authorized Submissions & Sign-offs */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#ece4d6] pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-[#163a34]">Authorized Filings & Final Sign-Offs</h2>
-              <p className="text-xs text-[#718279]">
-                Returns approved by independent reviewer ready for dispatch authorization
-              </p>
-            </div>
-            <span className="rounded-full bg-[#fae7d4] px-3 py-1 text-xs font-bold text-[#8e4c19]">
-              {submissionAuthorizations.length} authorization records
-            </span>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {submissionAuthorizations.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#72837b]">
-                <FileCheck className="mx-auto mb-2 size-6 text-[#9bb3a6]" />
-                No returns awaiting authorized submission. Once a return is prepared and approved, authorization records appear here.
-              </div>
-            ) : (
-              submissionAuthorizations.map((sub) => (
-                <div
-                  key={sub.id}
-                  className="rounded-xl border border-[#ece4d6] bg-white p-5"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-[#193d33]">{sub.taskTitle}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                            sub.status === "approved" || sub.status === "submitted"
-                              ? "bg-[#e5efe1] text-[#2c5847]"
-                              : "bg-[#fae7d4] text-[#8e4c19]"
-                          }`}
-                        >
-                          {sub.status.replaceAll("_", " ")}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-[#708078]">
-                        Requested on {new Date(sub.createdAt).toLocaleDateString()}
-                        {sub.approvedAt
-                          ? ` · Approved on ${new Date(sub.approvedAt).toLocaleDateString()}`
-                          : ""}
-                      </p>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      onClick={() => setLocation(`/tasks/${sub.taskId}`)}
-                      className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#102b26]"
-                    >
-                      Review & Authorize
-                      <ArrowRight className="ml-1.5 size-3.5" />
-                    </Button>
-                  </div>
-
-                  {sub.reviewerNote && (
-                    <div className="mt-3 rounded-lg bg-[#f0f7ee] p-3 text-xs text-[#2b5847]">
-                      <strong>Reviewer Feedback:</strong> {sub.reviewerNote}
-                    </div>
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{obs.detailedNotes}</p>
+                  {obs.certificateReference && (
+                    <p className="mt-2 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                      Cert Ref: {obs.certificateReference}
+                    </p>
                   )}
                 </div>
               ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                No pending observation notes. Clean compliance status.
+              </div>
             )}
           </div>
         </div>
@@ -327,4 +212,3 @@ export default function CaReview() {
     </DashboardLayout>
   );
 }
-

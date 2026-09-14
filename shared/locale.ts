@@ -31,8 +31,55 @@ export function getCurrencySymbol(currency: string) {
   return match?.symbol ?? "$";
 }
 
-export function formatMinorAmount(minor: number, currency: string, locale = "en-US") {
-  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: currency === "JPY" ? 0 : 2 }).format(minor / 100);
+// ─── Exchange Rates & Dynamic Conversion ─────────────────────────────────────
+export const DEFAULT_EXCHANGE_RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  CAD: 1.36,
+  AUD: 1.53,
+  SGD: 1.34,
+  AED: 3.67,
+  JPY: 149.5,
+  BRL: 4.97,
+  ZAR: 18.6,
+  INR: 83.5,
+};
+
+let liveExchangeRates: Record<string, number> = { ...DEFAULT_EXCHANGE_RATES };
+
+export function setLiveExchangeRates(rates: Record<string, number>) {
+  if (rates && typeof rates === "object") {
+    liveExchangeRates = { ...DEFAULT_EXCHANGE_RATES, ...rates };
+  }
+}
+
+export function getLiveExchangeRates(): Record<string, number> {
+  return { ...liveExchangeRates };
+}
+
+/**
+ * Converts a minor amount from one currency to another using exchange rates against USD base.
+ * @param minor The integer minor amount (e.g. 12500000 cents)
+ * @param fromCurrency The original currency code (default: USD)
+ * @param toCurrency The target currency code (e.g. INR, EUR, JPY)
+ */
+export function convertCurrencyMinor(minor: number, fromCurrency = "USD", toCurrency = "USD"): number {
+  if (!minor || fromCurrency === toCurrency) return minor;
+  const fromRate = liveExchangeRates[fromCurrency] ?? DEFAULT_EXCHANGE_RATES[fromCurrency] ?? 1;
+  const toRate = liveExchangeRates[toCurrency] ?? DEFAULT_EXCHANGE_RATES[toCurrency] ?? 1;
+  // Convert from origin to USD, then from USD to target
+  const converted = Math.round(minor * (toRate / fromRate));
+  return converted;
+}
+
+export function formatMinorAmount(minor: number, currency: string, locale = "en-US", fromCurrency = currency) {
+  const converted = convertCurrencyMinor(minor, fromCurrency, currency);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "JPY" ? 0 : 2,
+  }).format(converted / 100);
 }
 
 export function formatWorkspaceDate(value: Date | string | number, locale = "en-US", timezone = "UTC") {

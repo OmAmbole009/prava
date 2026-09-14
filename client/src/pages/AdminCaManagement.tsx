@@ -51,34 +51,35 @@ export default function AdminCaManagement() {
   const [isGrantOpen, setIsGrantOpen] = useState(false);
   const [isResetPassOpen, setIsResetPassOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [selectedCaUserId, setSelectedCaUserId] = useState<number | null>(null);
-  const [selectedCaName, setSelectedCaName] = useState("");
 
-  // Grant CA Form State
+  // Form States - Grant Access
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [membershipNumber, setMembershipNumber] = useState("");
+  const [phone, setPhone] = useState("");
   const [firmName, setFirmName] = useState("");
-  const [specialization, setSpecialization] = useState("GST Filings, Direct Tax & Corporate Audit");
   const [initialPassword, setInitialPassword] = useState("");
+  const [specialization, setSpecialization] = useState("GST & Corporate Audit");
   const [bio, setBio] = useState("");
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
 
-  // Reset Password State
+  // Form States - Reset Password
+  const [selectedCaId, setSelectedCaId] = useState<number | null>(null);
+  const [selectedCaName, setSelectedCaName] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  // Assignment State
-  const [assignWorkspaceId, setAssignWorkspaceId] = useState<string>("");
+  // Form States - Assign Workspace
+  const [assignCaId, setAssignCaId] = useState<number | null>(null);
+  const [assignWorkspaceId, setAssignWorkspaceId] = useState("");
   const [assignNotes, setAssignNotes] = useState("");
 
-  // Search/Filter
+  // Search filter
   const [search, setSearch] = useState("");
 
   // Mutations
   const grantCa = trpc.admin.grantCaAccess.useMutation({
     onSuccess: (data) => {
-      toast.success(`CA Access granted to ${data.fullName} (${data.membershipNumber}).`);
+      toast.success(`CA Access granted to ${data.fullName}. Credentials provisioned successfully.`);
       setIsGrantOpen(false);
       resetGrantForm();
       utils.admin.listCas.invalidate();
@@ -87,40 +88,43 @@ export default function AdminCaManagement() {
     onError: (err) => toast.error(err.message),
   });
 
-  const updateStatus = trpc.admin.updateCaStatus.useMutation({
-    onSuccess: (_, vars) => {
-      toast.success(`CA status updated to ${vars.status}.`);
+  const resetPassword = trpc.admin.resetCaPassword.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Password reset for ${data.caName}. Action recorded in audit trail.`);
+      setIsResetPassOpen(false);
+      setNewPassword("");
+      setSelectedCaId(null);
+      utils.admin.auditLog.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const setStatus = trpc.admin.setCaStatus.useMutation({
+    onSuccess: (data) => {
+      toast.success(`CA status updated to ${data.status}.`);
       utils.admin.listCas.invalidate();
       utils.admin.auditLog.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const resetPassword = trpc.admin.resetCaPassword.useMutation({
-    onSuccess: () => {
-      toast.success("Chartered Accountant password has been updated.");
-      setIsResetPassOpen(false);
-      setNewPassword("");
-      utils.admin.auditLog.invalidate();
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const assignWorkspace = trpc.admin.assignCaToBusiness.useMutation({
-    onSuccess: () => {
-      toast.success("Workspace successfully assigned to Chartered Accountant.");
+  const assignWorkspace = trpc.admin.assignCaToWorkspace.useMutation({
+    onSuccess: (data) => {
+      toast.success(`CA assigned to ${data.businessName}.`);
       setIsAssignOpen(false);
       setAssignWorkspaceId("");
       setAssignNotes("");
       utils.admin.listCas.invalidate();
+      utils.admin.auditLog.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const unassignWorkspace = trpc.admin.unassignCaFromBusiness.useMutation({
+  const unassignWorkspace = trpc.admin.unassignCaFromWorkspace.useMutation({
     onSuccess: () => {
-      toast.success("Workspace unassigned from CA.");
+      toast.success("Workspace assignment removed.");
       utils.admin.listCas.invalidate();
+      utils.admin.auditLog.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -128,211 +132,231 @@ export default function AdminCaManagement() {
   const resetGrantForm = () => {
     setFullName("");
     setEmail("");
-    setPhone("");
     setMembershipNumber("");
+    setPhone("");
     setFirmName("");
-    setSpecialization("GST Filings, Direct Tax & Corporate Audit");
     setInitialPassword("");
+    setSpecialization("GST & Corporate Audit");
     setBio("");
     setSelectedWorkspaceId("");
   };
 
   const handleGrantSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (!fullName || !email || !membershipNumber || !initialPassword) return;
     grantCa.mutate({
       fullName,
       email,
-      phone: phone || undefined,
       membershipNumber,
+      phone: phone || undefined,
       firmName: firmName || undefined,
-      specialization,
       initialPassword,
+      specialization: specialization || undefined,
       bio: bio || undefined,
-      assignedBusinessIds: selectedWorkspaceId ? [Number(selectedWorkspaceId)] : [],
+      assignBusinessId: selectedWorkspaceId ? Number(selectedWorkspaceId) : undefined,
     });
   };
 
   const handleResetPasswordSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedCaUserId || !newPassword) return;
+    if (!selectedCaId || !newPassword) return;
     resetPassword.mutate({
-      caUserId: selectedCaUserId,
+      caProfileId: selectedCaId,
       newPassword,
     });
   };
 
   const handleAssignSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedCaUserId || !assignWorkspaceId) return;
+    if (!assignCaId || !assignWorkspaceId) return;
     assignWorkspace.mutate({
-      caUserId: selectedCaUserId,
+      caProfileId: assignCaId,
       businessId: Number(assignWorkspaceId),
-      notes: assignNotes || undefined,
+      assignmentNotes: assignNotes || undefined,
     });
   };
 
   const casList = casQuery.data ?? [];
-  const workspacesList = workspacesQuery.data?.workspaces ?? [{ id: 1, name: "Acme Global Solutions" }];
+  const workspacesList = workspacesQuery.data?.workspaces ?? [];
 
   const filteredCas = casList.filter((ca) => {
-    const term = search.toLowerCase();
+    const q = search.toLowerCase();
     return (
-      ca.fullName.toLowerCase().includes(term) ||
-      ca.email.toLowerCase().includes(term) ||
-      ca.membershipNumber.toLowerCase().includes(term) ||
-      (ca.firmName && ca.firmName.toLowerCase().includes(term))
+      ca.fullName.toLowerCase().includes(q) ||
+      ca.membershipNumber.toLowerCase().includes(q) ||
+      ca.email.toLowerCase().includes(q) ||
+      (ca.firmName && ca.firmName.toLowerCase().includes(q))
     );
   });
 
   const activeCasCount = casList.filter((c) => c.status === "active").length;
-  const totalAssignmentsCount = casList.reduce((acc, c) => acc + c.assignedWorkspacesCount, 0);
+  const totalAssignmentsCount = casList.reduce((acc, c) => acc + (c.assignedBusinesses?.length ?? 0), 0);
+
+  if (casQuery.error) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto mt-16 max-w-xl rounded-2xl border border-destructive/20 bg-destructive/10 p-7 text-foreground">
+          <AlertCircle className="size-5 text-destructive" />
+          <h1 className="font-serif mt-3 text-lg font-bold">Administrative access is required.</h1>
+          <p className="mt-2 text-xs text-muted-foreground">{casQuery.error.message}</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-6xl space-y-7 py-2">
-        {/* Header Hero */}
-        <section className="rounded-3xl bg-[#163a34] p-7 text-[#f7f1e4] sm:p-9">
+        {/* CA Management Banner */}
+        <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card/90 via-card/50 to-card/90 p-7 shadow-xl backdrop-blur-xl sm:p-9">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#27534b] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#cfe4ad]">
-                <ShieldCheck className="size-3.5" />
-                Administrative Authority
-              </div>
-              <h1 className="prava-display mt-3 text-4xl">
-                Chartered Accountant Network Management
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                <ShieldCheck className="size-3.5 text-primary" />
+                CA Governance & Credentials
+              </span>
+              <h1 className="font-serif mt-4 text-3xl sm:text-4xl font-normal tracking-tight text-foreground">
+                Chartered Accountant <span className="italic font-normal text-muted-foreground">Network Management</span>
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#c5d2c9]">
-                Only administrators can onboard, grant credentials, and assign Chartered Accountants to client businesses. CAs sign in through their dedicated portal to inspect records and provide statutory review certifications.
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                Only administrators can onboard, grant credentials, and assign Chartered Accountants to client businesses.
+                CAs sign in through their dedicated portal to inspect records and provide statutory review certifications.
               </p>
             </div>
             <Button
               onClick={() => setIsGrantOpen(true)}
-              className="rounded-full bg-[#f4eddf] text-sm font-semibold text-[#163a34] shadow-md hover:bg-white active:scale-95 shrink-0"
+              className="rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90 shrink-0"
             >
-              <UserPlus className="mr-2 size-4 text-[#163a34]" />
+              <UserPlus className="mr-1.5 size-4" />
               Grant CA Access
             </Button>
           </div>
 
           {/* Quick Metrics */}
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4 border-t border-[#26534b] pt-6">
+          <div className="mt-8 grid grid-cols-2 gap-4 border-t border-border/60 pt-6 sm:grid-cols-4">
             <div>
-              <p className="text-xs text-[#a3b8ad]">Active CAs</p>
-              <p className="mt-1 text-2xl font-bold text-[#f4eddf]">{activeCasCount}</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Active CAs</p>
+              <p className="font-serif mt-1 text-2xl font-normal text-foreground">{activeCasCount}</p>
             </div>
             <div>
-              <p className="text-xs text-[#a3b8ad]">Assigned Workspaces</p>
-              <p className="mt-1 text-2xl font-bold text-[#f4eddf]">{totalAssignmentsCount}</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Assigned Workspaces</p>
+              <p className="font-serif mt-1 text-2xl font-normal text-foreground">{totalAssignmentsCount}</p>
             </div>
             <div>
-              <p className="text-xs text-[#a3b8ad]">Review Status</p>
-              <p className="mt-1 text-2xl font-bold text-[#cfe4ad]">Operational</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Review Status</p>
+              <p className="font-serif mt-1 text-2xl font-normal text-foreground">Operational</p>
             </div>
             <div>
-              <p className="text-xs text-[#a3b8ad]">Access Policy</p>
-              <p className="mt-1 text-2xl font-bold text-[#f4eddf]">Admin-Gated</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Access Policy</p>
+              <p className="font-serif mt-1 text-2xl font-normal text-foreground">Admin-Gated</p>
             </div>
           </div>
         </section>
 
         {/* Main CA Roster Card */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-[#ece4d6] pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-2xl border border-border/60 bg-card/60 p-6 shadow-sm backdrop-blur-xl">
+          <div className="flex flex-col gap-4 border-b border-border/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-[#163a34]">Onboarded Chartered Accountants</h2>
-              <p className="text-xs text-[#718279]">
+              <h2 className="font-serif text-lg font-normal text-foreground">Onboarded Chartered Accountants</h2>
+              <p className="text-xs text-muted-foreground">
                 Manage credentials, practice details, and client workspace allocations.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-2.5 size-4 text-[#75847c]" />
+                <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
                 <Input
                   placeholder="Search CA name, reg no, email…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="h-9 rounded-full border-[#dcd1be] pl-9 text-xs"
+                  className="h-9 rounded-xl border-border/60 bg-background/50 pl-9 text-xs text-foreground"
                 />
               </div>
             </div>
           </div>
 
           {casQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12 text-sm text-[#75847c]">
-              <Loader2 className="mr-2 size-4 animate-spin" />
+            <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin text-primary" />
               Loading Chartered Accountants roster…
             </div>
           ) : filteredCas.length === 0 ? (
             <div className="py-12 text-center">
-              <UserX className="mx-auto size-9 text-[#a8b8b0]" />
-              <p className="mt-3 text-sm font-semibold text-[#1a443b]">No Chartered Accountants found</p>
-              <p className="mt-1 text-xs text-[#75847c]">Click "Grant CA Access" above to onboard your first in-house CA.</p>
+              <UserX className="mx-auto size-9 text-muted-foreground" />
+              <p className="mt-3 text-sm font-semibold text-foreground">No Chartered Accountants found</p>
+              <p className="mt-1 text-xs text-muted-foreground">Click "Grant CA Access" above to onboard your first in-house CA.</p>
             </div>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#ece4d6] text-[11px] font-bold uppercase tracking-wider text-[#75847c]">
-                    <th className="py-3 px-3">Chartered Accountant</th>
-                    <th className="py-3 px-3">Membership & Firm</th>
-                    <th className="py-3 px-3">Specialization</th>
-                    <th className="py-3 px-3">Assigned Workspaces</th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3 text-right">Actions</th>
+                  <tr className="border-b border-border/60 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="py-3 px-3 font-semibold">Chartered Accountant</th>
+                    <th className="py-3 px-3 font-semibold">Membership & Firm</th>
+                    <th className="py-3 px-3 font-semibold">Specialization</th>
+                    <th className="py-3 px-3 font-semibold">Assigned Workspaces</th>
+                    <th className="py-3 px-3 font-semibold">Status</th>
+                    <th className="py-3 px-3 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#f0e9dc]">
+                <tbody className="divide-y divide-border/40">
                   {filteredCas.map((ca) => (
-                    <tr key={ca.id} className="hover:bg-[#fbf8f2] transition-colors">
+                    <tr key={ca.id} className="transition-colors hover:bg-secondary/30">
                       <td className="py-3.5 px-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#e2ece0] text-[#1a443b] font-bold text-xs">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary/50 font-semibold text-xs text-foreground">
                             {ca.fullName.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-semibold text-[#153832]">{ca.fullName}</p>
-                            <p className="text-xs text-[#6e8076]">{ca.email}</p>
-                            {ca.phone && <p className="text-[11px] text-[#8ea096]">{ca.phone}</p>}
+                            <p className="font-medium text-foreground">{ca.fullName}</p>
+                            <p className="text-[11px] text-muted-foreground">{ca.email}</p>
+                            {ca.phone && <p className="font-mono text-[10px] text-muted-foreground">{ca.phone}</p>}
                           </div>
                         </div>
                       </td>
                       <td className="py-3.5 px-3">
-                        <span className="inline-flex items-center gap-1 rounded bg-[#ebf3e8] px-2 py-0.5 text-xs font-bold text-[#235041]">
-                          <BadgeCheck className="size-3" />
+                        <span className="inline-flex items-center gap-1 rounded border border-border/60 bg-secondary/60 px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground">
+                          <BadgeCheck className="size-3 text-primary" />
                           {ca.membershipNumber}
                         </span>
-                        {ca.firmName && <p className="mt-1 text-xs text-[#5d6f66] truncate max-w-[180px]">{ca.firmName}</p>}
+                        <p className="mt-1 text-[11px] text-muted-foreground">{ca.firmName || "Independent Practice"}</p>
                       </td>
-                      <td className="py-3.5 px-3 text-xs text-[#4b6056] max-w-[200px]">
-                        {ca.specialization}
-                      </td>
+                      <td className="py-3.5 px-3 text-muted-foreground">{ca.specialization}</td>
                       <td className="py-3.5 px-3">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-[#eee8dc] px-2.5 py-0.5 text-xs font-bold text-[#1f473e]">
-                            {ca.assignedWorkspacesCount} Workspaces
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedCaUserId(ca.userId);
-                              setSelectedCaName(ca.fullName);
-                              setIsAssignOpen(true);
-                            }}
-                            className="h-6 px-2 text-[11px] font-semibold text-[#1a443b] hover:bg-[#e6efe2]"
-                          >
-                            + Assign
-                          </Button>
+                        <div className="flex flex-wrap gap-1.5 max-w-xs">
+                          {ca.assignedBusinesses?.length ? (
+                            ca.assignedBusinesses.map((b) => (
+                              <span
+                                key={b.businessId}
+                                className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-secondary/40 px-2 py-0.5 text-[11px] text-foreground"
+                              >
+                                {b.businessName}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    unassignWorkspace.mutate({
+                                      caProfileId: ca.id,
+                                      businessId: b.businessId,
+                                    })
+                                  }
+                                  className="text-destructive hover:opacity-80 ml-1 text-xs"
+                                  title="Unassign workspace"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground italic">No active assignments</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3.5 px-3">
                         <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold ${
                             ca.status === "active"
-                              ? "bg-[#e5efe1] text-[#2b5847]"
-                              : ca.status === "suspended"
-                              ? "bg-[#fdf4e4] text-[#8e6018]"
-                              : "bg-[#fae8e5] text-[#933429]"
+                              ? "border border-border/60 bg-secondary/80 text-foreground"
+                              : "border border-destructive/30 bg-destructive/10 text-destructive"
                           }`}
                         >
                           {ca.status.toUpperCase()}
@@ -340,52 +364,48 @@ export default function AdminCaManagement() {
                       </td>
                       <td className="py-3.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Reset Password */}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => {
-                              setSelectedCaUserId(ca.userId);
+                              setAssignCaId(ca.id);
+                              setSelectedCaName(ca.fullName);
+                              setIsAssignOpen(true);
+                            }}
+                            className="h-8 rounded-lg text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          >
+                            Assign Client
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCaId(ca.id);
                               setSelectedCaName(ca.fullName);
                               setIsResetPassOpen(true);
                             }}
-                            className="h-7 rounded-full border-[#d8cdba] text-xs font-medium text-[#244b41] hover:bg-[#f0e9dc]"
+                            className="h-8 rounded-lg text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
                           >
-                            <KeyRound className="mr-1 size-3 text-[#587268]" />
-                            Reset Password
+                            <KeyRound className="size-3.5 mr-1" />
+                            Pass
                           </Button>
-
-                          {/* Status Toggles */}
-                          {ca.status === "active" ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                updateStatus.mutate({
-                                  caUserId: ca.userId,
-                                  status: "suspended",
-                                  reason: "Suspended by Admin",
-                                })
-                              }
-                              className="h-7 rounded-full text-xs font-medium text-[#8e6018] hover:bg-[#fdf4e4]"
-                            >
-                              Suspend
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                updateStatus.mutate({
-                                  caUserId: ca.userId,
-                                  status: "active",
-                                })
-                              }
-                              className="h-7 rounded-full text-xs font-medium text-[#2b5847] hover:bg-[#e5efe1]"
-                            >
-                              Activate
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setStatus.mutate({
+                                caProfileId: ca.id,
+                                status: ca.status === "active" ? "suspended" : "active",
+                              })
+                            }
+                            className={`h-8 rounded-lg text-xs ${
+                              ca.status === "active"
+                                ? "text-amber-500 hover:bg-amber-500/10"
+                                : "text-primary hover:bg-primary/10"
+                            }`}
+                          >
+                            {ca.status === "active" ? "Suspend" : "Activate"}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -396,33 +416,29 @@ export default function AdminCaManagement() {
           )}
         </div>
 
-        {/* Recent Privileged CA Audit Actions */}
-        <div className="rounded-2xl border border-[#dfd6c4] bg-[#fffdf8] p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#ece4d6] pb-4">
-            <div>
-              <h2 className="text-base font-bold text-[#163a34]">Audited CA Access & Review Activity</h2>
-              <p className="text-xs text-[#718279]">Immutable log of administrative CA provisioning and CA review submissions.</p>
-            </div>
+        {/* Audit Activity Card */}
+        <div className="rounded-2xl border border-border/60 bg-card/60 p-6 shadow-sm backdrop-blur-xl">
+          <div className="border-b border-border/60 pb-4">
+            <h2 className="font-serif text-base font-normal text-foreground">Audited CA Access & Review Activity</h2>
+            <p className="text-xs text-muted-foreground">Immutable log of administrative CA provisioning and CA review submissions.</p>
           </div>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-[#ece4d6] text-[#75847c]">
+                <tr className="border-b border-border/60 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="py-2.5 px-3 font-semibold">Action</th>
                   <th className="py-2.5 px-3 font-semibold">Actor / Entity</th>
                   <th className="py-2.5 px-3 font-semibold">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f2ede3]">
+              <tbody className="divide-y divide-border/40">
                 {auditQuery.data?.slice(0, 8).map(({ event, actorName }) => (
-                  <tr key={event.id}>
-                    <td className="py-2 px-3 font-semibold text-[#1e483f]">
-                      {event.action.replaceAll("_", " ")}
-                    </td>
-                    <td className="py-2 px-3 text-[#586b62]">
+                  <tr key={event.id} className="transition-colors hover:bg-secondary/30">
+                    <td className="py-2.5 px-3 font-medium text-foreground">{event.action.replaceAll("_", " ")}</td>
+                    <td className="py-2.5 px-3 text-muted-foreground">
                       {actorName || "Administrator"} · {event.entityType} #{event.entityId}
                     </td>
-                    <td className="py-2 px-3 text-[#798a81]">
+                    <td className="py-2.5 px-3 font-mono text-[10px] text-muted-foreground">
                       {new Date(event.createdAt).toLocaleString()}
                     </td>
                   </tr>
@@ -435,17 +451,17 @@ export default function AdminCaManagement() {
 
       {/* MODAL 1: Grant CA Access */}
       <Dialog open={isGrantOpen} onOpenChange={setIsGrantOpen}>
-        <DialogContent className="max-w-xl bg-[#fffdf8] border-[#dfd6c4]">
+        <DialogContent className="max-w-xl border-border/60 bg-popover text-popover-foreground shadow-2xl">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-[#163a34] text-[#d9e8be]">
+              <div className="flex size-9 items-center justify-center rounded-xl border border-border/60 bg-secondary/50 text-foreground">
                 <UserCheck className="size-5" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-bold text-[#163a34]">
+                <DialogTitle className="font-serif text-lg font-normal text-foreground">
                   Grant Chartered Accountant Access
                 </DialogTitle>
-                <DialogDescription className="text-xs text-[#6e8076]">
+                <DialogDescription className="text-xs text-muted-foreground">
                   Provision credentials and register a qualified CA into Prava's professional review network.
                 </DialogDescription>
               </div>
@@ -455,62 +471,62 @@ export default function AdminCaManagement() {
           <form onSubmit={handleGrantSubmit} className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">Full Legal Name *</Label>
+                <Label className="text-xs font-semibold text-foreground">Full Legal Name *</Label>
                 <Input
                   placeholder="e.g. CA Rajesh Verma, FCA"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">CA Email Address *</Label>
+                <Label className="text-xs font-semibold text-foreground">CA Email Address *</Label>
                 <Input
                   type="email"
                   placeholder="ca.name@prava.internal"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">ICAI / CPA Reg Number *</Label>
+                <Label className="text-xs font-semibold text-foreground">ICAI / CPA Reg Number *</Label>
                 <Input
                   placeholder="e.g. ICAI #409212"
                   value={membershipNumber}
                   onChange={(e) => setMembershipNumber(e.target.value)}
                   required
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs font-mono text-foreground"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">Phone / Contact</Label>
+                <Label className="text-xs font-semibold text-foreground">Phone / Contact</Label>
                 <Input
                   placeholder="+91 98200 12345"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">CA Firm / Practice Name</Label>
+                <Label className="text-xs font-semibold text-foreground">CA Firm / Practice Name</Label>
                 <Input
                   placeholder="Verma & Associates CA"
                   value={firmName}
                   onChange={(e) => setFirmName(e.target.value)}
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-[#30544a]">Initial Login Password *</Label>
+                <Label className="text-xs font-semibold text-foreground">Initial Login Password *</Label>
                 <Input
                   type="password"
                   placeholder="Min 8 characters"
@@ -518,27 +534,27 @@ export default function AdminCaManagement() {
                   onChange={(e) => setInitialPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="rounded-xl border-[#dcd1be] text-xs"
+                  className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">Practice Specialization</Label>
+              <Label className="text-xs font-semibold text-foreground">Practice Specialization</Label>
               <Input
                 value={specialization}
                 onChange={(e) => setSpecialization(e.target.value)}
-                className="rounded-xl border-[#dcd1be] text-xs"
+                className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">Assign Initial Workspace (Optional)</Label>
+              <Label className="text-xs font-semibold text-foreground">Assign Initial Workspace (Optional)</Label>
               <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
-                <SelectTrigger className="rounded-xl border-[#dcd1be] text-xs">
+                <SelectTrigger className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground">
                   <SelectValue placeholder="Select client workspace…" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border/80 bg-popover text-popover-foreground">
                   {workspacesList.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
@@ -549,13 +565,13 @@ export default function AdminCaManagement() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">Professional Bio / Notes</Label>
+              <Label className="text-xs font-semibold text-foreground">Professional Bio / Notes</Label>
               <Textarea
                 placeholder="Senior Fellow CA with extensive experience in corporate GST audits…"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={2}
-                className="rounded-xl border-[#dcd1be] text-xs"
+                className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
               />
             </div>
 
@@ -564,14 +580,14 @@ export default function AdminCaManagement() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsGrantOpen(false)}
-                className="rounded-full border-[#d8cdba] text-xs"
+                className="rounded-xl border-border/60 bg-secondary/50 text-xs text-foreground hover:bg-secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={grantCa.isPending || !fullName || !email || !membershipNumber || !initialPassword}
-                className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#0f2824]"
+                className="rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90"
               >
                 {grantCa.isPending ? "Granting Access…" : "Grant CA Access"}
               </Button>
@@ -582,19 +598,19 @@ export default function AdminCaManagement() {
 
       {/* MODAL 2: Reset CA Password */}
       <Dialog open={isResetPassOpen} onOpenChange={setIsResetPassOpen}>
-        <DialogContent className="max-w-md bg-[#fffdf8] border-[#dfd6c4]">
+        <DialogContent className="max-w-md border-border/60 bg-popover text-popover-foreground shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-[#163a34]">
+            <DialogTitle className="font-serif text-base font-normal text-foreground">
               Reset CA Password
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#6e8076]">
-              Set a new secure password for <strong>{selectedCaName}</strong>.
+            <DialogDescription className="text-xs text-muted-foreground">
+              Set a new secure password for <strong className="text-foreground">{selectedCaName}</strong>.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleResetPasswordSubmit} className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">New Password</Label>
+              <Label className="text-xs font-semibold text-foreground">New Password</Label>
               <Input
                 type="password"
                 placeholder="Min 8 characters"
@@ -602,7 +618,7 @@ export default function AdminCaManagement() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={8}
                 required
-                className="rounded-xl border-[#dcd1be] text-xs"
+                className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
               />
             </div>
 
@@ -611,14 +627,14 @@ export default function AdminCaManagement() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsResetPassOpen(false)}
-                className="rounded-full border-[#d8cdba] text-xs"
+                className="rounded-xl border-border/60 bg-secondary/50 text-xs text-foreground hover:bg-secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={resetPassword.isPending || !newPassword || newPassword.length < 8}
-                className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#0f2824]"
+                className="rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90"
               >
                 {resetPassword.isPending ? "Updating…" : "Update Password"}
               </Button>
@@ -629,24 +645,24 @@ export default function AdminCaManagement() {
 
       {/* MODAL 3: Assign Workspace */}
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-        <DialogContent className="max-w-md bg-[#fffdf8] border-[#dfd6c4]">
+        <DialogContent className="max-w-md border-border/60 bg-popover text-popover-foreground shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-[#163a34]">
+            <DialogTitle className="font-serif text-base font-normal text-foreground">
               Assign Workspace to {selectedCaName}
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#6e8076]">
+            <DialogDescription className="text-xs text-muted-foreground">
               Grant this Chartered Accountant review access to the selected client business.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleAssignSubmit} className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">Client Workspace</Label>
+              <Label className="text-xs font-semibold text-foreground">Client Workspace</Label>
               <Select value={assignWorkspaceId} onValueChange={setAssignWorkspaceId}>
-                <SelectTrigger className="rounded-xl border-[#dcd1be] text-xs">
+                <SelectTrigger className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground">
                   <SelectValue placeholder="Select workspace…" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border/80 bg-popover text-popover-foreground">
                   {workspacesList.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
@@ -657,12 +673,12 @@ export default function AdminCaManagement() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-[#30544a]">Assignment Scope / Notes</Label>
+              <Label className="text-xs font-semibold text-foreground">Assignment Scope / Notes</Label>
               <Input
                 placeholder="Lead CA for quarterly GST review"
                 value={assignNotes}
                 onChange={(e) => setAssignNotes(e.target.value)}
-                className="rounded-xl border-[#dcd1be] text-xs"
+                className="rounded-xl border-border/60 bg-background/50 text-xs text-foreground"
               />
             </div>
 
@@ -671,14 +687,14 @@ export default function AdminCaManagement() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsAssignOpen(false)}
-                className="rounded-full border-[#d8cdba] text-xs"
+                className="rounded-xl border-border/60 bg-secondary/50 text-xs text-foreground hover:bg-secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={assignWorkspace.isPending || !assignWorkspaceId}
-                className="rounded-full bg-[#163a34] text-xs font-semibold text-[#f7f1e4] hover:bg-[#0f2824]"
+                className="rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90"
               >
                 {assignWorkspace.isPending ? "Assigning…" : "Confirm Assignment"}
               </Button>
