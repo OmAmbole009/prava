@@ -63,25 +63,15 @@ export const inMemoryCaAssignments = [
     caUserId: 201,
     businessId: 1,
     status: "active",
-    notes: "Primary designated Chartered Accountant for quarterly GST & annual audit review.",
+    notes: "Designated Chartered Accountant for statutory & tax compliance sign-offs.",
     assignedByAdminId: 1,
     assignedAt: new Date("2026-01-15"),
   },
 ];
 
-export const inMemoryCaObservations = [
-  {
-    id: 1,
-    businessId: 1,
-    taskId: 1,
-    caUserId: 201,
-    decision: "approved",
-    observationTitle: "Statutory ITC & Outward Tax Computation Verified",
-    detailedNotes: "All sample sales invoices and input tax credit claims have been cross-checked against supplier GST declarations. GSTR-3B tax liability computation is reconciled and approved for dispatch.",
-    certificateReference: "CA-VERMA-2026-Q3-0091",
-    createdAt: new Date("2026-08-22"),
-  },
-];
+export const inMemoryCaObservations = [];
+export const inMemoryReviewRequests = [];
+export const inMemoryGstSubmissions = [];
 
 // Helper to record administrative audit events
 async function recordAudit(actorUserId, action, entityType, entityId, metadata) {
@@ -436,11 +426,13 @@ export async function getCaProfileForUser(userId) {
 export async function getCaDashboardStats(caUserId) {
   const db = await getDb();
   if (!db) {
+    const pendingReviewsCount = inMemoryReviewRequests.filter(r => r.status === "in_review" || r.status === "requested").length;
+    const totalGstSubmissionsInQueue = inMemoryGstSubmissions.filter(s => s.status === "awaiting_review").length;
     return {
       assignedBusinessesCount: inMemoryCaAssignments.filter(a => a.caUserId === caUserId && a.status === "active").length,
-      pendingReviewsCount: 1,
-      completedReviewsCount: inMemoryCaObservations.length,
-      totalGstSubmissionsInQueue: 1,
+      pendingReviewsCount,
+      completedReviewsCount: inMemoryCaObservations.filter(o => o.caUserId === caUserId).length,
+      totalGstSubmissionsInQueue,
       caProfile: inMemoryCaProfiles.find(p => p.userId === caUserId) ?? inMemoryCaProfiles[0],
     };
   }
@@ -492,18 +484,18 @@ export async function getAssignedWorkspacesForCa(caUserId) {
     return [
       {
         id: 1,
-        name: "Acme Global Solutions",
-        businessType: "Corporation",
-        industry: "Technology & Services",
+        name: "Prava Technologies Private Limited",
+        businessType: "Private Limited Company",
+        industry: "Enterprise Software & AI",
         gstStatus: "registered",
-        gstin: "US-TAX-98765",
-        country: "US",
-        currency: "USD",
-        taxSystem: "Sales Tax",
+        gstin: "27AABCP8821F1Z2",
+        country: "IN",
+        currency: "INR",
+        taxSystem: "GST & Direct Tax",
         pendingReviewCount: 1,
-        lastFilingDate: "2026-08-20",
-        assignedAt: new Date("2026-01-15"),
-        assignmentNotes: "Designated lead CA for statutory audit and GST filing.",
+        lastFilingDate: "2024-09-15",
+        assignedAt: new Date("2024-04-01"),
+        assignmentNotes: "Designated lead statutory auditor for Section 44AB Tax Audit & GSTR-9C.",
       },
     ];
   }
@@ -533,41 +525,9 @@ export async function listCaReviewQueue(caUserId) {
   const db = await getDb();
   if (!db) {
     return {
-      reviewRequests: [
-        {
-          id: 1,
-          businessId: 1,
-          businessName: "Acme Global Solutions",
-          taskId: 1,
-          taskTitle: "Tax & Compliance Preparation — Q3 2026",
-          taskType: "gst_return_preparation",
-          status: "in_review",
-          note: "Please review supplier tax invoice attachments and verify statutory input tax credit eligibility.",
-          createdAt: new Date("2026-08-20"),
-          gstPreparation: {
-            salesMinor: 4850000,
-            taxableValueMinor: 4500000,
-            cgstMinor: 405000,
-            sgstMinor: 405000,
-            igstMinor: 0,
-            inputTaxCreditMinor: 210000,
-            netTaxPositionMinor: 600000,
-          },
-        },
-      ],
-      gstSubmissions: [
-        {
-          id: 1,
-          businessId: 1,
-          businessName: "Acme Global Solutions",
-          taskId: 1,
-          taskTitle: "Tax & Compliance Preparation — Q3 2026",
-          status: "awaiting_review",
-          requesterNote: "Ready for authorized dispatch after CA sign-off.",
-          createdAt: new Date("2026-08-21"),
-        },
-      ],
-      historicalObservations: inMemoryCaObservations,
+      reviewRequests: inMemoryReviewRequests,
+      gstSubmissions: inMemoryGstSubmissions,
+      historicalObservations: inMemoryCaObservations.filter(o => o.caUserId === caUserId),
     };
   }
 

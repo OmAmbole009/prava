@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { SEED_CA_DEFAULT_PASSWORD, SEED_CA_EMAIL } from "@shared/const";
 import {
   ArrowRight,
   BadgeCheck,
@@ -14,7 +13,6 @@ import {
   Lock,
   Mail,
   ShieldCheck,
-  Sparkles,
   UserCheck,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
@@ -42,12 +40,6 @@ export default function CaLogin() {
     e.preventDefault();
     if (!email || !password) return;
     caLogin.mutate({ email, password });
-  };
-
-  const handleFillDemoCredentials = () => {
-    setEmail(SEED_CA_EMAIL);
-    setPassword(SEED_CA_DEFAULT_PASSWORD);
-    toast.info("Filled with pre-seeded In-House CA credentials for local evaluation.");
   };
 
   return (
@@ -117,24 +109,6 @@ export default function CaLogin() {
                   <strong className="text-slate-900 dark:text-white">Multi-Tenant Confidentiality:</strong> CAs only access client businesses explicitly assigned to them.
                 </span>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-purple-400/30 bg-purple-500/[0.05] p-4 text-xs text-slate-700 dark:text-slate-300">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-bold">Local Demo Testing</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleFillDemoCredentials}
-                  className="h-7 rounded-lg border-purple-400/40 bg-purple-500/10 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 shadow-sm"
-                >
-                  <Sparkles className="mr-1.5 size-3" />
-                  Auto-fill CA Credentials
-                </Button>
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Pre-configured account: <code className="font-mono font-bold text-slate-900 dark:text-white">{SEED_CA_EMAIL}</code>
-              </p>
             </div>
           </div>
 

@@ -51,4 +51,20 @@ export function registerStorageProxy(app) {
       res.status(502).send("Storage proxy error");
     }
   });
+
+  app.get("/api/storage/*", async (req, res) => {
+    try {
+      const { getSupabaseFile } = await import("../storage.js");
+      const key = decodeURIComponent(req.params[0] || "");
+      if (!key) return res.status(400).send("Missing storage key");
+      const file = await getSupabaseFile(key);
+      if (!file) return res.status(404).send("File not found in storage");
+      res.setHeader("Content-Type", file.contentType);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.send(file.buffer);
+    } catch (err) {
+      console.error("[StorageProxy api] error:", err);
+      res.status(500).send("Storage error");
+    }
+  });
 }

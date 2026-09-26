@@ -16,6 +16,7 @@ import {
 import { invokeLLM } from "./_core/llm.js";
 import { getDb } from "./db.js";
 import { formatMinorAmount } from "../shared/locale.js";
+import { buildCaAdvisoryResponse, retrieveCaKnowledge } from "./caRag.js";
 
 export const askPravaInputSchema = z.object({
   businessId: z.number().int().positive(),
@@ -35,11 +36,11 @@ async function verifyWorkspaceAccess(userId, businessId) {
   if (!db) {
     return {
       businessId,
-      name: "Acme Global Solutions",
-      currency: "USD",
-      locale: "en-US",
-      taxSystem: "Sales Tax",
-      gstin: "US-TAX-98765",
+      name: "Prava Technologies Private Limited",
+      currency: "INR",
+      locale: "en-IN",
+      taxSystem: "GST & Indian Direct Tax",
+      gstin: "27AABCP8821F1Z2",
       role: "owner",
     };
   }
@@ -78,60 +79,71 @@ export async function getLiveWorkspaceContext(userId, businessId) {
     formatMinorAmount(minor, workspace.currency, workspace.locale);
 
   if (!db) {
+    const { inMemoryAccountingEntries, inMemoryActionItems, inMemoryDocuments, inMemoryTasks } = await import("./operations.js");
+    const entries = inMemoryAccountingEntries.filter(e => e.businessId === businessId);
+    let revenueMinor = 0;
+    let expensesMinor = 0;
+    for (const e of entries) {
+      if (e.category === "revenue" || e.entryType === "credit") revenueMinor += (e.amountMinor || 0);
+      else expensesMinor += (e.amountMinor || 0);
+    }
+    const cashMinor = Math.max(0, revenueMinor - expensesMinor);
+    const gstPositionMinor = Math.round(revenueMinor * 0.18 - expensesMinor * 0.18);
+    const receivablesMinor = Math.round(revenueMinor * 0.15);
+    const payablesMinor = Math.round(expensesMinor * 0.10);
+
+    const bizDocs = inMemoryDocuments.filter(d => d.document.businessId === businessId);
+    const bizActions = inMemoryActionItems.filter(a => a.businessId === businessId && a.status === "open");
+    const bizTasks = inMemoryTasks.filter(t => t.businessId === businessId);
+
     return {
       workspace,
       financials: {
-        revenueMinor: 12500000,
-        revenueFormatted: fmt(12500000),
-        expensesMinor: 4850000,
-        expensesFormatted: fmt(4850000),
-        cashMinor: 7650000,
-        cashFormatted: fmt(7650000),
-        gstPositionMinor: 1420000,
-        gstPositionFormatted: fmt(1420000),
-        receivablesMinor: 3200000,
-        receivablesFormatted: fmt(3200000),
-        payablesMinor: 1150000,
-        payablesFormatted: fmt(1150000),
+        revenueMinor,
+        revenueFormatted: fmt(revenueMinor),
+        expensesMinor,
+        expensesFormatted: fmt(expensesMinor),
+        cashMinor,
+        cashFormatted: fmt(cashMinor),
+        gstPositionMinor,
+        gstPositionFormatted: fmt(gstPositionMinor),
+        receivablesMinor,
+        receivablesFormatted: fmt(receivablesMinor),
+        payablesMinor,
+        payablesFormatted: fmt(payablesMinor),
       },
-      openActions: [
-        {
-          id: 1,
-          title: "Review Supplier Invoice INV-2026-0801",
-          description: "Verify extracted invoice components and jurisdiction before quarter-end preparation.",
-          documentId: 1,
-          taskId: 1,
-          type: "review_document",
-          priority: "high",
-        },
-      ],
-      recentDocuments: [
-        {
-          id: 1,
-          originalName: "Supplier_Invoice_Apex_Aug2026.pdf",
-          documentType: "invoice",
-          status: "extracted",
-          vendorName: "Apex Global Supplies",
-          invoiceNumber: "INV-2026-0801",
-          totalMinor: 5335000,
-          totalFormatted: fmt(5335000),
-          invoiceType: "purchase",
-        },
-      ],
-      tasks: [
-        {
-          id: 1,
-          type: "gst_return_preparation",
-          title: "Tax & Compliance Preparation — Q3 2026",
-          status: "prepared",
-          requiresProfessionalReview: 0,
-        },
-      ],
+      openActions: bizActions.map(a => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        documentId: a.documentId,
+        taskId: a.taskId,
+        type: a.type,
+        priority: a.priority,
+      })),
+      recentDocuments: bizDocs.slice(0, 5).map(d => ({
+        id: d.document.id,
+        originalName: d.document.originalName,
+        documentType: d.document.documentType,
+        status: d.document.status,
+        vendorName: d.extraction?.vendorName || "Commercial Document",
+        invoiceNumber: d.extraction?.invoiceNumber || `DOC-${d.document.id}`,
+        totalMinor: d.extraction?.totalMinor || 0,
+        totalFormatted: fmt(d.extraction?.totalMinor || 0),
+        invoiceType: d.extraction?.invoiceType || "purchase",
+      })),
+      tasks: bizTasks.map(t => ({
+        id: t.id,
+        type: t.type,
+        title: t.title,
+        status: t.status,
+        requiresProfessionalReview: t.requiresProfessionalReview,
+      })),
       gstPreparation: {
-        status: "prepared",
-        salesFormatted: fmt(12500000),
-        estimatedTaxFormatted: fmt(940000),
-        inputTaxCreditFormatted: fmt(480000),
+        status: bizTasks[0]?.status || "fresh",
+        salesFormatted: fmt(revenueMinor),
+        estimatedTaxFormatted: fmt(gstPositionMinor),
+        inputTaxCreditFormatted: fmt(Math.round(expensesMinor * 0.18)),
       },
     };
   }
@@ -321,16 +333,50 @@ Always respond with helpful, structured markdown explaining the facts simply and
   });
 
   const rawAnswer = response.choices[0]?.message.content;
-  const answer =
-    typeof rawAnswer === "string"
+  const lower = input.message.toLowerCase();
+
+  const isCaOrTaxTopic =
+    lower.includes("tax") ||
+    lower.includes("advance") ||
+    lower.includes("msme") ||
+    lower.includes("43b") ||
+    lower.includes("gst") ||
+    lower.includes("tds") ||
+    lower.includes("save") ||
+    lower.includes("salary") ||
+    lower.includes("dividend") ||
+    lower.includes("audit") ||
+    lower.includes("itc") ||
+    lower.includes("ca") ||
+    lower.includes("replace") ||
+    lower.includes("rule");
+
+  let answer =
+    typeof rawAnswer === "string" && !rawAnswer.includes("### Financial Analysis & Guidance")
       ? rawAnswer
-      : "I have gathered your business information. Here is what you need to know.";
+      : "";
+
+  if (isCaOrTaxTopic || !answer) {
+    const caAdvice = buildCaAdvisoryResponse(input.message, context.financials, context.workspace);
+    answer = `### ⚖️ ${caAdvice.title}
+
+${caAdvice.analysis}
+
+#### 📋 Statutory Protocol & Action Plan:
+${caAdvice.actionPlan.map((step) => `- ${step}`).join("\n")}
+
+> ⚠️ **Autonomous CA Advisory Warning**: ${caAdvice.warning}
+
+*Statutory Reference: ${caAdvice.sectionsReferenced.join(", ")}*`;
+  }
 
   // Determine contextual action buttons based on user query and intent
   const actions = [];
   const sources = [];
 
-  const lower = input.message.toLowerCase();
+  if (isCaOrTaxTopic) {
+    actions.push({ label: "Open CA Replacement Suite", path: "/ca-suite", variant: "default" });
+  }
 
   if (lower.includes("invoice") || lower.includes("bill") || lower.includes("document") || lower.includes("receipt")) {
     actions.push({ label: "View Documents", path: "/documents", variant: "default" });
@@ -432,19 +478,7 @@ export async function getCaReviewItemsForUser(userId, businessId) {
         bio: "Designated In-House Chartered Accountant for Statutory & Compliance Verification",
         assignedAt: new Date("2026-01-15"),
       },
-      professionalReviews: [
-        {
-          id: 1,
-          taskId: 1,
-          taskTitle: "Tax & Compliance Preparation — Q3 2026",
-          taskType: "gst_return_preparation",
-          status: "in_review",
-          note: "Reviewing supplier tax invoice attachments and jurisdiction details.",
-          createdAt: new Date("2026-08-20"),
-          updatedAt: new Date("2026-08-20"),
-          taskStatus: "professional_review",
-        },
-      ],
+      professionalReviews: [],
       submissionAuthorizations: [],
       caObservations: inMemoryCaObservations.filter(o => o.businessId === businessId),
     };

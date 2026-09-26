@@ -5,10 +5,10 @@ describe("Ask Prava Assistant backend", () => {
   it("retrieves live workspace context with formatted metrics without error", async () => {
     const context = await getLiveWorkspaceContext(1, 1);
     expect(context.workspace).toBeDefined();
-    expect(context.workspace.name).toBe("Acme Global Solutions");
+    expect(context.workspace.name).toBe("Prava Technologies Private Limited");
     expect(context.financials).toBeDefined();
     expect(typeof context.financials.revenueFormatted).toBe("string");
-    expect(context.financials.revenueFormatted).toContain("$");
+    expect(context.financials.revenueFormatted).toContain("₹");
     expect(typeof context.financials.expensesFormatted).toBe("string");
     expect(typeof context.financials.cashFormatted).toBe("string");
   });

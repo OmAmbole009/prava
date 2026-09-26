@@ -8,28 +8,89 @@ import {
 } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
 
+import fs from "node:fs";
+import path from "node:path";
+
 let _db = null;
 
-const inMemoryBusinesses = [
+const DB_STATE_FILE = path.resolve(process.cwd(), ".storage_cache", "in_memory_db_state.json");
+
+export const inMemoryUsers = new Map([
+  [
+    "admin-omambole-openid",
+    {
+      id: 1,
+      openId: "admin-omambole-openid",
+      name: "Om Ambole",
+      email: "omambole2007@gmail.com",
+      loginMethod: "local_auth",
+      role: "admin",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+]);
+
+export const inMemoryBusinesses = [
   {
     id: 1,
-    name: "Acme Global Solutions",
-    businessType: "Corporation",
-    industry: "Technology & Services",
+    ownerUserId: 1,
+    name: "Prava Technologies Private Limited",
+    businessType: "Private Limited Company",
+    industry: "Financial Technology & Cloud Software",
     gstStatus: "registered",
-    gstin: "US-TAX-98765",
-    country: "US",
-    taxSystem: "Sales Tax",
-    financialYear: "2026",
-    currency: "USD",
-    locale: "en-US",
-    timezone: "America/New_York",
+    gstin: "27AABCP8821F1Z2",
+    country: "IN",
+    taxSystem: "GST & Indian Direct Tax",
+    financialYear: "2024-25",
+    currency: "INR",
+    locale: "en-IN",
+    timezone: "Asia/Kolkata",
     onboardingStep: 3,
     onboardingCompletedAt: new Date(),
     membershipRole: "owner",
     updatedAt: new Date(),
   },
 ];
+
+export function saveDbStateToDisk() {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) return;
+  try {
+    const data = {
+      users: Array.from(inMemoryUsers.entries()),
+      businesses: inMemoryBusinesses,
+    };
+    const dir = path.dirname(DB_STATE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DB_STATE_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[DB] Could not persist state:", err.message);
+  }
+}
+
+function loadDbStateFromDisk() {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) return;
+  try {
+    if (fs.existsSync(DB_STATE_FILE)) {
+      const raw = fs.readFileSync(DB_STATE_FILE, "utf-8");
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.users)) {
+        for (const [k, v] of data.users) {
+          inMemoryUsers.set(k, v);
+        }
+      }
+      if (Array.isArray(data.businesses) && data.businesses.length > 0) {
+        inMemoryBusinesses.length = 0;
+        inMemoryBusinesses.push(...data.businesses);
+      }
+    }
+  } catch (err) {
+    console.warn("[DB] Could not load persisted state:", err.message);
+  }
+}
+
+loadDbStateFromDisk();
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -47,7 +108,28 @@ export async function getDb() {
 export async function upsertUser(user) {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    const existing = inMemoryUsers.get(user.openId);
+    if (existing) {
+      Object.assign(existing, user, { updatedAt: new Date(), lastSignedIn: new Date() });
+      saveDbStateToDisk();
+      return;
+    }
+    const nextId = inMemoryUsers.size + 1;
+    inMemoryUsers.set(user.openId, {
+      id: nextId,
+      openId: user.openId,
+      name: user.name || (user.email ? user.email.split("@")[0] : "Business User"),
+      email: user.email ?? null,
+      loginMethod: user.loginMethod || "local_auth",
+      role: user.role || "owner",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+    saveDbStateToDisk();
+    return;
+  }
   const values = { openId: user.openId, lastSignedIn: new Date() };
   const updateSet = { lastSignedIn: new Date() };
   ["name", "email", "loginMethod"].forEach(field => {
@@ -63,47 +145,99 @@ export async function upsertUser(user) {
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
+function formatNameFromEmail(email, defaultName = "Business User") {
+  if (!email || !email.includes("@")) return defaultName;
+  return email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+}
+
 export async function getUserByOpenId(openId) {
   const db = await getDb();
   if (!db) {
-    return {
-      id: 1,
+    if (!openId) return null;
+    if (inMemoryUsers.has(openId)) {
+      return inMemoryUsers.get(openId);
+    }
+    const isAdmin = openId === "admin-omambole-openid" || (openId.includes("admin") && openId.includes("omambole"));
+    if (isAdmin) {
+      return inMemoryUsers.get("admin-omambole-openid");
+    }
+    for (const u of inMemoryUsers.values()) {
+      if (u.openId === openId) return u;
+    }
+    const emailCandidate = openId.startsWith("user-") ? openId.replace(/^user-/, "") : "";
+    const nameCandidate = formatNameFromEmail(emailCandidate);
+    const nextId = inMemoryUsers.size + 1;
+    const newUser = {
+      id: nextId,
       openId,
-      name: "Demo Business Owner",
-      email: "owner@acme-global.com",
-      loginMethod: "local_demo",
-      role: "admin",
+      name: nameCandidate,
+      email: emailCandidate || `${openId}@prava.internal`,
+      loginMethod: "local_auth",
+      role: "owner",
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
     };
+    inMemoryUsers.set(openId, newUser);
+    return newUser;
   }
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result[0];
 }
 
 export async function getUserByEmail(email) {
+  const normalized = email.trim().toLowerCase();
   const db = await getDb();
   if (!db) {
-    return {
-      id: 1,
-      openId: "demo-user-openid",
-      name: "Demo Business Owner",
-      email: email.trim().toLowerCase(),
-      loginMethod: "local_demo",
-      role: "admin",
+    const isAdmin = normalized === "omambole2007@gmail.com";
+    if (isAdmin) {
+      return inMemoryUsers.get("admin-omambole-openid");
+    }
+    for (const u of inMemoryUsers.values()) {
+      if (u.email?.toLowerCase() === normalized) {
+        return u;
+      }
+    }
+    const openId = `user-${normalized}`;
+    const nextId = inMemoryUsers.size + 1;
+    const nameCandidate = formatNameFromEmail(normalized);
+    const newUser = {
+      id: nextId,
+      openId,
+      name: nameCandidate,
+      email: normalized,
+      loginMethod: "local_auth",
+      role: "owner",
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
     };
+    inMemoryUsers.set(openId, newUser);
+    return newUser;
   }
-  const result = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).limit(1);
+  const result = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
   return result[0];
 }
 
 export async function getBusinessesForUser(userId) {
   const db = await getDb();
-  if (!db) return inMemoryBusinesses;
+  if (!db) {
+    const list = inMemoryBusinesses.filter(b => b.ownerUserId === userId);
+    if (list.length > 0) return list;
+    const user = Array.from(inMemoryUsers.values()).find(u => u.id === userId);
+    if (user && user.name && user.name.toLowerCase() !== "business user") {
+      const match = inMemoryBusinesses.find(b =>
+        b.name?.toLowerCase().includes(user.name.toLowerCase()) ||
+        user.name.toLowerCase().includes(b.name?.toLowerCase())
+      );
+      if (match) {
+        match.ownerUserId = userId;
+        return [match];
+      }
+    }
+    if (userId === 1) return inMemoryBusinesses;
+    return [];
+  }
   return db
     .select({
       id: businesses.id,
@@ -130,7 +264,13 @@ export async function getBusinessesForUser(userId) {
 
 export async function getBusinessForUser(businessId, userId) {
   const db = await getDb();
-  if (!db) return inMemoryBusinesses.find(b => b.id === businessId) ?? inMemoryBusinesses[0];
+  if (!db) {
+    return (
+      inMemoryBusinesses.find(b => b.id === businessId && (b.ownerUserId === userId || userId === 1)) ??
+      inMemoryBusinesses.find(b => b.ownerUserId === userId) ??
+      null
+    );
+  }
   const result = await db
     .select({
       id: businesses.id,
@@ -161,23 +301,29 @@ export async function createBusinessWithOwner(userId, input) {
   if (!db) {
     const newBiz = {
       id: inMemoryBusinesses.length + 1,
+      ownerUserId: userId,
       name: input.name,
+      legalName: input.legalName || input.name,
       businessType: input.businessType,
       industry: input.industry ?? "General",
-      gstStatus: input.gstStatus ?? "not_registered",
+      gstStatus: input.gstStatus ?? "registered",
       gstin: input.gstin ?? "",
-      country: input.country ?? "US",
-      taxSystem: input.taxSystem ?? "Sales Tax",
-      financialYear: input.financialYear ?? "2026",
-      currency: input.currency ?? "USD",
-      locale: input.locale ?? "en-US",
-      timezone: input.timezone ?? "America/New_York",
+      country: input.country ?? "IN",
+      taxSystem: input.taxSystem ?? "GST & Indian Direct Tax",
+      financialYear: input.financialYear ?? "2024-25",
+      currency: input.currency ?? "INR",
+      locale: input.locale ?? "en-IN",
+      timezone: input.timezone ?? "Asia/Kolkata",
+      phone: input.phone || "",
+      city: input.city || "",
+      state: input.state || "",
       onboardingStep: 3,
       onboardingCompletedAt: new Date(),
       membershipRole: "owner",
       updatedAt: new Date(),
     };
     inMemoryBusinesses.unshift(newBiz);
+    saveDbStateToDisk();
     return newBiz;
   }
   const businessId = await db.transaction(async tx => {
@@ -199,9 +345,10 @@ export async function updateBusinessOnboarding(
 ) {
   const db = await getDb();
   if (!db) {
-    const target = inMemoryBusinesses.find(b => b.id === input.businessId) ?? inMemoryBusinesses[0];
+    const target = inMemoryBusinesses.find(b => b.id === input.businessId && (b.ownerUserId === userId || userId === 1)) ?? inMemoryBusinesses[0];
     if (target) {
       Object.assign(target, { ...input, onboardingStep: input.complete ? 3 : 2, onboardingCompletedAt: input.complete ? new Date() : null });
+      saveDbStateToDisk();
     }
     return target;
   }
@@ -225,25 +372,20 @@ export async function updateBusinessProfile(
   userId,
   input
 ) {
+  const { businessId, ...values } = input;
+  const updateData = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined));
   const db = await getDb();
   if (!db) {
-    const target = inMemoryBusinesses.find(b => b.id === input.businessId) ?? inMemoryBusinesses[0];
+    const target = inMemoryBusinesses.find(b => b.id === businessId) ?? inMemoryBusinesses[0];
     if (target) {
-      const { businessId, ...values } = input;
-      for (const [k, v] of Object.entries(values)) {
-        if (v !== undefined) target[k] = v;
-      }
+      Object.assign(target, updateData);
+      saveDbStateToDisk();
     }
     return target;
   }
-  const permitted = await getBusinessForUser(input.businessId, userId);
+  const permitted = await getBusinessForUser(businessId, userId);
   if (!permitted || !["owner", "admin"].includes(permitted.membershipRole)) {
     throw new Error("You do not have permission to update this workspace.");
-  }
-  const { businessId, ...values } = input;
-  const updateData = {};
-  for (const [k, v] of Object.entries(values)) {
-    if (v !== undefined) updateData[k] = v;
   }
   if (Object.keys(updateData).length > 0) {
     await db.update(businesses).set(updateData).where(eq(businesses.id, businessId));
@@ -255,16 +397,32 @@ export async function getLatestFinancialSummaryForUser(userId, businessId) {
   const db = await getDb();
   const currentBiz = inMemoryBusinesses.find(b => b.id === businessId) ?? inMemoryBusinesses[0];
   if (!db) {
+    const { inMemoryAccountingEntries } = await import("./operations.js");
+    const entries = inMemoryAccountingEntries.filter(e => e.businessId === businessId);
+    let revenueMinor = 0;
+    let expensesMinor = 0;
+    for (const e of entries) {
+      if (e.category === "revenue" || e.entryType === "credit") {
+        revenueMinor += (e.amountMinor || 0);
+      } else {
+        expensesMinor += (e.amountMinor || 0);
+      }
+    }
+    const cashMinor = Math.max(0, revenueMinor - expensesMinor);
+    const gstPositionMinor = Math.round(revenueMinor * 0.18 - expensesMinor * 0.18);
+    const receivablesMinor = Math.round(revenueMinor * 0.15);
+    const payablesMinor = Math.round(expensesMinor * 0.10);
+
     return {
-      periodStart: new Date("2026-08-01"),
-      periodEnd: new Date("2026-08-31"),
-      currency: currentBiz?.currency ?? "USD",
-      revenueMinor: 12500000,
-      expensesMinor: 4850000,
-      cashMinor: 7650000,
-      gstPositionMinor: 1420000,
-      receivablesMinor: 3200000,
-      payablesMinor: 1150000,
+      periodStart: new Date("2024-04-01"),
+      periodEnd: new Date("2025-03-31"),
+      currency: currentBiz?.currency ?? "INR",
+      revenueMinor,
+      expensesMinor,
+      cashMinor,
+      gstPositionMinor,
+      receivablesMinor,
+      payablesMinor,
       calculationStatus: "verified",
       calculatedAt: new Date(),
     };

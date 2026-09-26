@@ -1,6 +1,21 @@
 import { COOKIE_NAME } from "../shared/const.js";
 import { z } from "zod";
-import { adminLoginSchema, signInLocalAdministrator } from "./adminLogin.js";
+import { adminLoginSchema, signInLocalAdministrator, signInUnified, unifiedLoginSchema } from "./adminLogin.js";
+import { getStorageHealth } from "./storage.js";
+import {
+  calculateAdvanceTax,
+  auditMsme43BhCompliance,
+  reconcileGstr2B,
+  getTdsComplianceOverview,
+  auditCashTransactions,
+  draftTaxNoticeDefense,
+  getStatutoryComplianceCalendar,
+  generateGstnReturnSchema,
+  auditVendorInvoice,
+  generateSchedule3Financials,
+  generateForm3CDTaxAudit,
+  askCaCopilotRag,
+} from "./caEngine.js";
 import {
   acceptBusinessInvitation,
   auditLogSchema,
@@ -121,6 +136,25 @@ const gstLineItemUpdateSchema = z.object({
   partyGstin: z.string().optional(),
 });
 
+async function resolveBusinessId(userId, inputBusinessId) {
+  if (inputBusinessId) return inputBusinessId;
+  const bizList = await getBusinessesForUser(userId);
+  return bizList?.[0]?.id;
+}
+
+async function getDocFinancialTotals(userId, businessId) {
+  const docs = await listDocumentsForUser(userId, businessId);
+  let revenue = 0;
+  let expenses = 0;
+  for (const d of docs) {
+    if (!d.extraction) continue;
+    const amt = (d.extraction.taxableValueMinor || d.extraction.totalMinor || 0) / 100;
+    if (d.extraction.invoiceType === "sales") revenue += amt;
+    else if (d.extraction.invoiceType === "purchase") expenses += amt;
+  }
+  return { revenue, expenses, docs };
+}
+
 export const appRouter = router({
   system: systemRouter,
   assistant: router({
@@ -130,6 +164,7 @@ export const appRouter = router({
   }),
   auth: router({
     me: publicProcedure.query(({ ctx }) => ctx.user),
+    login: publicProcedure.input(unifiedLoginSchema).mutation(({ ctx, input }) => signInUnified(ctx, input)),
     adminLogin: publicProcedure.input(adminLoginSchema).mutation(({ ctx, input }) => signInLocalAdministrator(ctx, input)),
     caLogin: publicProcedure.input(caLoginSchema).mutation(({ ctx, input }) => signInCa(ctx, input)),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -227,5 +262,178 @@ export const appRouter = router({
   }),
   invitations: router({
     accept: protectedProcedure.input(z.object({ token: z.string().min(20).max(256) })).mutation(({ ctx, input }) => acceptBusinessInvitation(ctx.user, input.token)),
+  }),
+  storage: router({
+    status: publicProcedure.query(() => getStorageHealth()),
+  }),
+  caEngine: router({
+    advanceTax: protectedProcedure
+      .input(
+        z.object({
+          businessId: z.number().optional(),
+          grossRevenue: z.number().optional(),
+          operatingExpenses: z.number().optional(),
+          depreciation: z.number().optional(),
+          otherIncome: z.number().optional(),
+          deductions80C: z.number().optional(),
+          deductions80D: z.number().optional(),
+          tdsAlreadyDeducted: z.number().optional(),
+          entityType: z.enum(["company", "individual_business", "llp"]).optional(),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        let grossRevenue = input?.grossRevenue;
+        let operatingExpenses = input?.operatingExpenses;
+        const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+
+        if (businessId && (grossRevenue === undefined || operatingExpenses === undefined)) {
+          const totals = await getDocFinancialTotals(ctx.user.id, businessId);
+          if (grossRevenue === undefined) grossRevenue = totals.revenue;
+          if (operatingExpenses === undefined) operatingExpenses = totals.expenses;
+        }
+
+        return calculateAdvanceTax({
+          ...input,
+          grossRevenue: grossRevenue ?? 0,
+          operatingExpenses: operatingExpenses ?? 0,
+        });
+      }),
+    msmeAudit: protectedProcedure
+      .input(z.object({ businessId: z.number().optional(), invoices: z.array(z.any()).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        if (input?.invoices) return auditMsme43BhCompliance(input.invoices);
+        const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+        if (businessId) {
+          const docs = await listDocumentsForUser(ctx.user.id, businessId);
+          const purchaseInvoices = docs
+            .filter(d => d.extraction && d.extraction.invoiceType === "purchase")
+            .map(d => ({
+              id: `INV-${d.document.id}`,
+              invoiceNumber: d.extraction.invoiceNumber || `DOC-${d.document.id}`,
+              vendorName: d.extraction.vendorName || "Commercial Vendor",
+              udyamNumber: d.extraction.udyamNumber || "",
+              enterpriseCategory: d.extraction.msmeStatus || "micro",
+              hasWrittenAgreement: d.extraction.hasWrittenContract ?? true,
+              invoiceDate: d.extraction.invoiceDate || new Date().toISOString().slice(0, 10),
+              invoiceAmount: (d.extraction.totalMinor || 0) / 100,
+              paymentDate: d.extraction.paymentDate || null,
+              daysOutstanding: d.extraction.invoiceDate ? Math.max(0, Math.floor((Date.now() - new Date(d.extraction.invoiceDate).getTime()) / 86400000)) : 0,
+              status: "open",
+            }));
+          return auditMsme43BhCompliance(purchaseInvoices);
+        }
+        return auditMsme43BhCompliance();
+      }),
+    gstr2bReconcile: protectedProcedure
+      .input(z.object({ businessId: z.number().optional(), period: z.string().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+        if (businessId) {
+          const docs = await listDocumentsForUser(ctx.user.id, businessId);
+          const purchaseInvoices = docs
+            .filter(d => d.extraction && d.extraction.invoiceType === "purchase")
+            .map(d => ({
+              invoiceNumber: d.extraction.invoiceNumber || `DOC-${d.document.id}`,
+              vendorName: d.extraction.vendorName || "Commercial Vendor",
+              gstin: d.extraction.gstin,
+              invoiceDate: d.extraction.invoiceDate,
+              taxableValue: (d.extraction.taxableValueMinor || 0) / 100,
+              cgst: (d.extraction.cgstMinor || 0) / 100,
+              sgst: (d.extraction.sgstMinor || 0) / 100,
+              igst: (d.extraction.igstMinor || 0) / 100,
+            }));
+          return reconcileGstr2B(purchaseInvoices);
+        }
+        return reconcileGstr2B();
+      }),
+    tdsCompliance: protectedProcedure
+      .query(() => getTdsComplianceOverview()),
+    cashAudit: protectedProcedure
+      .query(() => auditCashTransactions()),
+    draftNoticeDefense: protectedProcedure
+      .input(
+        z.object({
+          noticeType: z.enum(["gst_asmt_10", "it_143_1", "it_139_9", "gst_drc_01"]).default("gst_asmt_10"),
+          taxpayerName: z.string().optional(),
+          gstinOrPan: z.string().optional(),
+          noticeRef: z.string().optional(),
+          disputedAmount: z.number().optional(),
+          assessmentYear: z.string().optional(),
+        })
+      )
+      .mutation(({ input }) => draftTaxNoticeDefense(input)),
+    complianceCalendar: publicProcedure
+      .query(() => getStatutoryComplianceCalendar()),
+    gstnFilingJson: protectedProcedure
+      .input(z.object({ businessId: z.number().optional(), returnPeriod: z.string().optional(), gstin: z.string().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+        if (!businessId) {
+          return generateGstnReturnSchema(input || {});
+        }
+        const biz = await getBusinessForUser(businessId, ctx.user.id);
+        const docs = await listDocumentsForUser(ctx.user.id, businessId);
+        const invoices = docs
+          .filter(d => d.extraction)
+          .map(d => ({
+            ...d.extraction,
+            originalName: d.document.originalName,
+            documentId: d.document.id,
+            isBlocked17_5: d.extraction.isBlocked17_5,
+            blockedReason: d.extraction.blockedReason,
+            direction: d.extraction.invoiceType === "sales" ? "outward" : "inward",
+            taxableValue: (d.extraction.taxableValueMinor || 0) / 100,
+            cgst: (d.extraction.cgstMinor || 0) / 100,
+            sgst: (d.extraction.sgstMinor || 0) / 100,
+            igst: (d.extraction.igstMinor || 0) / 100,
+            total: (d.extraction.totalMinor || 0) / 100,
+          }));
+
+        return generateGstnReturnSchema({
+          legalName: biz?.name,
+          gstin: input?.gstin || biz?.gstin || (invoices[0]?.gstin ?? ""),
+          returnPeriod: input?.returnPeriod || "092024",
+          invoices,
+          isDynamic: true,
+        });
+      }),
+    auditInvoice: protectedProcedure
+      .input(
+        z.object({
+          vendorName: z.string().optional(),
+          vendorGstin: z.string().optional(),
+          invoiceNumber: z.string().optional(),
+          invoiceDate: z.string().optional(),
+          taxableAmount: z.number().optional(),
+          gstRate: z.number().optional(),
+          sacOrHsn: z.string().optional(),
+          expenseCategory: z.string().optional(),
+          msmeStatus: z.enum(["micro", "small", "medium", "non_msme"]).optional(),
+          hasWrittenContract: z.boolean().optional(),
+        })
+      )
+      .mutation(({ input }) => auditVendorInvoice(input)),
+    schedule3Financials: protectedProcedure
+      .input(z.object({ businessId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+        if (businessId) {
+          const biz = await getBusinessForUser(businessId, ctx.user.id);
+          const { revenue, expenses } = await getDocFinancialTotals(ctx.user.id, businessId);
+          return generateSchedule3Financials({
+            entityName: biz?.name,
+            cin: biz?.registrationNumber || "U72900MH2024PTC000000",
+            revenue,
+            expenses,
+            isDynamic: true,
+          });
+        }
+        return generateSchedule3Financials();
+      }),
+    form3CdTaxAudit: protectedProcedure
+      .query(() => generateForm3CDTaxAudit()),
+    askCopilot: protectedProcedure
+      .input(z.object({ query: z.string() }))
+      .mutation(({ input }) => askCaCopilotRag(input.query)),
   }),
 });

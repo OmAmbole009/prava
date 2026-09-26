@@ -27,6 +27,8 @@ const AdminCaManagement = lazy(() => import("@/pages/AdminCaManagement"));
 const CaLogin = lazy(() => import("@/pages/CaLogin"));
 const CaDashboard = lazy(() => import("@/pages/CaDashboard"));
 const InvitationAcceptance = lazy(() => import("@/pages/InvitationAcceptance"));
+const Login = lazy(() => import("@/pages/Login"));
+const CaSuite = lazy(() => import("@/pages/CaSuite"));
 
 function DeferredPage({ component: Component }: { component: React.ComponentType }) {
   return (
@@ -61,9 +63,11 @@ export default function WorkspaceApp() {
           <CursorTube />
           <Toaster />
           <Switch>
+            <Route path="/login">{() => <DeferredPage component={Login} />}</Route>
+            <Route path="/ca-suite">{() => <DeferredPage component={CaSuite} />}</Route>
             <Route path="/ca/login">{() => <DeferredPage component={CaLogin} />}</Route>
             <Route path="/ca/dashboard">{() => <DeferredPage component={CaDashboard} />}</Route>
-            <Route path="/admin/login">{() => <DeferredPage component={AdminLogin} />}</Route>
+            <Route path="/admin/login">{() => <DeferredPage component={Login} />}</Route>
             <Route path="/admin/security">{() => <DeferredPage component={AdminSecurity} />}</Route>
             <Route path="/admin/cas">{() => <DeferredPage component={AdminCaManagement} />}</Route>
             <Route path="/admin/gst">{() => <DeferredPage component={AdminGstSubmissions} />}</Route>

@@ -92,8 +92,8 @@ const interactivePrompts = [
   },
   {
     query: "Are any customer invoices overdue for payment?",
-    answer: "Apex Global Solutions has 1 overdue invoice (INV-042) for ₹3,40,000 due 6 days ago. 3 other invoices worth ₹8,90,000 are due next week.",
-    sources: ["Sales Ledger 2026", "Bank Inflow Match"],
+    answer: "Infosys Cloud Solutions has 1 overdue invoice (INV-042) for ₹3,40,000 due 6 days ago. 3 other verified invoices worth ₹8,90,000 are scheduled for payment next week.",
+    sources: ["Sales Ledger 2024-25", "HDFC Bank Statement Match"],
     category: "Receivables",
   },
   {
@@ -114,7 +114,9 @@ export default function Home() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "tax" | "documents" | "ca">("overview");
 
   const profile = profileForCountry(selectedCountry);
-  const begin = () => startLogin("/dashboard");
+  const begin = () => {
+    window.location.href = "/login";
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -210,15 +212,18 @@ export default function Home() {
 
         {/* Center links with dots */}
         <nav className="hidden lg:flex items-center gap-4 text-[13px] font-medium text-white/70">
+          <a href="/ca-suite" className="text-purple-400 hover:text-purple-300 transition-colors font-semibold flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-purple-400 animate-pulse" />
+            Autonomous CA Suite
+          </a>
+          <span className="size-1 rounded-full bg-white/30" />
           <a href="#pipeline" className="hover:text-white transition-colors">How It Connects</a>
           <span className="size-1 rounded-full bg-white/30" />
           <a href="#pulse" className="hover:text-white transition-colors">Financial Pulse</a>
           <span className="size-1 rounded-full bg-white/30" />
           <a href="#tax-engine" className="hover:text-white transition-colors">GST & Tax Engine</a>
           <span className="size-1 rounded-full bg-white/30" />
-          <a href="#ca-hub" className="hover:text-white transition-colors">CA Verification</a>
-          <span className="size-1 rounded-full bg-white/30" />
-          <a href="#copilot" className="hover:text-white transition-colors">Ask Prava AI</a>
+          <a href="/ca/login" className="hover:text-white transition-colors">CA Portal</a>
         </nav>
 
         {/* Right CTA & Locale */}
@@ -241,12 +246,10 @@ export default function Home() {
           </div>
 
           <button
-            onClick={begin}
-            onPointerEnter={prefetchWorkspace}
-            onFocus={prefetchWorkspace}
-            className="flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition-all backdrop-blur-md shadow-lg"
+            onClick={() => { window.location.href = "/login"; }}
+            className="flex items-center gap-2 rounded-xl bg-white text-black hover:bg-slate-100 px-4 py-1.5 text-xs font-semibold transition-all shadow-lg"
           >
-            <span>Launch Workspace</span>
+            <span>Sign In</span>
             <ArrowRight className="size-3.5" />
           </button>
         </div>
@@ -480,7 +483,7 @@ export default function Home() {
                 <div className="size-3 rounded-full bg-red-500/80" />
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-green-500/80" />
-                <span className="ml-3 font-mono text-xs text-white/50">Acme Global Solutions · {profile.code} Workspace</span>
+                <span className="ml-3 font-mono text-xs text-white/50">Prava Technologies Private Limited · {profile.code} Workspace</span>
               </div>
               <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/10">
                 {(["overview", "tax", "documents", "ca"] as const).map((tab) => {
@@ -582,7 +585,7 @@ export default function Home() {
                         <tbody className="divide-y divide-white/[0.06] text-white/80">
                           <tr>
                             <td className="py-3 px-3 font-mono text-white">INV-2026-0801</td>
-                            <td className="py-3 px-3 font-medium">Apex Global Supplies</td>
+                            <td className="py-3 px-3 font-medium">Kavita Industrial Equipment Ltd</td>
                             <td className="py-3 px-3 font-mono text-white/60">27AABCU9603R1ZM</td>
                             <td className="py-3 px-3">{profile.symbol}48,50,000</td>
                             <td className="py-3 px-3">18% GST</td>
@@ -700,7 +703,7 @@ export default function Home() {
 
                   <div className="space-y-2.5">
                     {[
-                      { name: "Vendor_Tax_Invoice_Apex_August.pdf", size: "1.4 MB", confidence: "99.9%", time: "1.2s", status: "Extracted" },
+                      { name: "Vendor_Tax_Invoice_Industrial_Equipment.pdf", size: "1.4 MB", confidence: "99.9%", time: "1.2s", status: "Extracted" },
                       { name: "AWS_Cloud_Services_INV88219.pdf", size: "840 KB", confidence: "100%", time: "0.8s", status: "Extracted" },
                       { name: "HDFC_Current_Account_Stmt_Aug2026.pdf", size: "3.2 MB", confidence: "99.7%", time: "1.8s", status: "Reconciled" },
                     ].map((doc, i) => (

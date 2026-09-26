@@ -271,7 +271,7 @@ export default function CaDashboard() {
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
                             <span className="rounded-md bg-slate-100 dark:bg-white/[0.08] px-2 py-0.5 text-[11px] font-bold text-slate-900 dark:text-white">
-                              {item.businessName || "Acme Global Solutions"}
+                              {item.businessName || "Prava Technologies Private Limited"}
                             </span>
                             <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
                               Submitted {new Date(item.createdAt).toLocaleDateString()}
@@ -288,7 +288,7 @@ export default function CaDashboard() {
                             handleOpenAuditModal({
                               taskId: item.taskId,
                               businessId: item.businessId,
-                              businessName: item.businessName || "Acme Global Solutions",
+                              businessName: item.businessName || "Prava Technologies Private Limited",
                               taskTitle: item.taskTitle,
                               gstPreparation: (item as any).gstPreparation,
                             })
@@ -370,7 +370,7 @@ export default function CaDashboard() {
 
                     <div className="border-t border-slate-200 dark:border-white/[0.06] pt-2.5 text-xs text-slate-700 dark:text-slate-300 space-y-1">
                       <p>
-                        <strong className="text-slate-900 dark:text-white">GSTIN / Tax ID:</strong> {biz.gstin || "US-TAX-98765"}
+                        <strong className="text-slate-900 dark:text-white">GSTIN / Tax ID:</strong> {biz.gstin || "Unassigned"}
                       </p>
                       <p>
                         <strong className="text-slate-900 dark:text-white">Jurisdiction & Currency:</strong> {biz.country} ({biz.currency})

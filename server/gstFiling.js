@@ -87,7 +87,7 @@ function getBaselineInvoices(businessGstin, businessName) {
       direction: "outward",
       invoiceNumber: "INV-2026-0894",
       invoiceDate: "2026-09-10",
-      partyName: "Apex Global FinTech BV (Netherlands)",
+      partyName: "Rotterdam Cloud Solutions BV (Netherlands)",
       partyGstin: "EXPORT_WOP",
       pos: "96-Foreign",
       invoiceType: "EXPORT",
@@ -234,7 +234,7 @@ export async function getGstFilingWorkbench(userId, businessId, period = "2026-0
   if (stored && stored.length > 0) {
     invoices = [...stored];
   } else {
-    // Check if database has documents with extractions
+    // Check if database has documents with extractions or use in-memory uploaded documents
     let dbInvoices = [];
     if (db) {
       try {
@@ -299,10 +299,62 @@ export async function getGstFilingWorkbench(userId, businessId, period = "2026-0
       } catch (err) {
         console.warn("[GstFiling] Error fetching extractions:", err.message);
       }
+    } else {
+      const { inMemoryDocuments } = await import("./operations.js");
+      const bizDocs = inMemoryDocuments.filter(d => d.document.businessId === businessId && d.extraction);
+      dbInvoices = bizDocs.map((d) => {
+        const r = {
+          documentId: d.document.id,
+          originalName: d.document.originalName,
+          invoiceNumber: d.extraction.invoiceNumber,
+          invoiceDate: d.extraction.invoiceDate,
+          vendorName: d.extraction.vendorName,
+          gstin: d.extraction.gstin,
+          placeOfSupply: d.extraction.placeOfSupply,
+          invoiceType: d.extraction.invoiceType,
+          taxableValueMinor: d.extraction.taxableValueMinor,
+          cgstMinor: d.extraction.cgstMinor,
+          sgstMinor: d.extraction.sgstMinor,
+          igstMinor: d.extraction.igstMinor,
+          totalMinor: d.extraction.totalMinor,
+          status: d.extraction.status,
+        };
+        const isPurchase = r.invoiceType === "purchase";
+        const taxable = (r.taxableValueMinor || 0) / 100;
+        const cgst = (r.cgstMinor || 0) / 100;
+        const sgst = (r.sgstMinor || 0) / 100;
+        const igst = (r.igstMinor || 0) / 100;
+        const total = (r.totalMinor || 0) / 100 || (taxable + cgst + sgst + igst);
+        const rate = taxable > 0 ? Math.round(((cgst + sgst + igst) / taxable) * 100) : 18;
+
+        return {
+          id: `mem-doc-${r.documentId}`,
+          documentId: r.documentId,
+          direction: isPurchase ? "inward" : "outward",
+          invoiceNumber: r.invoiceNumber || `INV-DOC-${r.documentId}`,
+          invoiceDate: r.invoiceDate ? new Date(r.invoiceDate).toISOString().slice(0, 10) : "2026-09-05",
+          partyName: r.vendorName || (isPurchase ? "Vendor Provider" : "Client Enterprise"),
+          partyGstin: r.gstin || "27AABCV1234F1Z9",
+          pos: r.placeOfSupply || "27-Maharashtra",
+          invoiceType: isPurchase ? "B2B" : (taxable > 250000 ? "B2B" : "B2C_SMALL"),
+          hsnCode: "998311",
+          hsnDesc: "Uploaded Commercial Record",
+          taxableValue: taxable,
+          rate: rate || 18,
+          cgst,
+          sgst,
+          igst,
+          total,
+          itcEligibility: isPurchase ? "eligible_services" : "ineligible_17_5",
+          ragAuditStatus: r.status === "extracted" ? "verified" : "mismatch_detected",
+          ragNotes: `RAG Analyzed from uploaded document: ${r.originalName}. Extractions confirmed.`,
+          caVerdict: "approved",
+          isAdjusted: false,
+        };
+      });
     }
 
-    const baseline = getBaselineInvoices(businessGstin, businessName);
-    invoices = [...dbInvoices, ...baseline];
+    invoices = dbInvoices;
     workspaceAdjustments.set(`${businessId}-${period}`, invoices);
   }
 

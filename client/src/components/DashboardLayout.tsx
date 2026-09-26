@@ -44,6 +44,7 @@ import {
   PanelLeft,
   Receipt,
   ReceiptText,
+  Scale,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -79,6 +80,7 @@ const navGroups = [
   {
     category: "03 // STATUTORY AUDIT",
     items: [
+      { icon: Scale, label: "Autonomous CA Suite", path: "/ca-suite", badge: "AUTONOMOUS", color: "text-purple-400", glow: "from-purple-500/25" },
       { icon: Receipt, label: "Tax & Compliance", path: "/tax", color: "text-orange-400", glow: "from-orange-500/25" },
       { icon: UserCheck, label: "CA Review Desk", path: "/ca-review", badge: "ICAI", color: "text-purple-400", glow: "from-purple-500/25" },
     ],
@@ -344,11 +346,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
           </div>
           <Button
-            onClick={() => startLogin()}
+            onClick={() => {
+              if (typeof window !== "undefined") window.location.href = "/login";
+              else startLogin();
+            }}
             size="lg"
             className="w-full rounded-xl bg-white text-sm font-semibold text-black shadow-lg hover:bg-slate-200 transition"
           >
-            Authenticate & Launch
+            Go to Business Sign In
           </Button>
         </div>
       </div>
@@ -681,8 +686,14 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }: Das
                 <DropdownMenuItem
                   onClick={() => {
                     void logout()
-                      .then(() => toast.success("Signed out safely."))
-                      .catch(() => toast.error("Could not complete sign-out."));
+                      .then(() => {
+                        toast.success("Signed out safely.");
+                        window.location.href = "/login";
+                      })
+                      .catch(() => {
+                        toast.error("Could not complete sign-out.");
+                        window.location.href = "/login";
+                      });
                   }}
                   className="cursor-pointer text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 text-xs font-bold py-2"
                 >

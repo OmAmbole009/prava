@@ -24,7 +24,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -51,6 +51,7 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [localError, setLocalError] = useState("");
+  const utils = trpc.useUtils();
 
   const defaultProfile = profileForCountry("IN");
 
@@ -72,13 +73,26 @@ export default function Onboarding() {
     gstStatus: "registered",
   });
 
+  useEffect(() => {
+    if (user?.name && user.name !== "Business User" && !form.name) {
+      setForm((prev) => ({
+        ...prev,
+        name: user.name || "",
+        legalName: user.name || "",
+      }));
+    }
+  }, [user]);
+
   const update = <K extends keyof WorkspaceForm>(k: K, v: WorkspaceForm[K]) => {
     setForm((prev) => ({ ...prev, [k]: v }));
   };
 
   const createWorkspace = trpc.businesses.create.useMutation({
     onSuccess: (data) => {
-      toast.success("Business command center initialized successfully.");
+      void utils.businesses.list.invalidate();
+      toast.success("Business command center initialized successfully.", {
+        description: `Workspace '${data.name}' ready for CA audits and invoice processing.`,
+      });
       setLocation("/dashboard");
     },
     onError: (err) => {
@@ -238,7 +252,7 @@ export default function Onboarding() {
                       <Input
                         value={form.name}
                         onChange={(e) => update("name", e.target.value)}
-                        placeholder="e.g. Acme Innovations Corp"
+                        placeholder="e.g. Prava Innovations Pvt Ltd"
                         className="h-10 rounded-xl border-slate-200 bg-white dark:border-white/10 dark:bg-[#0D131A] text-xs text-slate-900 dark:text-white placeholder:text-slate-400 shadow-sm focus:border-slate-400 dark:focus:border-white/30"
                         autoFocus
                       />

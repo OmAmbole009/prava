@@ -113,7 +113,7 @@ export default function DocumentReview() {
   }
   const submit = (decision: "approve" | "save_for_review") =>
     review.mutate({ documentId, decision, ...draft });
-  const returnPath = document.taskId ? `/tasks/${document.taskId}` : "/tasks";
+  const returnPath = document.taskId ? `/tasks/${document.taskId}` : "/documents";
   const field = (
     key: keyof Pick<
       Draft,

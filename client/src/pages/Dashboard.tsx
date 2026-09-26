@@ -15,6 +15,7 @@ import { formatMinorAmount, profileForCountry } from "@shared/locale";
 import {
   AlertCircle,
   ArrowDownLeft,
+  ArrowRight,
   ArrowUpRight,
   Bot,
   CheckCircle2,
@@ -250,11 +251,19 @@ function WorkspaceOverview({
 
           <motion.div variants={scaleIn} className="flex flex-wrap items-center gap-3">
             <Button
+              onClick={() => setLocation("/ca-suite")}
+              size="sm"
+              className="rounded-xl border border-purple-500/40 bg-purple-500/15 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-500/25 backdrop-blur-xl"
+            >
+              <Sparkles className="mr-1.5 size-3.5 text-purple-500" />
+              CA Suite
+            </Button>
+            <Button
               onClick={() => setLocation("/assistant")}
               size="sm"
               className="rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-md hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100"
             >
-              <Sparkles className="mr-1.5 size-3.5" />
+              <Bot className="mr-1.5 size-3.5" />
               Ask Prava AI
             </Button>
             <Button
@@ -307,6 +316,57 @@ function WorkspaceOverview({
             </Button>
           </div>
         </motion.form>
+      </motion.div>
+
+      {/* ── Business Quick-Action Launchpad: Start CA Works & Upload Bills ──── */}
+      <motion.div variants={fadeUp} className="grid gap-3.5 sm:grid-cols-3">
+        <div
+          onClick={() => setLocation("/ca-suite")}
+          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-purple-500/30 bg-purple-500/5 p-4.5 backdrop-blur-xl transition hover:border-purple-500/60 hover:bg-purple-500/10 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/20 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+              <Sparkles className="size-3" /> Autonomous CA Works
+            </span>
+            <ArrowRight className="size-4 text-purple-600 dark:text-purple-400 transition group-hover:translate-x-1" />
+          </div>
+          <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">Start CA Works</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
+            Run MSME Section 43B(h) compliance audits, Form 3CD tax audit schedules, advance tax estimates & statutory notice defenses.
+          </p>
+        </div>
+
+        <div
+          onClick={() => setLocation("/documents")}
+          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4.5 backdrop-blur-xl transition hover:border-sky-500/60 hover:bg-sky-500/10 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+              <FileUp className="size-3" /> Invoices & Bills Vault
+            </span>
+            <ArrowRight className="size-4 text-sky-600 dark:text-sky-400 transition group-hover:translate-x-1" />
+          </div>
+          <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">Upload Invoices & Bills</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
+            Drop purchase invoices, vendor bills, and expense vouchers with sub-second OCR extraction and automatic ledger posting.
+          </p>
+        </div>
+
+        <div
+          onClick={() => setLocation("/tax")}
+          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4.5 backdrop-blur-xl transition hover:border-emerald-500/60 hover:bg-emerald-500/10 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+              <Receipt className="size-3" /> GST Filing & Credits
+            </span>
+            <ArrowRight className="size-4 text-emerald-600 dark:text-emerald-400 transition group-hover:translate-x-1" />
+          </div>
+          <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">File & Reconcile Returns</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
+            Prepare monthly GSTR-1, GSTR-3B vs 2B auto-matching, compute net tax liability, and generate certified filing bundles.
+          </p>
+        </div>
       </motion.div>
 
       {/* ── Financial Telemetry ──────────────────────────────────────── */}

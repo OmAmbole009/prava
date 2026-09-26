@@ -35,18 +35,21 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // Already unauthenticated
+      } else {
+        console.warn("[Auth] Logout error:", error);
       }
-      throw error;
     } finally {
-      // Clear the Preview auto-login token mirrored into sessionStorage, so
-      // header-based sessions (Safari ITP / WebView) are logged out too. The
-      // backend cookie is cleared by the logout mutation.
       try {
         sessionStorage.removeItem("manus-cookie");
+        localStorage.removeItem("manus-runtime-user-info");
+        localStorage.removeItem("prava-active-business-id");
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
     }
   }, [logoutMutation, utils]);
 
@@ -58,32 +61,16 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [meQuery.data]);
 
-  const demoUser = useMemo(() => {
-    if (import.meta.env.VITE_OAUTH_PORTAL_URL) return null;
-    return {
-      id: 1,
-      openId: "demo-user",
-      name: "Demo Business Owner",
-      email: "owner@acme-global.com",
-      loginMethod: "local_demo",
-      role: "admin",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    };
-  }, []);
-
   const state = useMemo(() => {
-    const activeUser = meQuery.data ?? demoUser;
+    const activeUser = meQuery.data ?? null;
     return {
       user: activeUser,
-      loading: meQuery.isLoading && !activeUser,
+      loading: meQuery.isLoading,
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(activeUser),
     };
   }, [
     meQuery.data,
-    demoUser,
     meQuery.error,
     meQuery.isLoading,
     logoutMutation.error,

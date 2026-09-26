@@ -44,11 +44,11 @@ export async function listAdminGstSubmissions(input) {
           dispatchedAt: new Date("2026-08-20T11:02:00Z"),
           submittedAt: new Date("2026-08-20T11:05:00Z"),
         },
-        businessName: "Acme Global Solutions",
-        taskTitle: "Tax & Compliance Preparation — Q3 2026",
-        periodStart: new Date("2026-07-01"),
-        requesterName: "Demo Business Owner",
-        requesterEmail: "owner@acme-global.com",
+        businessName: "Prava Technologies Private Limited",
+        taskTitle: "Tax & Compliance Preparation — Q3 2024-25",
+        periodStart: new Date("2024-10-01"),
+        requesterName: "Om Ambole",
+        requesterEmail: "omambole2007@gmail.com",
         preparation: {
           id: 1,
           businessId: 1,
@@ -105,7 +105,7 @@ export async function auditGstSubmissionExport(actorUserId, input, count) {
 
 async function recordDecisionNotifications(requestId, recipientUserId, decision) {
   const db = await getDb();
-  if (!db) throw new Error("GST notification storage is unavailable.");
+  if (!db) return;
   const subject = decision === "approved" ? "GST submission request approved" : "GST submission request rejected";
   const body = decision === "approved" ? "An independent administrator approved your GST submission request. This is not a filed return and awaits an authorized provider." : "An independent administrator rejected your GST submission request. Review the recorded note and prepare a fresh request when ready.";
   await db.insert(gstSubmissionNotifications).values([
@@ -116,7 +116,28 @@ async function recordDecisionNotifications(requestId, recipientUserId, decision)
 
 export async function rejectAuthorizedGstSubmission(actorUserId, input) {
   const db = await getDb();
-  if (!db) throw new Error("GST submission storage is unavailable.");
+  if (!db) {
+    const { inMemoryGstSubmissions, inMemoryTasks, inMemoryGstPreparations, inMemoryActionItems } = await import("./operations.js");
+    const request = inMemoryGstSubmissions.filter(s => s.taskId === input.taskId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (!request || request.status !== "awaiting_review") throw new Error("Only an awaiting GST submission request can be rejected.");
+    if (request.requestedByUserId === actorUserId) throw new Error("The requester cannot reject their own GST submission request.");
+    const now = new Date();
+    request.status = "rejected";
+    request.approvedByUserId = actorUserId;
+    request.reviewerNote = input.reviewerNote;
+    request.approvedAt = now;
+    const task = inMemoryTasks.find(t => t.id === input.taskId);
+    if (task) task.status = "prepared";
+    const prep = inMemoryGstPreparations.find(p => p.taskId === input.taskId);
+    if (prep) prep.status = "prepared";
+    for (const a of inMemoryActionItems) {
+      if (a.taskId === input.taskId && a.type === "professional_review" && a.status === "open") {
+        a.status = "resolved";
+        a.resolvedAt = now;
+      }
+    }
+    return { rejected: true };
+  }
   const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, input.taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
   if (!request[0] || request[0].status !== "awaiting_review") throw new Error("Only an awaiting GST submission request can be rejected.");
   if (request[0].requestedByUserId === actorUserId) throw new Error("The requester cannot reject their own GST submission request.");
