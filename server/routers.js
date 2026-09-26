@@ -365,7 +365,7 @@ export const appRouter = router({
     complianceCalendar: publicProcedure
       .query(() => getStatutoryComplianceCalendar()),
     gstnFilingJson: protectedProcedure
-      .input(z.object({ businessId: z.number().optional(), returnPeriod: z.string().optional(), gstin: z.string().optional() }).optional())
+      .input(z.object({ businessId: z.number().optional(), returnPeriod: z.string().nullable().optional(), gstin: z.string().nullable().optional() }).optional())
       .query(async ({ ctx, input }) => {
         const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
         if (!businessId) {

@@ -54,19 +54,19 @@ export default function CaSuite() {
 
   // Notice Defense state
   const [noticeType, setNoticeType] = useState<"gst_asmt_10" | "it_143_1" | "it_139_9" | "gst_drc_01">("gst_asmt_10");
-  const [noticeRef, setNoticeRef] = useState("");
-  const [disputedAmount, setDisputedAmount] = useState(0);
+  const [noticeRef, setNoticeRef] = useState("ASMT10/2024/09812");
+  const [disputedAmount, setDisputedAmount] = useState(345000);
 
   // AI Invoice Auditor state
-  const [auditVendorName, setAuditVendorName] = useState("");
-  const [auditVendorGstin, setAuditVendorGstin] = useState("");
-  const [auditInvoiceNumber, setAuditInvoiceNumber] = useState("");
+  const [auditVendorName, setAuditVendorName] = useState("Amazon Web Services India Pvt Ltd");
+  const [auditVendorGstin, setAuditVendorGstin] = useState("27AABCA1234F1Z8");
+  const [auditInvoiceNumber, setAuditInvoiceNumber] = useState("AWS-INV-2024-883");
   const [auditInvoiceDate, setAuditInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
-  const [auditTaxableAmount, setAuditTaxableAmount] = useState(0);
+  const [auditTaxableAmount, setAuditTaxableAmount] = useState(250000);
   const [auditGstRate, setAuditGstRate] = useState(18);
-  const [auditSacHsn, setAuditSacHsn] = useState("");
-  const [auditCategory, setAuditCategory] = useState("");
-  const [auditMsmeStatus, setAuditMsmeStatus] = useState<"micro" | "small" | "medium" | "non_msme">("non_msme");
+  const [auditSacHsn, setAuditSacHsn] = useState("998315");
+  const [auditCategory, setAuditCategory] = useState("Cloud Hosting & Computing Infrastructure");
+  const [auditMsmeStatus, setAuditMsmeStatus] = useState<"micro" | "small" | "medium" | "non_msme">("micro");
   const [auditHasContract, setAuditHasContract] = useState(true);
 
   // AI CA Co-Pilot (RAG) state
@@ -82,7 +82,7 @@ export default function CaSuite() {
 
   // Vault documents for this business
   const userDocsQuery = trpc.documents.list.useQuery(
-    { businessId: activeBiz?.id ?? 0 },
+    { businessId: activeBiz?.id ?? 1 },
     { enabled: !!activeBiz?.id }
   );
 
@@ -127,7 +127,7 @@ export default function CaSuite() {
   const cashQuery = trpc.caEngine.cashAudit.useQuery();
   const complianceCalendarQuery = trpc.caEngine.complianceCalendar.useQuery();
   const gstnFilingQuery = trpc.caEngine.gstnFilingJson.useQuery(
-    { businessId: activeBiz?.id, gstin: activeBiz?.gstin },
+    { businessId: activeBiz?.id, gstin: activeBiz?.gstin || undefined },
     { enabled: !!activeBiz?.id }
   );
   const schedule3Query = trpc.caEngine.schedule3Financials.useQuery(
@@ -141,11 +141,17 @@ export default function CaSuite() {
     onSuccess: () => {
       toast.success("Legal defense petition generated with statutory citations!");
     },
+    onError: (err) => {
+      toast.error(err.message || "Failed to generate legal defense petition");
+    },
   });
 
   const invoiceAuditMutation = trpc.caEngine.auditInvoice.useMutation({
     onSuccess: () => {
       toast.success("AI CA Audit Completed: Statutory Voucher generated!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to audit invoice");
     },
   });
 
@@ -153,12 +159,19 @@ export default function CaSuite() {
     onSuccess: () => {
       toast.success("Statutory CA legal opinion retrieved from RAG knowledge base!");
     },
+    onError: (err) => {
+      toast.error(err.message || "Failed to retrieve CA opinion");
+    },
   });
 
   const handleGenerateNotice = () => {
+    if (!noticeRef.trim()) {
+      toast.error("Please enter a Notice Reference Number / DIN.");
+      return;
+    }
     noticeMutation.mutate({
       noticeType,
-      noticeRef,
+      noticeRef: noticeRef.trim(),
       disputedAmount,
       taxpayerName: activeBiz?.name || "Your Enterprise Workspace",
       gstinOrPan: activeBiz?.gstin || "27AABCP8821F1Z2",
@@ -166,15 +179,19 @@ export default function CaSuite() {
   };
 
   const handleAuditInvoice = () => {
+    if (!auditVendorName.trim() && !auditInvoiceNumber.trim()) {
+      toast.error("Please enter vendor details or select a quick test profile.");
+      return;
+    }
     invoiceAuditMutation.mutate({
-      vendorName: auditVendorName,
-      vendorGstin: auditVendorGstin,
-      invoiceNumber: auditInvoiceNumber,
+      vendorName: auditVendorName.trim(),
+      vendorGstin: auditVendorGstin.trim(),
+      invoiceNumber: auditInvoiceNumber.trim(),
       invoiceDate: auditInvoiceDate,
       taxableAmount: auditTaxableAmount,
       gstRate: auditGstRate,
-      sacOrHsn: auditSacHsn,
-      expenseCategory: auditCategory,
+      sacOrHsn: auditSacHsn.trim(),
+      expenseCategory: auditCategory.trim(),
       msmeStatus: auditMsmeStatus,
       hasWrittenContract: auditHasContract,
     });
@@ -184,7 +201,7 @@ export default function CaSuite() {
     const q = question || copilotQuery;
     if (!q.trim()) return;
     setCopilotQuery(q);
-    copilotMutation.mutate({ query: q });
+    copilotMutation.mutate({ query: q.trim() });
   };
 
   const copyToClipboard = (text: string) => {
@@ -265,10 +282,11 @@ export default function CaSuite() {
   const form3CdData = form3CdQuery.data;
 
   // Compute Founder Remuneration Tax Comparison
-  const corporateTaxSaved = Math.round(founderRemuneration * 0.2288); // 22% + 4% cess
-  const npsTaxFreeAmount = Math.round((founderRemuneration * npsContributionPct) / 100);
-  const netFounderPersonalTax = Math.round((founderRemuneration - npsTaxFreeAmount - 75000) * 0.18);
-  const netTaxOptimizationBenefit = Math.max(0, corporateTaxSaved - netFounderPersonalTax);
+  const corporateTaxSaved = founderRemuneration > 0 ? Math.round(founderRemuneration * 0.2288) : 0; // 22% + 4% cess
+  const npsTaxFreeAmount = founderRemuneration > 0 ? Math.round((founderRemuneration * npsContributionPct) / 100) : 0;
+  const taxableFounderSalary = Math.max(0, founderRemuneration - npsTaxFreeAmount - 75000);
+  const netFounderPersonalTax = founderRemuneration > 0 ? Math.round(taxableFounderSalary * 0.18) : 0;
+  const netTaxOptimizationBenefit = founderRemuneration > 0 ? Math.max(0, corporateTaxSaved - netFounderPersonalTax) : 0;
 
   return (
     <DashboardLayout>
@@ -1125,7 +1143,7 @@ Certified by Prava Autonomous Chartered Accountant Engine`;
                           <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-1.5">
                             <span className="text-[10px] uppercase font-bold text-muted-foreground">Section 43B(h) MSME Horizon</span>
                             <p className="font-bold text-foreground">
-                              {invoiceAuditMutation.data.msmeAudit?.msmeStatus.toUpperCase()} ENTERPRISE ({invoiceAuditMutation.data.msmeAudit?.daysAllowed} Days Window)
+                              {(invoiceAuditMutation.data.msmeAudit?.msmeStatus || "non_msme").toUpperCase()} ENTERPRISE ({invoiceAuditMutation.data.msmeAudit?.daysAllowed ?? 0} Days Window)
                             </p>
                             <p className="text-[11px] text-amber-500 font-mono leading-tight">
                               {invoiceAuditMutation.data.msmeAudit?.notice || "Vendor not registered as MSME Micro/Small."}

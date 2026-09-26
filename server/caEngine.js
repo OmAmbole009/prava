@@ -570,7 +570,8 @@ export function auditVendorInvoice(input) {
   } = input;
 
   const buyerGstin = "27AABCP8821F1Z2";
-  const isInterState = buyerGstin.slice(0, 2) !== vendorGstin.slice(0, 2);
+  const safeVendorGstin = String(vendorGstin || "");
+  const isInterState = safeVendorGstin ? buyerGstin.slice(0, 2) !== safeVendorGstin.slice(0, 2) : false;
 
   const taxAmount = Math.round((taxableAmount * gstRate) / 100);
   const cgst = isInterState ? 0 : Math.round(taxAmount / 2);
@@ -578,7 +579,7 @@ export function auditVendorInvoice(input) {
   const igst = isInterState ? taxAmount : 0;
 
   // 1. Section 17(5) Blocked ITC Check
-  const catLower = (expenseCategory || "").toLowerCase();
+  const catLower = String(expenseCategory || "").toLowerCase();
   const matchedBlockedRule = BLOCKED_REASON_RULES.find(r => r.match.some(kw => catLower.includes(kw)));
   const isBlocked17_5 = Boolean(matchedBlockedRule);
   const blockedReason = matchedBlockedRule ? matchedBlockedRule.reason : null;
@@ -598,14 +599,15 @@ export function auditVendorInvoice(input) {
 
   // 3. Section 194Q / 194C / 194J TDS Audit
   let applicableTds = null;
-  if (sacOrHsn.startsWith("9983") || catLower.includes("software") || catLower.includes("consult")) {
+  const safeSac = String(sacOrHsn || "").trim();
+  if (safeSac.startsWith("9983") || catLower.includes("software") || catLower.includes("consult")) {
     applicableTds = {
       section: "Section 194J (Technical / Professional Services)",
       rate: "2% (Technical Services)",
       tdsAmount: Math.round(taxableAmount * 0.02),
       statutoryRemark: "Deduct 2% TDS under Section 194J(1)(b) for software/cloud technical services.",
     };
-  } else if (sacOrHsn.startsWith("9987") || catLower.includes("contract") || catLower.includes("maintenance")) {
+  } else if (safeSac.startsWith("9987") || catLower.includes("contract") || catLower.includes("maintenance")) {
     applicableTds = {
       section: "Section 194C (Contractor / Maintenance)",
       rate: "2% (Company)",

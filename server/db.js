@@ -244,6 +244,8 @@ export async function getBusinessesForUser(userId) {
       name: businesses.name,
       businessType: businesses.businessType,
       industry: businesses.industry,
+      gstin: businesses.gstin,
+      registrationNumber: businesses.registrationNumber,
       gstStatus: businesses.gstStatus,
       country: businesses.country,
       taxSystem: businesses.taxSystem,
