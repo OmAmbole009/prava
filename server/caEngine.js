@@ -7,12 +7,41 @@
 // 1. ADVANCE TAX & REGIME OPTIMIZER
 // ==========================================
 
-const INSTALLMENTS_CONFIG = [
-  { quarter: "Q1", dueDate: "15th June 2024", cumulativePercentage: 15, quarterPct: 0.15, status: "paid" },
-  { quarter: "Q2", dueDate: "15th September 2024", cumulativePercentage: 45, quarterPct: 0.30, status: "due_soon" },
-  { quarter: "Q3", dueDate: "15th December 2024", cumulativePercentage: 75, quarterPct: 0.30, status: "upcoming" },
-  { quarter: "Q4", dueDate: "15th March 2025", cumulativePercentage: 100, quarterPct: 0.25, status: "upcoming" },
-];
+export function getAdvanceTaxInstallments(netPayableAfterTds = 0, hasActivity = false) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const fyStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+  const fyEnd = fyStart + 1;
+
+  const quarters = [
+    { quarter: "Q1", dueMonth: 5, dueDay: 15, year: fyStart, dueDate: `15th June ${fyStart}`, cumulativePercentage: 15, quarterPct: 0.15 },
+    { quarter: "Q2", dueMonth: 8, dueDay: 15, year: fyStart, dueDate: `15th September ${fyStart}`, cumulativePercentage: 45, quarterPct: 0.30 },
+    { quarter: "Q3", dueMonth: 11, dueDay: 15, year: fyStart, dueDate: `15th December ${fyStart}`, cumulativePercentage: 75, quarterPct: 0.30 },
+    { quarter: "Q4", dueMonth: 2, dueDay: 15, year: fyEnd, dueDate: `15th March ${fyEnd}`, cumulativePercentage: 100, quarterPct: 0.25 },
+  ];
+
+  return quarters.map(q => {
+    const dueDateObj = new Date(q.year, q.dueMonth, q.dueDay, 23, 59, 59);
+    const diffDays = Math.ceil((dueDateObj - now) / 86400000);
+    let status = "upcoming";
+    if (diffDays < 0) {
+      status = "paid";
+    } else if (diffDays <= 30) {
+      status = "due_soon";
+    }
+
+    return {
+      quarter: q.quarter,
+      dueDate: q.dueDate,
+      cumulativePercentage: q.cumulativePercentage,
+      cumulativeAmount: q.quarter === "Q4" ? netPayableAfterTds : Math.round(netPayableAfterTds * (q.cumulativePercentage / 100)),
+      quarterInstallment: Math.round(netPayableAfterTds * q.quarterPct),
+      status: !hasActivity && q.quarter === "Q2" ? "upcoming" : status,
+      interestPenaltySec234C: 0,
+    };
+  });
+}
 
 export function calculateAdvanceTax(input = {}) {
   const {
@@ -54,15 +83,7 @@ export function calculateAdvanceTax(input = {}) {
   const netPayableAfterTds = Math.max(0, taxPayableAnnual - tdsAlreadyDeducted);
   const isAdvanceTaxApplicable = netPayableAfterTds >= 10000;
 
-  const installments = INSTALLMENTS_CONFIG.map(q => ({
-    quarter: q.quarter,
-    dueDate: q.dueDate,
-    cumulativePercentage: q.cumulativePercentage,
-    cumulativeAmount: q.quarter === "Q4" ? netPayableAfterTds : Math.round(netPayableAfterTds * (q.cumulativePercentage / 100)),
-    quarterInstallment: Math.round(netPayableAfterTds * q.quarterPct),
-    status: !hasActivity && q.quarter === "Q2" ? "upcoming" : q.status,
-    interestPenaltySec234C: 0,
-  }));
+  const installments = getAdvanceTaxInstallments(netPayableAfterTds, hasActivity);
 
   return {
     grossRevenue,
@@ -253,11 +274,13 @@ export function auditCashTransactions(transactions = []) {
 // ==========================================
 
 export function draftTaxNoticeDefense(input = {}) {
+  const currentYear = new Date().getFullYear();
+  const defAy = `${currentYear - 1}-${String(currentYear).slice(2)}`;
   const {
     noticeType = "gst_asmt_10",
-    noticeRef = "ASMT10/2024/09812",
-    disputedAmount = 345000,
-    assessmentYear = "2024-25",
+    noticeRef = input.noticeRef || "NOTICE/REF/001",
+    disputedAmount = Number(input.disputedAmount) || 0,
+    assessmentYear = input.assessmentYear || defAy,
   } = input;
 
   const formattedAmount = disputedAmount.toLocaleString("en-IN");
@@ -306,61 +329,116 @@ export function draftTaxNoticeDefense(input = {}) {
 // ==========================================
 
 export function getStatutoryComplianceCalendar() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const getNextDate = (targetDay) => {
+    let d = new Date(currentYear, currentMonth, targetDay, 23, 59, 59);
+    if (d < now) {
+      d = new Date(currentYear, currentMonth + 1, targetDay, 23, 59, 59);
+    }
+    return d;
+  };
+
+  const tdsDate = getNextDate(7);
+  const gstr1Date = getNextDate(11);
+  const gstr3bDate = getNextDate(20);
+
+  // Advance tax: 15 June, 15 Sep, 15 Dec, 15 March
+  const advTaxDates = [
+    new Date(currentYear, 5, 15, 23, 59, 59),
+    new Date(currentYear, 8, 15, 23, 59, 59),
+    new Date(currentYear, 11, 15, 23, 59, 59),
+    new Date(currentYear + 1, 2, 15, 23, 59, 59),
+  ].filter(d => d >= now);
+  const nextAdvDate = advTaxDates[0] || new Date(currentYear + 1, 5, 15, 23, 59, 59);
+
+  // Form 26Q (Quarterly TDS): 31 July, 31 October, 31 January, 31 May
+  const form26QDates = [
+    new Date(currentYear, 4, 31, 23, 59, 59),
+    new Date(currentYear, 6, 31, 23, 59, 59),
+    new Date(currentYear, 9, 31, 23, 59, 59),
+    new Date(currentYear + 1, 0, 31, 23, 59, 59),
+  ].filter(d => d >= now);
+  const next26QDate = form26QDates[0] || new Date(currentYear + 1, 4, 31, 23, 59, 59);
+
+  const formatDue = (dateObj, dayStr) => {
+    return `${dayStr} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+  };
+
+  const getStatus = (diffDays) => {
+    if (diffDays <= 5) return "critical_due";
+    if (diffDays <= 15) return "due_soon";
+    return "upcoming";
+  };
+
+  const tdsDiff = Math.max(0, Math.ceil((tdsDate - now) / 86400000));
+  const gstr1Diff = Math.max(0, Math.ceil((gstr1Date - now) / 86400000));
+  const advDiff = Math.max(0, Math.ceil((nextAdvDate - now) / 86400000));
+  const gstr3bDiff = Math.max(0, Math.ceil((gstr3bDate - now) / 86400000));
+  const f26QDiff = Math.max(0, Math.ceil((next26QDate - now) / 86400000));
+
   return [
     {
       id: "COMP-01",
       title: "TDS / TCS Deposit (Challan 281)",
       category: "Direct Tax",
-      dueDate: "7th September 2024",
+      dueDate: formatDue(tdsDate, "7th"),
       frequency: "Monthly",
       applicableSection: "Section 200(3) & 201(1A)",
       statutoryPenalty: "1.5% interest per month for delayed deposit from deduction date",
-      status: "critical_due",
-      daysRemaining: 4,
+      status: getStatus(tdsDiff),
+      daysRemaining: tdsDiff,
     },
     {
       id: "COMP-02",
       title: "GSTR-1 (Outward Supplies)",
       category: "GST",
-      dueDate: "11th September 2024",
+      dueDate: formatDue(gstr1Date, "11th"),
       frequency: "Monthly",
       applicableSection: "Section 37 of CGST Act",
       statutoryPenalty: "₹50/day late fee (₹20 for Nil returns) + E-way bill blocking",
-      status: "due_soon",
-      daysRemaining: 8,
+      status: getStatus(gstr1Diff),
+      daysRemaining: gstr1Diff,
     },
     {
       id: "COMP-03",
-      title: "Advance Tax (2nd Installment - 45%)",
+      title: "Advance Tax Installment",
       category: "Direct Tax",
-      dueDate: "15th September 2024",
+      dueDate: formatDue(nextAdvDate, "15th"),
       frequency: "Quarterly",
       applicableSection: "Section 208, 209 & 234C",
       statutoryPenalty: "1% per month simple interest u/s 234C on deferred amount",
-      status: "due_soon",
-      daysRemaining: 12,
+      status: getStatus(advDiff),
+      daysRemaining: advDiff,
     },
     {
       id: "COMP-04",
       title: "GSTR-3B (Summary Return & Tax Payment)",
       category: "GST",
-      dueDate: "20th September 2024",
+      dueDate: formatDue(gstr3bDate, "20th"),
       frequency: "Monthly",
       applicableSection: "Section 39 & Section 50 of CGST Act",
       statutoryPenalty: "18% p.a. interest u/s 50 on net cash tax liability + ₹50/day late fee",
-      status: "upcoming",
-      daysRemaining: 17,
+      status: getStatus(gstr3bDiff),
+      daysRemaining: gstr3bDiff,
     },
     {
       id: "COMP-05",
-      title: "Form 26Q (Quarterly TDS Return - Q2)",
+      title: "Form 26Q (Quarterly TDS Return)",
       category: "Direct Tax",
-      dueDate: "31st October 2024",
+      dueDate: formatDue(next26QDate, "31st"),
       frequency: "Quarterly",
       applicableSection: "Section 234E & Section 271H",
       statutoryPenalty: "₹200 per day late fee u/s 234E up to total TDS amount",
-      status: "upcoming",
-      daysRemaining: 58,
+      status: getStatus(f26QDiff),
+      daysRemaining: f26QDiff,
     },
   ];
 }
@@ -386,7 +464,9 @@ const round2 = n => Math.round(n * 100) / 100;
 
 export function generateGstnReturnSchema(input = {}) {
   const gstin = input.gstin || "";
-  const returnPeriod = input.returnPeriod || "092024";
+  const now = new Date();
+  const defFp = `${String(now.getMonth() + 1).padStart(2, "0")}${now.getFullYear()}`;
+  const returnPeriod = input.returnPeriod || defFp;
   const legalName = input.legalName || "Your Enterprise Workspace";
 
   const invoices = Array.isArray(input.invoices) ? input.invoices : [];
@@ -522,7 +602,7 @@ export function generateGstnReturnSchema(input = {}) {
     },
     audit_certification: {
       certifiedBy: "Prava Autonomous CA Replacement Engine",
-      certNumber: "PRV/2024-25/CA-CERT/88219",
+      certNumber: `PRV/${new Date().getFullYear()}/CA-CERT/${Math.floor(10000 + Math.random() * 90000)}`,
       standard: "ICAI Technical Guide on GST Audit & Section 39 Filing",
       timestamp: new Date().toISOString(),
     },
@@ -555,18 +635,18 @@ const BLOCKED_REASON_RULES = [
   { match: ["personal", "beauty", "cab"], reason: "Section 17(5)(g): Goods/services used for personal consumption are ineligible." },
 ];
 
-export function auditVendorInvoice(input) {
+export function auditVendorInvoice(input = {}) {
   const {
-    vendorName = "Amazon Web Services India Pvt Ltd",
-    vendorGstin = "27AABCA1234F1Z8",
-    invoiceNumber = "AWS-INV-2024-883",
-    invoiceDate = "2024-08-15",
-    taxableAmount = 250000,
-    gstRate = 18,
-    sacOrHsn = "998315",
-    expenseCategory = "Cloud Hosting & Computing Infrastructure",
-    msmeStatus = "micro",
-    hasWrittenContract = true,
+    vendorName = input.vendorName || "Commercial Supplier",
+    vendorGstin = input.vendorGstin || "",
+    invoiceNumber = input.invoiceNumber || "",
+    invoiceDate = input.invoiceDate || new Date().toISOString().slice(0, 10),
+    taxableAmount = Number(input.taxableAmount) || 0,
+    gstRate = Number(input.gstRate) || 18,
+    sacOrHsn = input.sacOrHsn || "",
+    expenseCategory = input.expenseCategory || "General Operating Expense",
+    msmeStatus = input.msmeStatus || "non_msme",
+    hasWrittenContract = input.hasWrittenContract ?? true,
   } = input;
 
   const buyerGstin = "27AABCP8821F1Z2";
@@ -652,9 +732,16 @@ export function auditVendorInvoice(input) {
 
 export function generateSchedule3Financials(input = {}) {
   const isDynamic = Boolean(input.isDynamic || input.revenue !== undefined || input.expenses !== undefined);
-  const entityName = input.entityName || (isDynamic ? "Your Enterprise Workspace" : "Prava Technologies Private Limited");
-  const cin = input.cin || (isDynamic ? "U72900MH2024PTC000000" : "U72900MH2022PTC388219");
-  const reportingPeriod = input.reportingPeriod || "As at 31st March 2025 (FY 2024-25)";
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const fyStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+  const fyEnd = fyStart + 1;
+  const defPeriod = `As at 31st March ${fyEnd} (FY ${fyStart}-${String(fyEnd).slice(2)})`;
+
+  const entityName = input.entityName || (isDynamic ? "Your Enterprise Workspace" : "Your Enterprise Workspace");
+  const cin = input.cin || `U72900MH${fyStart}PTC000000`;
+  const reportingPeriod = input.reportingPeriod || defPeriod;
 
   const rev = input.revenue || 0;
   const exp = input.expenses || 0;

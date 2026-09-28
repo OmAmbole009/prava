@@ -158,7 +158,7 @@ export default defineConfig({
           const moduleId = id.replaceAll("\\", "/");
           if (!moduleId.includes("node_modules")) return;
           if (moduleId.includes("/node_modules/react/") || moduleId.includes("/node_modules/react-dom/") || moduleId.includes("/node_modules/scheduler/")) return "react-runtime";
-          if (moduleId.includes("/node_modules/@tanstack/") || moduleId.includes("/node_modules/@trpc/") || moduleId.includes("/node_modules/superjson/")) return "data-runtime";
+          if (moduleId.includes("/node_modules/@tanstack/")) return "data-runtime";
           if (moduleId.includes("/node_modules/lucide-react/")) return "icon-runtime";
           if (moduleId.includes("/node_modules/@radix-ui/") || moduleId.includes("/node_modules/class-variance-authority/") || moduleId.includes("/node_modules/clsx/") || moduleId.includes("/node_modules/tailwind-merge/")) return "ui-runtime";
         },

@@ -1,20 +1,14 @@
-import { TRPCError } from "@trpc/server";
+import { HttpError } from "../../shared/_core/errors.js";
 import { ENV } from "./env.js";
 
 const SERVICE = "webdevtoken.v1.WebDevService";
 
 const buildEndpoint = (rpc) => {
   if (!ENV.forgeApiUrl) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Heartbeat service URL is not configured (BUILT_IN_FORGE_API_URL).",
-    });
+    throw new HttpError(500, "Heartbeat service URL is not configured (BUILT_IN_FORGE_API_URL).");
   }
   if (!ENV.forgeApiKey) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Heartbeat service API key is not configured (BUILT_IN_FORGE_API_KEY).",
-    });
+    throw new HttpError(500, "Heartbeat service API key is not configured (BUILT_IN_FORGE_API_KEY).");
   }
   const baseUrl = ENV.forgeApiUrl;
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
@@ -23,17 +17,10 @@ const buildEndpoint = (rpc) => {
 
 const mapForgeError = (response, detail, rpc) => {
   const status = response.status;
-  let code = "INTERNAL_SERVER_ERROR";
-  if (status === 401) code = "UNAUTHORIZED";
-  else if (status === 403) code = "FORBIDDEN";
-  else if (status === 404) code = "NOT_FOUND";
-  else if (status === 400 || status === 422) code = "BAD_REQUEST";
-  else if (status === 409) code = "CONFLICT";
-  else if (status === 429) code = "TOO_MANY_REQUESTS";
-  return new TRPCError({
-    code,
-    message: `Heartbeat ${rpc} failed (${status})${detail ? `: ${detail}` : ""}`,
-  });
+  return new HttpError(
+    status || 500,
+    `Heartbeat ${rpc} failed (${status})${detail ? `: ${detail}` : ""}`
+  );
 };
 
 const callForge = async (rpc, body, userSession) => {
@@ -58,10 +45,7 @@ const callForge = async (rpc, body, userSession) => {
       body: JSON.stringify(body),
     });
   } catch (error) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Heartbeat ${rpc} network error: ${String(error)}`,
-    });
+    throw new HttpError(500, `Heartbeat ${rpc} network error: ${String(error)}`);
   }
 
   if (!response.ok) {
@@ -79,10 +63,7 @@ const stringifyPayload = (payload) => {
 
 const validateCallbackPath = (path) => {
   if (!path || !path.startsWith("/api/scheduled/")) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "callback path must start with /api/scheduled/",
-    });
+    throw new HttpError(400, "callback path must start with /api/scheduled/");
   }
 };
 

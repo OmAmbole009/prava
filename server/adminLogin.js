@@ -1,4 +1,4 @@
-import { TRPCError } from "@trpc/server";
+import { HttpError } from "../shared/_core/errors.js";
 import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const.js";
 import { adminAuditEvents } from "../drizzle/schema.js";
@@ -24,7 +24,7 @@ export const unifiedLoginSchema = z.object({
 });
 
 function clientKey(req) {
-  return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+  return req?.ip ?? req?.socket?.remoteAddress ?? "unknown";
 }
 
 function canAttempt(key) {
@@ -49,7 +49,7 @@ function recordFailure(key) {
 export async function signInLocalAdministrator(ctx, input) {
   const key = clientKey(ctx.req);
   if (!canAttempt(key)) {
-    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many sign-in attempts. Please wait before trying again." });
+    throw new HttpError(429, "Too many sign-in attempts. Please wait before trying again.");
   }
 
   const normalizedEmail = input.email.trim().toLowerCase();
@@ -58,7 +58,7 @@ export async function signInLocalAdministrator(ctx, input) {
 
   if (!credentialsAreValid || !user || user.role !== "admin") {
     recordFailure(key);
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid administrator email or password." });
+    throw new HttpError(401, "Invalid administrator email or password.");
   }
 
   attempts.delete(key);
@@ -88,7 +88,7 @@ export async function signInLocalAdministrator(ctx, input) {
 export async function signInUnified(ctx, input) {
   const key = clientKey(ctx.req);
   if (!canAttempt(key)) {
-    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many sign-in attempts. Please wait before trying again." });
+    throw new HttpError(429, "Too many sign-in attempts. Please wait before trying again.");
   }
 
   let normalizedEmail = input.email.trim().toLowerCase();
@@ -102,7 +102,7 @@ export async function signInUnified(ctx, input) {
     const isValid = await verifyAdministratorPassword(user?.id || 1, normalizedEmail, input.password);
     if (!isValid) {
       recordFailure(key);
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid administrator password." });
+      throw new HttpError(401, "Invalid administrator password.");
     }
 
     attempts.delete(key);

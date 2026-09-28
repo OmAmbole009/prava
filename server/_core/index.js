@@ -2,11 +2,9 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth.js";
 import { registerStorageProxy } from "./storageProxy.js";
-import { appRouter } from "../routers.js";
-import { createContext } from "./context.js";
+import apiRouter from "../routes/index.js";
 import { serveStatic, setupVite } from "./vite.js";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db.js";
@@ -55,14 +53,8 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  // tRPC API
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
+  // REST API
+  app.use("/api", apiRouter);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV !== "production") {
     await setupVite(app, server);

@@ -1,4 +1,4 @@
-import { TRPCError } from "@trpc/server";
+import { HttpError } from "../shared/_core/errors.js";
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { eq } from "drizzle-orm";
@@ -23,7 +23,7 @@ export const caLoginSchema = z.object({
 });
 
 function clientKey(req) {
-  return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+  return req?.ip ?? req?.socket?.remoteAddress ?? "unknown";
 }
 
 function canAttempt(key) {
@@ -118,10 +118,7 @@ export async function verifyCaPassword(userId, email, supplied) {
 export async function signInCa(ctx, input) {
   const key = clientKey(ctx.req);
   if (!canAttempt(key)) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: "Too many sign-in attempts. Please wait 15 minutes before trying again.",
-    });
+    throw new HttpError(429, "Too many sign-in attempts. Please wait 15 minutes before trying again.");
   }
 
   const normalizedEmail = input.email.trim().toLowerCase();
@@ -154,26 +151,17 @@ export async function signInCa(ctx, input) {
 
   if (!user || user.role !== "ca") {
     recordFailure(key);
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "No Chartered Accountant account found for this email. CA access is granted exclusively by Prava Administrators.",
-    });
+    throw new HttpError(401, "No Chartered Accountant account found for this email. CA access is granted exclusively by Prava Administrators.");
   }
 
   if (profileStatus === "suspended" || profileStatus === "revoked") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Your Chartered Accountant access has been ${profileStatus} by the administrator. Please contact Prava operations.`,
-    });
+    throw new HttpError(403, `Your Chartered Accountant access has been ${profileStatus} by the administrator. Please contact Prava operations.`);
   }
 
   const credentialsAreValid = await verifyCaPassword(user.id, normalizedEmail, input.password);
   if (!credentialsAreValid) {
     recordFailure(key);
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Invalid Chartered Accountant password.",
-    });
+    throw new HttpError(401, "Invalid Chartered Accountant password.");
   }
 
   attempts.delete(key);

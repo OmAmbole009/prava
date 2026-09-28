@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const onboarding = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Onboarding.tsx"), "utf8");
-const dashboardLayout = readFileSync(resolve(import.meta.dirname, "../client/src/components/DashboardLayout.tsx"), "utf8");
-const taskDetail = readFileSync(resolve(import.meta.dirname, "../client/src/pages/TaskDetail.tsx"), "utf8");
-const billing = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Billing.tsx"), "utf8");
-const documentReview = readFileSync(resolve(import.meta.dirname, "../client/src/pages/DocumentReview.tsx"), "utf8");
-const dashboard = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Dashboard.tsx"), "utf8");
-const tasks = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Tasks.tsx"), "utf8");
-const integrations = readFileSync(resolve(import.meta.dirname, "../client/src/pages/AdminIntegrations.tsx"), "utf8");
+const onboarding = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Onboarding.jsx"), "utf8");
+const dashboardLayout = readFileSync(resolve(import.meta.dirname, "../client/src/components/DashboardLayout.jsx"), "utf8");
+const taskDetail = readFileSync(resolve(import.meta.dirname, "../client/src/pages/TaskDetail.jsx"), "utf8");
+const billing = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Billing.jsx"), "utf8");
+const documentReview = readFileSync(resolve(import.meta.dirname, "../client/src/pages/DocumentReview.jsx"), "utf8");
+const dashboard = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Dashboard.jsx"), "utf8");
+const tasks = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Tasks.jsx"), "utf8");
+const integrations = readFileSync(resolve(import.meta.dirname, "../client/src/pages/AdminIntegrations.jsx"), "utf8");
 const operations = readFileSync(resolve(import.meta.dirname, "../server/operations.js"), "utf8");
 
 describe("protected Prava route accessibility contracts", () => {
@@ -52,7 +52,7 @@ describe("protected Prava route accessibility contracts", () => {
 
   it("routes document actions into review and clears the open action only after approval", () => {
     expect(dashboard).toContain("action.documentId ? `/documents/${action.documentId}`");
-    expect(documentReview).toContain("utils.actions.list.invalidate");
+    expect(documentReview).toContain('invalidateQueries({ queryKey: ["actions"] })');
     expect(operations).toContain("documentId,");
     expect(operations).toContain('eq(actionItems.type, "review_document")');
     expect(operations).toContain('input.decision === "approve"');

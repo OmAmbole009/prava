@@ -23,59 +23,27 @@ function contains(record, search) {
 export async function listAdminGstSubmissions(input) {
   const db = await getDb();
   if (!db) {
-    const mockRows = [
-      {
-        request: {
-          id: 1,
-          businessId: 1,
-          taskId: 1,
-          requestedByUserId: 1,
-          approvedByUserId: 2,
-          providerName: "Automated Compliance Gateway",
-          providerSubmissionId: "REF-2026-TAX-00981",
-          status: "approved",
-          failureCode: null,
-          requesterNote: "Ready for independent administrative review.",
-          reviewerNote: "All reconciliation items and invoice calculations verified.",
-          idempotencyKey: "gst-1-1725192000",
-          createdAt: new Date("2026-08-20T10:30:00Z"),
-          updatedAt: new Date("2026-08-20T11:00:00Z"),
-          approvedAt: new Date("2026-08-20T11:00:00Z"),
-          dispatchedAt: new Date("2026-08-20T11:02:00Z"),
-          submittedAt: new Date("2026-08-20T11:05:00Z"),
-        },
-        businessName: "Prava Technologies Private Limited",
-        taskTitle: "Tax & Compliance Preparation — Q3 2024-25",
-        periodStart: new Date("2024-10-01"),
-        requesterName: "Om Ambole",
-        requesterEmail: "omambole2007@gmail.com",
-        preparation: {
-          id: 1,
-          businessId: 1,
-          taskId: 1,
-          periodStart: new Date("2026-07-01"),
-          periodEnd: new Date("2026-09-30"),
-          status: "prepared",
-          salesMinor: 12500000,
-          taxableValueMinor: 11000000,
-          cgstMinor: 550000,
-          sgstMinor: 550000,
-          igstMinor: 320000,
-          inputTaxCreditMinor: 480000,
-          netTaxPositionMinor: 940000,
-          documentsRequiringReview: 0,
-          officialReference: "REF-2026-TAX-00981",
-          preparedAt: new Date("2026-08-20T10:00:00Z"),
-          submittedAt: new Date("2026-08-20T11:05:00Z"),
-          createdAt: new Date("2026-08-20T10:00:00Z"),
-          updatedAt: new Date("2026-08-20T10:00:00Z"),
-        },
-      },
-    ];
-    return mockRows.filter(row => contains(row, input.search)
+    const { inMemoryGstSubmissions, inMemoryTasks, inMemoryGstPreparations } = await import("./operations.js");
+    const { inMemoryBusinesses, inMemoryUsers } = await import("./db.js");
+    const rows = inMemoryGstSubmissions.map(sub => {
+      const biz = inMemoryBusinesses.find(b => b.id === sub.businessId) || {};
+      const task = inMemoryTasks.find(t => t.id === sub.taskId) || {};
+      const prep = inMemoryGstPreparations.find(p => p.taskId === sub.taskId) || null;
+      const user = Array.from(inMemoryUsers.values()).find(u => u.id === sub.requestedByUserId) || {};
+      return {
+        request: sub,
+        businessName: biz.name || "Default Business",
+        taskTitle: task.title || "GST Submission",
+        periodStart: task.periodStart || new Date(),
+        requesterName: user.name || "User",
+        requesterEmail: user.email || "",
+        preparation: prep,
+      };
+    });
+    return rows.filter(row => contains(row, input.search)
       && (!input.workspace || row.businessName.toLowerCase().includes(input.workspace.toLowerCase()))
       && (!input.provider || (row.request.providerName ?? "").toLowerCase().includes(input.provider.toLowerCase()))
-      && (!input.period || (row.periodStart ? row.periodStart.toISOString().slice(0, 7) === input.period : false)));
+      && (!input.period || (row.periodStart ? new Date(row.periodStart).toISOString().slice(0, 7) === input.period : false)));
   }
   const rows = await db.select({ request: gstSubmissionRequests, businessName: businesses.name, taskTitle: operationalTasks.title, periodStart: operationalTasks.periodStart, requesterName: users.name, requesterEmail: users.email, preparation: gstPreparations }).from(gstSubmissionRequests)
     .innerJoin(businesses, eq(gstSubmissionRequests.businessId, businesses.id))
