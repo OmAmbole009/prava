@@ -37,9 +37,27 @@ export const api = {
   auth: {
     me: () => apiFetch("/auth/me"),
     login: (body) => apiFetch("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+    verifyOtp: (body) => apiFetch("/auth/verify-otp", { method: "POST", body: JSON.stringify(body) }),
+    resendOtp: (body) => apiFetch("/auth/resend-otp", { method: "POST", body: JSON.stringify(body) }),
+    register: (body) => apiFetch("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+    forgotPasswordRequest: (body) => apiFetch("/auth/forgot-password/request", { method: "POST", body: JSON.stringify(body) }),
+    forgotPasswordVerify: (body) => apiFetch("/auth/forgot-password/verify", { method: "POST", body: JSON.stringify(body) }),
+    forgotPasswordReset: (body) => apiFetch("/auth/forgot-password/reset", { method: "POST", body: JSON.stringify(body) }),
     adminLogin: (body) => apiFetch("/auth/admin-login", { method: "POST", body: JSON.stringify(body) }),
     caLogin: (body) => apiFetch("/auth/ca-login", { method: "POST", body: JSON.stringify(body) }),
     logout: () => apiFetch("/auth/logout", { method: "POST" }),
+  },
+  user: {
+    profile: () => apiFetch("/user/profile"),
+    changePassword: (body) => apiFetch("/user/change-password", { method: "POST", body: JSON.stringify(body) }),
+  },
+  invoices: {
+    list: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/invoices${q}`);
+    },
+    get: (id) => apiFetch(`/invoices/${id}`),
+    delete: (id) => apiFetch(`/invoices/${id}`, { method: "DELETE" }),
   },
   businesses: {
     list: () => apiFetch("/businesses"),
@@ -80,6 +98,8 @@ export const api = {
     get: (params) => apiFetch(`/documents/${params.documentId}`),
     upload: (body) => apiFetch("/documents/upload", { method: "POST", body: JSON.stringify(body) }),
     review: (body) => apiFetch("/documents/review", { method: "POST", body: JSON.stringify(body) }),
+    delete: (documentId) => apiFetch(`/documents/${documentId}`, { method: "DELETE" }),
+    ocrStatus: () => apiFetch("/documents/ocr-status"),
   },
   actions: {
     list: (params) => {
@@ -175,5 +195,36 @@ export const api = {
   system: {
     health: () => apiFetch("/system/health"),
     notifyOwner: (body) => apiFetch("/system/notify-owner", { method: "POST", body: JSON.stringify(body) }),
+  },
+  intelligence: {
+    overview: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/overview${q}`);
+    },
+    full: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/full${q}`);
+    },
+    tds: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/tds${q}`);
+    },
+    calculateTds: (body) => apiFetch("/intelligence/tds/calculate", { method: "POST", body: JSON.stringify(body) }),
+    ar: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/ar${q}`);
+    },
+    ap: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/ap${q}`);
+    },
+    healthScore: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/health-score${q}`);
+    },
+    todayActions: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/intelligence/today-actions${q}`);
+    },
   },
 };

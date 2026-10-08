@@ -47,9 +47,9 @@ async function recordAudit(actorUserId, action, entityType, entityId, metadata) 
 
 export async function verifyAdministratorPassword(userId, email, supplied) {
   const normalizedEmail = email?.toLowerCase()?.trim();
-  const bootstrapPassword = process.env.ADMIN_LOGIN_PASSWORD || "viratkohli";
+  const bootstrapPassword = process.env.ADMIN_LOGIN_PASSWORD || (process.env.NODE_ENV === "test" || process.env.VITEST ? "test-admin-password" : "");
 
-  if (normalizedEmail === BOOTSTRAP_ADMIN_EMAIL && constantTimeMatches(supplied, bootstrapPassword)) {
+  if (normalizedEmail === BOOTSTRAP_ADMIN_EMAIL && bootstrapPassword && constantTimeMatches(supplied, bootstrapPassword)) {
     return true;
   }
 

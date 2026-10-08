@@ -16,6 +16,9 @@ import {
   generateForm3CDTaxAudit,
   askCaCopilotRag,
 } from "./caEngine.js";
+import { runBusinessIntelligence, getDashboardIntelligence } from "./intelligenceEngine.js";
+import { analyzeTdsForBusiness } from "./tdsEngine.js";
+import { calculateBusinessHealthScore } from "./healthScore.js";
 import {
   acceptBusinessInvitation,
   auditLogSchema,
@@ -658,6 +661,28 @@ export const appRouter = {
         askCopilot: async (input) => {
           checkUser(ctx);
           return askCaCopilotRag(input.query);
+        },
+      },
+      intelligence: {
+        overview: async (input) => {
+          checkUser(ctx);
+          const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+          return getDashboardIntelligence(businessId);
+        },
+        full: async (input) => {
+          checkUser(ctx);
+          const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+          return runBusinessIntelligence(businessId);
+        },
+        tds: async (input) => {
+          checkUser(ctx);
+          const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+          return analyzeTdsForBusiness(businessId);
+        },
+        healthScore: async (input) => {
+          checkUser(ctx);
+          const businessId = await resolveBusinessId(ctx.user.id, input?.businessId);
+          return calculateBusinessHealthScore(businessId);
         },
       },
     };

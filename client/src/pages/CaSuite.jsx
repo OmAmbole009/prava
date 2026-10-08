@@ -191,6 +191,161 @@ export default function CaSuite() {
         URL.revokeObjectURL(url);
         toast.success(`Downloaded ${filename}!`);
     };
+
+    // Statutory Export Helpers across all CA Suite Modules
+    const downloadSchedule3Csv = () => {
+        const pnl = schedule3Data?.profitAndLoss || {};
+        const bs = schedule3Data?.balanceSheet || {};
+        const ratios = schedule3Data?.ratios || [];
+        const rows = [
+            ["MCA SCHEDULE III FINANCIAL STATEMENTS", `"${activeBiz?.name || 'Workspace'}"`],
+            ["Financial Year", schedule3Data?.reportingPeriod || "2024-25"],
+            ["Generated", new Date().toISOString()],
+            [],
+            ["PART I: BALANCE SHEET"],
+            ["Category", "Line Item", "Amount (INR)"],
+            ["Equity & Liabilities", "Share Capital & Reserves", bs.equityAndLiabilities?.shareholdersFunds?.totalShareholdersFunds ?? 0],
+            ["Equity & Liabilities", "Non-Current Borrowings", bs.equityAndLiabilities?.nonCurrentLiabilities?.totalNonCurrentLiabilities ?? 0],
+            ["Equity & Liabilities", "Trade Payables (MSME Sec 43B(h))", bs.equityAndLiabilities?.currentLiabilities?.tradePayablesMsme ?? 0],
+            ["Equity & Liabilities", "Trade Payables (Other)", bs.equityAndLiabilities?.currentLiabilities?.tradePayablesNonMsme ?? 0],
+            ["Equity & Liabilities", "Total Equity & Liabilities", bs.equityAndLiabilities?.totalEquityAndLiabilities ?? 0],
+            ["Assets", "Non-Current Assets (PPE)", bs.assets?.nonCurrentAssets?.totalNonCurrentAssets ?? 0],
+            ["Assets", "Trade Receivables", bs.assets?.currentAssets?.tradeReceivables ?? 0],
+            ["Assets", "Cash & Cash Equivalents", bs.assets?.currentAssets?.cashAndCashEquivalents ?? 0],
+            ["Assets", "Total Assets", bs.assets?.totalAssets ?? 0],
+            [],
+            ["PART II: STATEMENT OF PROFIT AND LOSS"],
+            ["Line Item", "Amount (INR)"],
+            ["Revenue from Operations", pnl.revenue?.revenueFromOperations ?? 0],
+            ["Other Income", pnl.revenue?.otherIncome ?? 0],
+            ["Operating & Other Expenses", pnl.expenses?.otherExpenses ?? 0],
+            ["Profit Before Tax (PBT)", pnl.profitBeforeTax ?? 0],
+            ["Tax Expense", pnl.taxExpense ?? 0],
+            ["Profit After Tax (PAT)", pnl.profitAfterTax ?? 0],
+            [],
+            ["MANDATORY MCA RATIOS"],
+            ["Ratio", "Value", "Benchmark", "Status"],
+            ...ratios.map(r => [`"${r.ratioName}"`, r.value, `"${r.benchmark}"`, r.status]),
+        ];
+        const csvContent = rows.map(r => r.join(",")).join("\n");
+        downloadTextFile(`MCA_Schedule_III_${activeBiz?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Financials'}.csv`, csvContent);
+    };
+
+    const downloadMsmeReportCsv = () => {
+        const list = msmeData?.invoices || [];
+        const rows = [
+            ["SECTION 43B(h) MSME AUDIT REGISTER", `"${activeBiz?.name || 'Workspace'}"`],
+            ["Generated", new Date().toISOString().slice(0, 10)],
+            ["Total MSME Payables", msmeData?.totalMsmePayables ?? 0],
+            ["Total Disallowance Risk", msmeData?.totalDisallowanceAmount ?? 0],
+            [],
+            ["Invoice Number", "Vendor Name", "Enterprise Category", "Invoice Amount (INR)", "Days Outstanding", "Max Days Allowed", "Sec 43B(h) Disallowed"],
+            ...list.map(i => [
+                `"${i.invoiceNumber || i.id}"`,
+                `"${i.vendorName}"`,
+                i.enterpriseCategory || "Micro",
+                i.invoiceAmount || i.amount || 0,
+                i.daysOutstanding ?? 0,
+                i.maxDaysAllowed ?? 45,
+                i.isDisallowedUnder43Bh ? "YES (Disallowed u/s 43B(h))" : "NO (Within Limit)",
+            ]),
+        ];
+        downloadTextFile(`MSME_Section_43Bh_Audit_${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.join(",")).join("\n"));
+    };
+
+    const downloadAdvanceTaxCsv = () => {
+        const inst = advanceTaxData?.installments || [];
+        const rows = [
+            ["ADVANCE TAX STATUTORY COMPUTATION (ITNS 280)", `"${activeBiz?.name || 'Workspace'}"`],
+            ["Financial Year", "2024-25 (AY 2025-26)"],
+            ["Taxable Net Profit (INR)", advanceTaxData?.taxableProfit ?? 0],
+            ["Assessed Annual Corporate Tax (INR)", advanceTaxData?.totalTaxAssessed ?? 0],
+            ["TDS Already Deducted (INR)", advanceTaxData?.tdsAlreadyDeducted ?? 0],
+            ["Net Advance Tax Payable u/s 208 (INR)", advanceTaxData?.netPayableAfterTds ?? advanceTaxData?.netTaxPayable ?? 0],
+            [],
+            ["Installment", "Due Date", "Cumulative % Due", "Cumulative Amount (INR)", "Quarter Installment (INR)", "Status"],
+            ...inst.map(i => [
+                `"${i.quarter || i.installment}"`,
+                i.dueDate,
+                `${i.cumulativePercentage || i.percentage}%`,
+                i.cumulativeAmount || 0,
+                i.quarterInstallment || 0,
+                i.status || "Pending",
+            ]),
+        ];
+        downloadTextFile(`Advance_Tax_Computation_Challan280_${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.join(",")).join("\n"));
+    };
+
+    const downloadTdsScheduleCsv = () => {
+        const sections = tdsData?.sections || [];
+        const rows = [
+            ["TDS COMPLIANCE SCHEDULE (FORM 26Q)", `"${activeBiz?.name || 'Workspace'}"`],
+            ["Entity", `"${activeBiz?.name || 'Workspace'}"`],
+            ["TAN / PAN", activeBiz?.gstin ? activeBiz.gstin.slice(2, 12) : "N/A"],
+            [],
+            ["Section", "Nature of Payment", "Rate (%)", "Threshold Limit", "TDS Due (INR)", "Transaction Volume (INR)"],
+            ...sections.map(s => [
+                s.section,
+                `"${s.nature || s.natureOfPayment}"`,
+                s.rate,
+                `"${s.statutoryThreshold || s.thresholdLimit}"`,
+                s.tdsDueThisMonth || s.tdsDeductible || 0,
+                s.monthlyTransactionVolume || s.quarterVolume || 0,
+            ]),
+        ];
+        downloadTextFile(`TDS_Form26Q_Compliance_Schedule_${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.join(",")).join("\n"));
+    };
+
+    const downloadForm3CdCsv = () => {
+        const clauses = form3CdData?.clauses || [];
+        const rows = [
+            ["FORM 3CD TAX AUDIT REPORT (SECTION 44AB)", `"${activeBiz?.name || 'Workspace'}"`],
+            ["Tax Audit Applicability", `"${form3CdData?.auditStatus || 'Assessed'}"`],
+            ["Assessment Year", `"${form3CdData?.assessmentYear || '2024-25'}"`],
+            [],
+            ["Clause No", "Description", "Relevant Remarks", "Quantified Amount (INR)", "Audit Status"],
+            ...clauses.map(c => [
+                `"${c.clause}"`,
+                `"${c.title}"`,
+                `"${(c.remarks || '').replace(/"/g, '""')}"`,
+                c.amountInvolved || 0,
+                c.status || "Verified",
+            ]),
+        ];
+        downloadTextFile(`Form_3CD_Tax_Audit_Report_${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.join(",")).join("\n"));
+    };
+
+    const downloadNoticeDefenseTxt = () => {
+        const d = noticeMutation.data;
+        if (!d) {
+            toast.error("Generate a legal defense petition first.");
+            return;
+        }
+        const text = [
+            `LEGAL DEFENSE PETITION BEFORE ASSESSING OFFICER`,
+            `Subject: ${d.subject || "Reply to Statutory Notice"}`,
+            `Notice Ref / DIN: ${noticeRef || "DIN/NA"}`,
+            `Taxpayer: ${activeBiz?.name || "Taxpayer Enterprise"} (GSTIN: ${activeBiz?.gstin || "N/A"})`,
+            `Date: ${new Date().toLocaleDateString("en-IN")}`,
+            ``,
+            `1. PRELIMINARY OBJECTIONS & STATUTORY BACKGROUND:`,
+            `This petition is submitted in formal response to notice ref ${noticeRef || "DIN/NA"} alleging disputed liability of Rs. ${Number(disputedAmount).toLocaleString("en-IN")}.`,
+            ``,
+            `2. JUDICIAL PRECEDENTS & HIGH COURT / SUPREME COURT CITATIONS:`,
+            ...(d.citations || []).map(c => ` - ${c}`),
+            ``,
+            `3. DETAILED LEGAL GROUNDS ON MERITS:`,
+            ...(d.legalGrounds || []).map((g, i) => ` Grounds ${i + 1}: ${g}`),
+            ``,
+            `4. PRAYER TO THE LEARNED OFFICER:`,
+            `"${d.prayerText || "It is humbly prayed that the proposed demand be dropped in its entirety."}"`,
+            ``,
+            `Authorized Signatory,`,
+            `${activeBiz?.name || "Taxpayer Enterprise"}`,
+        ].join("\n");
+        downloadTextFile(`Notice_Defense_${noticeRef || "Petition"}.txt`, text);
+    };
+
     // Preset invoice audit profiles
     const applyInvoicePreset = (preset) => {
         setAuditVendorName(preset.vendor);
@@ -954,7 +1109,12 @@ Certified by Prava Autonomous Chartered Accountant Engine`;
                   {schedule3Data?.entityName} · CIN: {schedule3Data?.cin} · {schedule3Data?.reportingPeriod}
                 </p>
               </div>
-              <Button size="sm" onClick={() => {
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={downloadSchedule3Csv} className="text-xs h-8 font-semibold gap-1.5 border-sky-500/30 hover:bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                  <Download className="size-3.5"/>
+                  Export CSV
+                </Button>
+                <Button size="sm" onClick={() => {
             const content = `# SCHEDULE III STATUTORY FINANCIAL STATEMENTS
 Entity: ${schedule3Data?.entityName}
 CIN: ${schedule3Data?.cin}
@@ -974,10 +1134,11 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
 `;
             const fy = schedule3Data?.reportingPeriod?.financialYear || "FY";
             downloadTextFile(`Schedule_III_Financials_${fy}.md`, content);
-        }} className="text-xs h-8 bg-sky-600 hover:bg-sky-700 text-white font-semibold gap-1.5">
-                <Download className="size-3.5"/>
-                Export Schedule III Report
-              </Button>
+        }} className="text-xs h-8 bg-sky-600 hover:bg-sky-700 text-white font-semibold gap-1.5 shadow-sm">
+                  <Download className="size-3.5"/>
+                  Export Report (.md)
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
@@ -1371,10 +1532,17 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                 {/* Installment Table */}
                 <Card className="border-border bg-card/95 shadow-md">
                   <CardHeader className="py-3 px-4 border-b border-border">
-                    <CardTitle className="text-xs font-bold flex items-center justify-between">
-                      <span>Statutory Advance Tax Installment Schedule ({advanceTaxData?.financialYear || "Current FY"})</span>
-                      <span className="text-[11px] font-mono text-muted-foreground">Section 208 / 211</span>
-                    </CardTitle>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-xs font-bold">
+                        Statutory Advance Tax Installment Schedule ({advanceTaxData?.financialYear || "Current FY"})
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={downloadAdvanceTaxCsv} className="text-xs h-7 px-2.5 gap-1.5 font-semibold border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Download className="size-3"/> Export Challan 280 (CSV)
+                        </Button>
+                        <span className="text-[11px] font-mono text-muted-foreground hidden sm:inline">Section 208 / 211</span>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y divide-border text-xs">
@@ -1447,9 +1615,14 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                   <CardHeader className="py-3 px-4 border-b border-border">
                     <div className="flex justify-between items-center">
                       <CardTitle className="text-xs font-bold">Active MSME Vendor Payables Register</CardTitle>
-                      <span className="text-[11px] font-mono text-rose-500 font-bold">
-                        {(msmeData?.overdueInvoicesCount ?? 0)} Overdue Invoices
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={downloadMsmeReportCsv} className="text-xs h-7 px-2.5 gap-1.5 font-semibold border-rose-500/30 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                          <Download className="size-3"/> Export MSME Schedule (CSV)
+                        </Button>
+                        <span className="text-[11px] font-mono text-rose-500 font-bold">
+                          {(msmeData?.overdueInvoicesCount ?? 0)} Overdue
+                        </span>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -1561,11 +1734,16 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                     Failure to deduct attracts 30% expenditure disallowance under Section 40(a)(ia)
                   </CardDescription>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-muted-foreground">Total TDS Due (7th Sep): </span>
-                  <span className="font-mono font-bold text-emerald-500 text-xs">
-                    ₹{formatInr(tdsData?.totalTdsDue)}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <Button size="sm" variant="outline" onClick={downloadTdsScheduleCsv} className="text-xs h-7 px-2.5 gap-1.5 font-semibold border-amber-500/30 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <Download className="size-3"/> Export Form 26Q (CSV)
+                  </Button>
+                  <div className="text-right hidden sm:block">
+                    <span className="text-[10px] text-muted-foreground">Total TDS Due (7th Sep): </span>
+                    <span className="font-mono font-bold text-emerald-500 text-xs">
+                      ₹{formatInr(tdsData?.totalTdsDue)}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1610,7 +1788,11 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                     AY {form3CdData?.assessmentYear} · Status: {form3CdData?.auditStatus}
                   </CardDescription>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => {
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={downloadForm3CdCsv} className="text-xs h-7 gap-1.5 font-semibold border-purple-500/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <Download className="size-3"/> Export Form 3CD (CSV)
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
             const content = `# FORM 3CD TAX AUDIT REPORT (SECTION 44AB)
 Assessee: ${form3CdData?.assesseeName}
 PAN: ${form3CdData?.pan}
@@ -1624,8 +1806,9 @@ Amount: ₹${formatInr(c.amountInvolved)}
 Remarks: ${c.remarks}`).join("\n\n")}`;
             downloadTextFile("Form_3CD_Audit_Report.md", content);
         }} className="text-xs h-7 gap-1">
-                  <Download className="size-3"/> Download Form 3CD Papers
-                </Button>
+                    <Download className="size-3"/> Report (.md)
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-border text-xs">
@@ -1777,9 +1960,18 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
                         {noticeMutation.data?.subject || "Includes Supreme Court & High Court case citations"}
                       </CardDescription>
                     </div>
-                    {noticeMutation.data && (<Button variant="outline" size="sm" onClick={() => copyToClipboard(JSON.stringify(noticeMutation.data, null, 2))} className="text-xs h-7 gap-1">
-                        <Copy className="size-3"/> Copy Text
-                      </Button>)}
+                    <div className="flex items-center gap-2">
+                      {noticeMutation.data && (
+                        <>
+                          <Button size="sm" onClick={downloadNoticeDefenseTxt} className="text-xs h-7 bg-purple-600 hover:bg-purple-700 text-white gap-1 font-semibold shadow-sm">
+                            <Download className="size-3"/> Download Petition (.txt)
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => copyToClipboard(JSON.stringify(noticeMutation.data, null, 2))} className="text-xs h-7 gap-1">
+                            <Copy className="size-3"/> Copy Text
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="p-4 space-y-3 text-xs leading-relaxed">
                     {noticeMutation.data ? (<div className="space-y-3">

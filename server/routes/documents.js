@@ -9,9 +9,20 @@ import {
   uploadDocumentSchema,
 } from "../operations.js";
 
+import { checkOllamaHealth } from "../services/ocrService.js";
+
 export const documentsRouter = Router();
 
 documentsRouter.use(requireUser);
+
+documentsRouter.get("/ocr-status", async (req, res) => {
+  try {
+    const status = await checkOllamaHealth();
+    return sendData(res, status);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
 
 documentsRouter.get("/", async (req, res) => {
   try {
@@ -51,6 +62,17 @@ documentsRouter.post("/review", async (req, res) => {
     return sendData(res, result);
   } catch (error) {
     return sendError(res, error, 400);
+  }
+});
+
+documentsRouter.delete("/:documentId", async (req, res) => {
+  try {
+    const documentId = Number(req.params.documentId);
+    const { deleteInvoiceForUser } = await import("../operations.js");
+    const result = await deleteInvoiceForUser(req.user.id, documentId);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error, error.statusCode || 400);
   }
 });
 

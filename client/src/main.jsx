@@ -40,7 +40,7 @@ const canonicalPath = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath
 if (canonicalPath !== rawPath) {
     window.history.replaceState(window.history.state, "", `${canonicalPath}${window.location.search}${window.location.hash}`);
 }
-const workspacePath = /^\/(login|ca-suite(?:\/|$)|onboarding|dashboard|assistant(?:\/|$)|money(?:\/|$)|tax(?:\/|$)|ca-review(?:\/|$)|ca(?:\/|$)|tasks(?:\/|$)|documents(?:\/|$)|billing|admin(?:\/|$)|invite(?:\/|$))/.test(canonicalPath);
+const workspacePath = /^\/(login|profile(?:\/|$)|forgot-password(?:\/|$)|ca-suite(?:\/|$)|onboarding|dashboard|assistant(?:\/|$)|money(?:\/|$)|tax(?:\/|$)|ca-review(?:\/|$)|ca(?:\/|$)|tasks(?:\/|$)|documents(?:\/|$)|billing|admin(?:\/|$)|invite(?:\/|$))/.test(canonicalPath);
 if (workspacePath) {
     root.render(<WorkspaceBoot />);
     void import("./workspace")

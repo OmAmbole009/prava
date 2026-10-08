@@ -157,10 +157,36 @@ router.get("/gstr2b-reconcile", gstr2bReconcileHandler);
 router.post("/gstr2b-reconcile", gstr2bReconcileHandler);
 
 // TDS Compliance
-router.get("/tds-compliance", async (_req, res) => {
+router.get("/tds-compliance", async (req, res) => {
   try {
-    const result = getTdsComplianceOverview();
-    return sendData(res, result);
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId ? parseInt(req.query.businessId, 10) : undefined);
+    const { analyzeTdsForBusiness } = await import("../tdsEngine.js");
+    const tdsAnalysis = businessId ? analyzeTdsForBusiness(businessId) : null;
+    const base = getTdsComplianceOverview();
+
+    if (tdsAnalysis && tdsAnalysis.vendorsWithTdsObligation > 0) {
+      // Map live section totals into compliance breakdown
+      const sectionMap = {};
+      for (const v of tdsAnalysis.vendors) {
+        if (v.status === "deduction_required" || v.status === "threshold_exceeded") {
+          const sec = v.applicableSection || "194C";
+          sectionMap[sec] = (sectionMap[sec] || 0) + (v.estimatedTdsMinor || 0);
+        }
+      }
+      base.totalTdsDue = Math.round(tdsAnalysis.totalTdsToDeductMinor / 100);
+      base.totalTdsPendingDeposit = Math.round(tdsAnalysis.totalTdsToDeductMinor / 100);
+      base.sections = base.sections.map(s => {
+        const secAmtMinor = sectionMap[s.section] || 0;
+        return {
+          ...s,
+          currentMonthDeduction: Math.round(secAmtMinor / 100),
+          challanStatus: secAmtMinor > 0 ? "pending_deposit" : "compliant",
+        };
+      });
+      base.liveVendors = tdsAnalysis.vendors;
+    }
+
+    return sendData(res, base);
   } catch (error) {
     return sendError(res, error);
   }

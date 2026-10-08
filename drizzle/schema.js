@@ -15,12 +15,37 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  passwordHash: varchar("passwordHash", { length: 256 }),
+  passwordSalt: varchar("passwordSalt", { length: 64 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin", "ca"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
+
+export const otpChallenges = mysqlTable(
+  "otpChallenges",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    challengeId: varchar("challengeId", { length: 64 }).notNull().unique(),
+    userId: int("userId").references(() => users.id),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    otpHash: varchar("otpHash", { length: 256 }).notNull(),
+    otpSalt: varchar("otpSalt", { length: 64 }).notNull(),
+    purpose: varchar("purpose", { length: 32 }).default("login").notNull(),
+    method: varchar("method", { length: 32 }).default("email").notNull(),
+    attempts: int("attempts").default(0).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    lastSentAt: timestamp("lastSentAt").defaultNow().notNull(),
+  },
+  table => [
+    index("otp_challenges_identifier_idx").on(table.identifier),
+    index("otp_challenges_expires_idx").on(table.expiresAt),
+  ]
+);
 
 export const businesses = mysqlTable(
   "businesses",

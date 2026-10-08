@@ -28,6 +28,7 @@ const CaDashboard = lazy(() => import("@/pages/CaDashboard"));
 const InvitationAcceptance = lazy(() => import("@/pages/InvitationAcceptance"));
 const Login = lazy(() => import("@/pages/Login"));
 const CaSuite = lazy(() => import("@/pages/CaSuite"));
+const Profile = lazy(() => import("@/pages/Profile"));
 function DeferredPage({ component: Component }) {
     return (<Suspense fallback={<div className="grid min-h-screen place-items-center bg-[#07080a] px-6 text-center text-slate-400">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl shadow-2xl">
@@ -75,6 +76,8 @@ export default function WorkspaceApp() {
             <Route path="/tasks">{() => <DeferredPage component={Tasks}/>}</Route>
             <Route path="/billing">{() => <DeferredPage component={Billing}/>}</Route>
             <Route path="/admin/billing">{() => <DeferredPage component={AdminBilling}/>}</Route>
+            <Route path="/profile">{() => <DeferredPage component={Profile}/>}</Route>
+            <Route path="/forgot-password">{() => <DeferredPage component={Login}/>}</Route>
             <Route component={NotFound}/>
           </Switch>
         </TooltipProvider>

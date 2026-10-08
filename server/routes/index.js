@@ -18,6 +18,9 @@ import caEngineRouter from "./caEngine.js";
 import caRouter from "./ca.js";
 import adminRouter from "./admin.js";
 import systemRouter from "./system.js";
+import userRouter from "./user.js";
+import invoicesRouter from "./invoices.js";
+import intelligenceRouter from "./intelligence.js";
 
 const apiRouter = Router();
 
@@ -25,6 +28,8 @@ const apiRouter = Router();
 apiRouter.use(authenticate);
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/user", userRouter);
+apiRouter.use("/invoices", invoicesRouter);
 apiRouter.use("/businesses", businessesRouter);
 apiRouter.use("/finance", financeRouter);
 apiRouter.use("/tasks", tasksRouter);
@@ -42,5 +47,6 @@ apiRouter.use("/caEngine", caEngineRouter);
 apiRouter.use("/ca", caRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/system", systemRouter);
+apiRouter.use("/intelligence", intelligenceRouter);
 
 export default apiRouter;

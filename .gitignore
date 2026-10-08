@@ -116,3 +116,27 @@ scratch_*
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# Secrets, Keys & Certificates
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Test Artifacts & Invoices
+test-*.png
+test-*.pdf
+test-*.jpg
+test-*.jpeg
+test_*.png
+test_*.pdf

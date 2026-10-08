@@ -225,6 +225,15 @@ class SDKServer {
       }
     }
 
+    if (!sessionToken) {
+      throw ForbiddenError("Missing session token");
+    }
+
+    const { isSessionTokenRevoked } = await import("../services/session.service.js");
+    if (isSessionTokenRevoked(sessionToken)) {
+      throw ForbiddenError("Session has been terminated");
+    }
+
     const session = await this.verifySession(sessionToken);
 
     if (!session) {

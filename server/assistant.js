@@ -80,6 +80,9 @@ export async function getLiveWorkspaceContext(userId, businessId) {
 
   if (!db) {
     const { inMemoryAccountingEntries, inMemoryActionItems, inMemoryDocuments, inMemoryTasks } = await import("./operations.js");
+    const { buildAccountsReceivable, buildAccountsPayable } = await import("./arApEngine.js");
+    const { getDashboardIntelligence } = await import("./intelligenceEngine.js");
+
     const entries = inMemoryAccountingEntries.filter(e => e.businessId === businessId);
     let revenueMinor = 0;
     let expensesMinor = 0;
@@ -87,17 +90,45 @@ export async function getLiveWorkspaceContext(userId, businessId) {
       if (e.category === "revenue" || e.entryType === "credit") revenueMinor += (e.amountMinor || 0);
       else expensesMinor += (e.amountMinor || 0);
     }
-    const cashMinor = Math.max(0, revenueMinor - expensesMinor);
-    const gstPositionMinor = Math.round(revenueMinor * 0.18 - expensesMinor * 0.18);
-    const receivablesMinor = Math.round(revenueMinor * 0.15);
-    const payablesMinor = Math.round(expensesMinor * 0.10);
 
     const bizDocs = inMemoryDocuments.filter(d => d.document.businessId === businessId);
+    const extractions = bizDocs.filter(d => d.extraction);
+    if (revenueMinor === 0 && expensesMinor === 0 && extractions.length > 0) {
+      for (const d of extractions) {
+        const amt = d.extraction.totalMinor || (d.extraction.taxableValueMinor || 0);
+        if (d.extraction.invoiceType === "sales") revenueMinor += amt;
+        else if (d.extraction.invoiceType === "purchase") expensesMinor += amt;
+      }
+    }
+
+    let outputGstMinor = 0;
+    let inputGstMinor = 0;
+    for (const d of extractions) {
+      const gst = (d.extraction.cgstMinor || 0) + (d.extraction.sgstMinor || 0) + (d.extraction.igstMinor || 0);
+      if (d.extraction.invoiceType === "sales") outputGstMinor += gst;
+      else if (d.extraction.invoiceType === "purchase") inputGstMinor += gst;
+    }
+    const gstPositionMinor = outputGstMinor - inputGstMinor;
+
+    const ar = buildAccountsReceivable(extractions);
+    const ap = buildAccountsPayable(extractions);
+    const receivablesMinor = ar.totalOutstandingMinor;
+    const payablesMinor = ap.totalOutstandingMinor;
+    const cashMinor = Math.max(0, revenueMinor - expensesMinor);
+
+    let intel = null;
+    try {
+      intel = await getDashboardIntelligence(businessId);
+    } catch {
+      // ignore
+    }
+
     const bizActions = inMemoryActionItems.filter(a => a.businessId === businessId && a.status === "open");
     const bizTasks = inMemoryTasks.filter(t => t.businessId === businessId);
 
     return {
       workspace,
+      intelligence: intel,
       financials: {
         revenueMinor,
         revenueFormatted: fmt(revenueMinor),
@@ -287,6 +318,12 @@ CURRENT BUSINESS DATA:
 - Money you owe (Payables): ${context.financials.payablesFormatted}
 - Estimated Tax / GST to pay: ${context.financials.gstPositionFormatted}
 
+${context.intelligence ? `BUSINESS HEALTH & PROACTIVE INTELLIGENCE:
+- Health Score: ${context.intelligence.healthScore}/100 (${context.intelligence.healthGradeLabel})
+- Critical Issues: ${context.intelligence.criticalCount}, Warnings: ${context.intelligence.warningCount}
+${context.intelligence.topFindings?.length ? `- Top Findings:\n${context.intelligence.topFindings.map(f => `  * [${f.severity.toUpperCase()}] ${f.title}: ${f.plainEnglish}`).join("\n")}` : ""}
+${context.intelligence.todayActions?.length ? `- Actions for Today:\n${context.intelligence.todayActions.map(a => `  * ${a.action}: ${a.why}`).join("\n")}` : ""}
+` : ""}
 LIVE ACTION ITEMS NEEDING ATTENTION (${context.openActions.length}):
 ${context.openActions.map((a, i) => `${i + 1}. [${a.priority.toUpperCase()}] ${a.title}: ${a.description} (Doc #${a.documentId || "none"}, Task #${a.taskId || "none"})`).join("\n") || "No open action items."}
 

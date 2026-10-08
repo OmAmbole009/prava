@@ -17,35 +17,36 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
-// ─── Grouped Nav Items for High-Tech Sci-Fi Sidebar ───────────────────────────
+// ─── Grouped Nav Items for Business Operations & Compliance ─────────────────────
 const navGroups = [
     {
-        category: "01 // COMMAND OPS",
+        category: "01 // OVERVIEW & ASSISTANCE",
         items: [
-            { icon: LayoutDashboard, label: "Command Center", path: "/dashboard", badge: "LIVE", color: "text-sky-400", glow: "from-sky-500/25" },
-            { icon: Sparkles, label: "Ask Prava (AI)", path: "/assistant", highlight: true, color: "text-violet-400", glow: "from-violet-500/25" },
+            { icon: LayoutDashboard, label: "Home Dashboard", path: "/dashboard", badge: "LIVE", color: "text-sky-400", glow: "from-sky-500/25" },
+            { icon: Sparkles, label: "Ask Prava AI", path: "/assistant", highlight: true, color: "text-violet-400", glow: "from-violet-500/25" },
         ],
     },
     {
-        category: "02 // LEDGER & CAPITAL",
+        category: "02 // MONEY & RECORDS",
         items: [
-            { icon: WalletCards, label: "Money & Cashflow", path: "/money", color: "text-emerald-400", glow: "from-emerald-500/25" },
-            { icon: FileText, label: "Documents Vault", path: "/documents", badge: "OCR", color: "text-cyan-400", glow: "from-cyan-500/25" },
-            { icon: ClipboardCheck, label: "Tasks & Workflows", path: "/tasks", color: "text-amber-400", glow: "from-amber-500/25" },
+            { icon: WalletCards, label: "Money In & Out", path: "/money", color: "text-emerald-400", glow: "from-emerald-500/25" },
+            { icon: FileText, label: "Invoices & Receipts", path: "/documents", badge: "OCR", color: "text-cyan-400", glow: "from-cyan-500/25" },
+            { icon: ClipboardCheck, label: "Things to Fix", path: "/tasks", color: "text-amber-400", glow: "from-amber-500/25" },
         ],
     },
     {
-        category: "03 // STATUTORY AUDIT",
+        category: "03 // TAXES & CA ASSISTANCE",
         items: [
-            { icon: Scale, label: "Autonomous CA Suite", path: "/ca-suite", badge: "AUTONOMOUS", color: "text-purple-400", glow: "from-purple-500/25" },
-            { icon: Receipt, label: "Tax & Compliance", path: "/tax", color: "text-orange-400", glow: "from-orange-500/25" },
+            { icon: Receipt, label: "Taxes & Compliance", path: "/tax", color: "text-orange-400", glow: "from-orange-500/25" },
+            { icon: Scale, label: "Autonomous CA Suite", path: "/ca-suite", badge: "ADVANCED", color: "text-purple-400", glow: "from-purple-500/25" },
             { icon: UserCheck, label: "CA Review Desk", path: "/ca-review", badge: "ICAI", color: "text-purple-400", glow: "from-purple-500/25" },
         ],
     },
     {
-        category: "04 // ENTITY CONFIG",
+        category: "04 // BUSINESS SETTINGS",
         items: [
             { icon: Building2, label: "Business Profile", path: "/onboarding", color: "text-rose-400", glow: "from-rose-500/25" },
+            { icon: ShieldCheck, label: "Account & Security", path: "/profile", color: "text-blue-400", glow: "from-blue-500/25" },
             { icon: CreditCard, label: "Billing & Plans", path: "/billing", color: "text-pink-400", glow: "from-pink-500/25" },
         ],
     },
@@ -470,6 +471,10 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                   <p className="text-[10px] font-mono font-bold text-slate-900 dark:text-slate-400 uppercase">Entity Identity</p>
                   <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user?.name}</p>
                 </div>
+                <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] text-xs font-semibold py-2">
+                  <ShieldCheck className="mr-2 size-3.5 text-purple-500"/>
+                  <span>Account & Security</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
             void logout()
                 .then(() => {

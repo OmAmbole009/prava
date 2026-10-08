@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { signInUnified } from "./adminLogin.js";
 
 describe("Unified Authentication", () => {
-  it("authenticates omambole2007@gmail.com with password viratkohli as Super Administrator and redirects to admin console", async () => {
+  it("authenticates omambole2007@gmail.com with configured password as Super Administrator and redirects to admin console", async () => {
     const mockCtx = {
       req: { ip: "127.0.0.1" },
       res: { cookie: () => {} },
@@ -10,7 +10,7 @@ describe("Unified Authentication", () => {
 
     const res = await signInUnified(mockCtx, {
       email: "omambole2007@gmail.com",
-      password: "viratkohli",
+      password: process.env.ADMIN_LOGIN_PASSWORD || "test-admin-password",
     });
 
     expect(res.success).toBe(true);
