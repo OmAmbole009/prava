@@ -244,9 +244,16 @@ export function validateFinancialCalculations(extracted) {
  */
 function buildExtractionPrompt() {
   return `You are an expert tax accountant and OCR extraction engine for Indian GST and commercial invoices.
-Analyze this invoice image thoroughly and extract all information into strict JSON format with this exact schema:
+Analyze this document image thoroughly, automatically determine the document type (invoice, credit note, debit note, bill of supply, receipt), and extract all information into strict JSON format with this exact schema:
 
 {
+  "document_type": "invoice",
+  "document_subtype": null,
+  "original_invoice_ref": {
+    "number": null,
+    "date": null
+  },
+  "note_reason": null,
   "vendor": {
     "name": null,
     "gstin": null,
@@ -288,11 +295,18 @@ Analyze this invoice image thoroughly and extract all information into strict JS
 
 STRICT EXTRACTION RULES:
 1. Return ONLY the raw JSON object matching the exact structure above. No markdown code blocks, no explanation.
-2. Use null when information is not visible or cannot be determined.
-3. NEVER invent, hallucinate, or guess values.
-4. All amount and numeric fields (subtotal, discount, taxable_amount, cgst, sgst, igst, total_tax, total_amount, quantity, rate, tax_rate, tax_amount, amount) MUST be numbers (e.g. 50000 or 50000.00) or null, NEVER strings with currency symbols or commas.
-5. Extract every line item in the items array with its description, HSN/SAC, quantity, unit, rate, and amount.
-6. The invoice date should be normalized to YYYY-MM-DD or DD-MM-YYYY format as printed.`;
+2. Determine "document_type" accurately:
+   - "credit_note": if titled Credit Note, Section 34 Credit Memo, or credit adjustment.
+   - "debit_note": if titled Debit Note or debit memo.
+   - "bill": if titled Bill of Supply (under Section 31(3)(c)), Utility Bill, Expense Bill, or Cash Bill.
+   - "receipt": if titled Payment Receipt, Cash Receipt, or Voucher.
+   - "invoice": for Tax Invoice, Commercial Invoice, or Proforma Invoice.
+3. If document is a credit note or debit note, extract the original invoice reference number & date into "original_invoice_ref".
+4. Use null when information is not visible or cannot be determined.
+5. NEVER invent, hallucinate, or guess values.
+6. All amount and numeric fields MUST be numbers (e.g. 50000 or 50000.00) or null, NEVER strings with currency symbols.
+7. Extract every line item in the items array with its description, HSN/SAC, quantity, unit, rate, and amount.
+8. The invoice date should be normalized to YYYY-MM-DD or DD-MM-YYYY format as printed.`;
 }
 
 /**

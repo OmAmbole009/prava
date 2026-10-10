@@ -69,7 +69,7 @@ function findTdsObligations(tdsAnalysis) {
     plainEnglish: `You have payments to ${tdsAnalysis.vendorsWithTdsObligation} vendor${tdsAnalysis.vendorsWithTdsObligation !== 1 ? "s" : ""} where tax may need to be deducted before paying them. If you miss this, 30% of the expense could be disallowed when calculating your business tax.`,
     amountMinor: totalTdsMinor,
     recommendedAction: "Review which vendors require TDS deduction and how much to deduct.",
-    actionPath: "/taxes",
+    actionPath: "/tax",
     transactionRefs: vendors.map(v => ({ vendorName: v.vendorName, amount: `Rs ${v.totalTdsRupees?.toLocaleString("en-IN")}` })),
     calculationBreakdown: vendors.slice(0, 3).map(v => ({
       label: v.vendorName,
@@ -193,26 +193,26 @@ function findReconciliationIssues(reconciliationItems) {
   const missing = openItems.filter(i => i.status === "missing");
   const duplicates = openItems.filter(i => i.status === "duplicate");
 
-  if (openItems.length > 0) {
+    const issueDetails = [
+      mismatches.length > 0 ? `${mismatches.length} amount mismatch${mismatches.length !== 1 ? "es" : ""}` : "",
+      missing.length > 0 ? `${missing.length} missing record${missing.length !== 1 ? "s" : ""}` : "",
+      duplicates.length > 0 ? `${duplicates.length} possible duplicate${duplicates.length !== 1 ? "s" : ""}` : "",
+    ].filter(Boolean).join(", ");
+
     findings.push(makeFinding({
       id: "reconciliation_issues",
       type: "reconciliation",
       severity: openItems.length >= 5 ? "critical" : "warning",
       title: `${openItems.length} transaction${openItems.length !== 1 ? "s" : ""} don't match`,
-      plainEnglish: `We found ${openItems.length} record${openItems.length !== 1 ? "s" : ""} that need${openItems.length === 1 ? "s" : ""} checking: ${[
-        mismatches.length > 0 ? `${mismatches.length} amount mismatch${mismatches.length !== 1 ? "es" : ""}` : "",
-        missing.length > 0 ? `${missing.length} missing record${missing.length !== 1 ? "s" : ""}` : "",
-        duplicates.length > 0 ? `${duplicates.length} possible duplicate${duplicates.length !== 1 ? "s" : ""}` : "",
-      ].filter(Boolean).join(", ")}.`,
+      plainEnglish: `We found ${openItems.length} record${openItems.length !== 1 ? "s" : ""} that need${openItems.length === 1 ? "s" : ""} checking: ${issueDetails || `${openItems.length} unmatched transactions`}.`,
       recommendedAction: "Review and resolve the unmatched transactions.",
-      actionPath: "/things-to-fix",
+      actionPath: openItems[0]?.taskId ? `/tasks/${openItems[0].taskId}` : "/tasks",
       transactionRefs: openItems.slice(0, 5).map(i => ({
         reference: i.reference || `Record #${i.id}`,
         status: i.status,
         amount: i.amountMinor ? `Rs ${Math.round(i.amountMinor / 100).toLocaleString("en-IN")}` : null,
       })),
     }));
-  }
 
   return findings;
 }
@@ -236,7 +236,7 @@ function findGstIssues(documents, gstPreparations) {
       plainEnglish: `Your estimated GST amount is Rs ${netTaxRupees.toLocaleString("en-IN")}. But ${prep.documentsRequiringReview} document${prep.documentsRequiringReview !== 1 ? "s" : ""} still need${prep.documentsRequiringReview === 1 ? "s" : ""} to be reviewed before this amount can be finalized.`,
       amountMinor: prep.netTaxPositionMinor || 0,
       recommendedAction: "Review pending documents to finalize your GST position.",
-      actionPath: "/taxes",
+      actionPath: "/tax",
       calculationBreakdown: [
         { label: "GST collected from customers", detail: `Rs ${salesGstRupees.toLocaleString("en-IN")}` },
         { label: "GST you may be able to claim back", detail: `Rs ${itcRupees.toLocaleString("en-IN")}` },
@@ -478,6 +478,8 @@ export async function runBusinessIntelligence(businessId) {
       severity: f.severity,
       title: f.title,
       plainEnglish: f.plainEnglish,
+      action: f.title,
+      why: f.plainEnglish,
       actionPath: f.actionPath,
       amountLabel: f.amountLabel,
     })),

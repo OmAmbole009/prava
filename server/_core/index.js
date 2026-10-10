@@ -78,6 +78,16 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
+  // Initialize Weaviate Vector Database & RAG Knowledge Base in background
+  import("../weaviateVectorDb.js")
+    .then((m) => m.initVectorDatabase())
+    .then((ok) => {
+      if (ok) console.log("[Weaviate] Vector DB & RAG Knowledge Base ready.");
+    })
+    .catch((err) => {
+      console.warn("[Weaviate] Background Vector DB initialization:", err.message);
+    });
+
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

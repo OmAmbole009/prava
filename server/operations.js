@@ -262,6 +262,20 @@ export function validateExtraction(raw) {
   };
 }
 
+export function resolveDocumentType(detectedType, userSelectedType = null) {
+  if (userSelectedType === "bank_statement") return "bank_statement";
+  const dt = String(detectedType || "").toLowerCase();
+  if (dt === "credit_note" || dt.includes("credit")) return "credit_note";
+  if (dt === "debit_note" || dt.includes("debit")) return "debit_note";
+  if (dt === "receipt") return "receipt";
+  if (dt === "bill" || dt.includes("bill")) return "invoice";
+  if (dt === "invoice") return "invoice";
+  if (userSelectedType && ["invoice", "credit_note", "debit_note", "receipt"].includes(userSelectedType)) {
+    return userSelectedType;
+  }
+  return "invoice";
+}
+
 export function calculateGstPreparation(rows) {
   let salesMinor = 0;
   let taxableValueMinor = 0;
@@ -273,22 +287,46 @@ export function calculateGstPreparation(rows) {
   for (const row of rows) {
     const tax = (row.cgstMinor ?? 0) + (row.sgstMinor ?? 0) + (row.igstMinor ?? 0);
     if (row.status !== "extracted" || row.invoiceType === "unknown" || row.invoiceType === null) documentsRequiringReview += 1;
-    if (row.invoiceType === "sales") {
-      salesMinor += row.totalMinor ?? 0;
-      taxableValueMinor += row.taxableValueMinor ?? 0;
-      cgstMinor += row.cgstMinor ?? 0;
-      sgstMinor += row.sgstMinor ?? 0;
-      igstMinor += row.igstMinor ?? 0;
+
+    let isCredit = false;
+    if (row.documentType === "credit_note") isCredit = true;
+    if (row.extractedData) {
+      try {
+        const parsed = typeof row.extractedData === "string" ? JSON.parse(row.extractedData) : row.extractedData;
+        if (parsed.isCreditNote || parsed.documentType === "credit_note") isCredit = true;
+      } catch {}
     }
-    if (row.invoiceType === "purchase") inputTaxCreditMinor += tax;
+
+    if (row.invoiceType === "sales") {
+      if (isCredit) {
+        salesMinor -= row.totalMinor ?? 0;
+        taxableValueMinor -= row.taxableValueMinor ?? 0;
+        cgstMinor -= row.cgstMinor ?? 0;
+        sgstMinor -= row.sgstMinor ?? 0;
+        igstMinor -= row.igstMinor ?? 0;
+      } else {
+        salesMinor += row.totalMinor ?? 0;
+        taxableValueMinor += row.taxableValueMinor ?? 0;
+        cgstMinor += row.cgstMinor ?? 0;
+        sgstMinor += row.sgstMinor ?? 0;
+        igstMinor += row.igstMinor ?? 0;
+      }
+    }
+    if (row.invoiceType === "purchase") {
+      if (isCredit) {
+        inputTaxCreditMinor -= tax;
+      } else {
+        inputTaxCreditMinor += tax;
+      }
+    }
   }
   return {
-    salesMinor,
-    taxableValueMinor,
-    cgstMinor,
-    sgstMinor,
-    igstMinor,
-    inputTaxCreditMinor,
+    salesMinor: Math.max(0, salesMinor),
+    taxableValueMinor: Math.max(0, taxableValueMinor),
+    cgstMinor: Math.max(0, cgstMinor),
+    sgstMinor: Math.max(0, sgstMinor),
+    igstMinor: Math.max(0, igstMinor),
+    inputTaxCreditMinor: Math.max(0, inputTaxCreditMinor),
     netTaxPositionMinor: Math.max(0, cgstMinor + sgstMinor + igstMinor - inputTaxCreditMinor),
     documentsRequiringReview,
   };
@@ -538,7 +576,16 @@ async function extractInvoice(storageKey, mimeType, bytes = null, originalName =
         const sgstNum = typeof amounts.sgst === "number" ? amounts.sgst : 0;
         const igstNum = typeof amounts.igst === "number" ? amounts.igst : 0;
 
+        const detectedDocType = qwenResult.document_type || "invoice";
         return {
+          documentType: detectedDocType,
+          documentSubtype: qwenResult.document_subtype || detectedDocType,
+          isCreditNote: detectedDocType === "credit_note",
+          isDebitNote: detectedDocType === "debit_note",
+          isBillOfSupply: detectedDocType === "bill",
+          originalInvoiceNumber: qwenResult.original_invoice_ref?.number || null,
+          originalInvoiceDate: qwenResult.original_invoice_ref?.date || null,
+          creditNoteReason: qwenResult.note_reason || null,
           vendorName: vendor.name || "",
           gstin: vendor.gstin || "",
           buyerName: buyer.name || "",
@@ -561,9 +608,7 @@ async function extractInvoice(storageKey, mimeType, bytes = null, originalName =
       }
     } catch (err) {
       console.warn("[OCRService] Qwen extraction error:", err.message);
-      if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-        throw err;
-      }
+      // Gracefully fall back to deterministic OCR parser without breaking the upload flow
     }
   }
 
@@ -624,6 +669,8 @@ export async function uploadAndProcessDocument(userId, input) {
       const validated = validateExtraction(raw);
       reasons = validated.reasons;
       extractionStatus = validated.reasons.length ? "needs_review" : "extracted";
+      const resolvedType = resolveDocumentType(raw.documentType, input.documentType);
+      documentRecord.documentType = resolvedType;
       extractionRecord = {
         id: inMemoryExtractions.length + 1,
         documentId,
@@ -647,16 +694,41 @@ export async function uploadAndProcessDocument(userId, input) {
       };
 
       if (validated.totalMinor !== null) {
+        const isCredit = raw.isCreditNote || resolvedType === "credit_note";
+        let entryType;
+        let category;
+        let accountName;
+
+        if (raw.invoiceType === "sales") {
+          accountName = raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables";
+          if (isCredit) {
+            entryType = "debit";
+            category = "sales_return";
+          } else {
+            entryType = "credit";
+            category = "revenue";
+          }
+        } else {
+          accountName = raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor";
+          if (isCredit) {
+            entryType = "credit";
+            category = "purchase_return";
+          } else {
+            entryType = "debit";
+            category = "operating_expense";
+          }
+        }
+
         inMemoryAccountingEntries.push({
           id: inMemoryAccountingEntries.length + 1,
           businessId: input.businessId,
           taskId: input.taskId ?? null,
           documentId,
           entryDate: validated.invoiceDate ?? new Date(),
-          accountName: raw.invoiceType === "sales" ? (raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables") : (raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor"),
-          entryType: raw.invoiceType === "sales" ? "credit" : "debit",
+          accountName,
+          entryType,
           amountMinor: validated.totalMinor,
-          category: raw.invoiceType === "sales" ? "revenue" : "operating_expense",
+          category,
           reviewStatus: extractionStatus,
           source: "document_extraction",
           createdAt: new Date(),
@@ -668,6 +740,8 @@ export async function uploadAndProcessDocument(userId, input) {
       const validated = validateExtraction(raw);
       extractionStatus = "extracted";
       reasons = [];
+      const resolvedType = resolveDocumentType(raw.documentType, input.documentType);
+      documentRecord.documentType = resolvedType;
       extractionRecord = {
         id: inMemoryExtractions.length + 1,
         documentId,
@@ -690,16 +764,41 @@ export async function uploadAndProcessDocument(userId, input) {
         updatedAt: new Date(),
       };
       if (validated.totalMinor !== null) {
+        const isCredit = raw.isCreditNote || resolvedType === "credit_note";
+        let entryType;
+        let category;
+        let accountName;
+
+        if (raw.invoiceType === "sales") {
+          accountName = raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables";
+          if (isCredit) {
+            entryType = "debit";
+            category = "sales_return";
+          } else {
+            entryType = "credit";
+            category = "revenue";
+          }
+        } else {
+          accountName = raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor";
+          if (isCredit) {
+            entryType = "credit";
+            category = "purchase_return";
+          } else {
+            entryType = "debit";
+            category = "operating_expense";
+          }
+        }
+
         inMemoryAccountingEntries.push({
           id: inMemoryAccountingEntries.length + 1,
           businessId: input.businessId,
           taskId: input.taskId ?? null,
           documentId,
           entryDate: validated.invoiceDate ?? new Date(),
-          accountName: raw.invoiceType === "sales" ? (raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables") : (raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor"),
-          entryType: raw.invoiceType === "sales" ? "credit" : "debit",
+          accountName,
+          entryType,
           amountMinor: validated.totalMinor,
-          category: raw.invoiceType === "sales" ? "revenue" : "operating_expense",
+          category,
           reviewStatus: "extracted",
           source: "document_extraction",
           createdAt: new Date(),
@@ -726,6 +825,24 @@ export async function uploadAndProcessDocument(userId, input) {
         resolvedAt: null,
       });
     }
+
+    if (extractionRecord) {
+      import("./weaviateVectorDb.js").then((m) => m.indexDocumentVector({
+        documentId,
+        businessId: input.businessId,
+        vendorName: extractionRecord.vendorName,
+        invoiceNumber: extractionRecord.invoiceNumber,
+        invoiceDate: extractionRecord.invoiceDate,
+        totalMinor: extractionRecord.totalMinor,
+        taxableValueMinor: extractionRecord.taxableValueMinor,
+        cgstMinor: extractionRecord.cgstMinor,
+        sgstMinor: extractionRecord.sgstMinor,
+        igstMinor: extractionRecord.igstMinor,
+        gstin: extractionRecord.gstin,
+        invoiceType: extractionRecord.invoiceType,
+      })).catch(() => {});
+    }
+
     return { documentId, status: extractionStatus, reviewReasons: reasons };
   }
   const inserted = await db.insert(documents).values({
@@ -755,6 +872,7 @@ export async function uploadAndProcessDocument(userId, input) {
     const raw = await extractInvoice(stored.key, input.mimeType, bytes, input.originalName, business);
     const validated = validateExtraction(raw);
     const extractionStatus = validated.reasons.length ? "needs_review" : "extracted";
+    const resolvedType = resolveDocumentType(raw.documentType, input.documentType);
     await db.insert(documentExtractions).values({
       documentId,
       model: raw.model || OLLAMA_MODEL || "qwen2.5vl:7b",
@@ -773,17 +891,42 @@ export async function uploadAndProcessDocument(userId, input) {
       invoiceType: raw.invoiceType,
       extractedData: JSON.stringify({ ...raw, reviewReasons: validated.reasons }),
     });
-    await db.update(documents).set({ status: extractionStatus }).where(eq(documents.id, documentId));
+    await db.update(documents).set({ status: extractionStatus, documentType: resolvedType }).where(eq(documents.id, documentId));
     if (validated.totalMinor !== null) {
+      const isCredit = raw.isCreditNote || resolvedType === "credit_note";
+      let entryType;
+      let category;
+      let accountName;
+
+      if (raw.invoiceType === "sales") {
+        accountName = raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables";
+        if (isCredit) {
+          entryType = "debit";
+          category = "sales_return";
+        } else {
+          entryType = "credit";
+          category = "revenue";
+        }
+      } else {
+        accountName = raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor";
+        if (isCredit) {
+          entryType = "credit";
+          category = "purchase_return";
+        } else {
+          entryType = "debit";
+          category = "operating_expense";
+        }
+      }
+
       await db.insert(accountingEntries).values({
         businessId: input.businessId,
         taskId: input.taskId ?? null,
         documentId,
         entryDate: validated.invoiceDate ?? new Date(),
-        accountName: raw.invoiceType === "sales" ? (raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables") : (raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor"),
-        entryType: raw.invoiceType === "sales" ? "credit" : "debit",
+        accountName,
+        entryType,
         amountMinor: validated.totalMinor,
-        category: raw.invoiceType === "sales" ? "revenue" : "operating_expense",
+        category,
         reviewStatus: "needs_review",
         source: "document_extraction",
       });
@@ -807,6 +950,22 @@ export async function uploadAndProcessDocument(userId, input) {
     await consumeUsage(input.businessId, "documents_processed");
     await consumeUsage(input.businessId, "ai_requests");
     await audit(input.businessId, userId, "document.extracted", "document", String(documentId), input.taskId, { status: extractionStatus });
+
+    import("./weaviateVectorDb.js").then((m) => m.indexDocumentVector({
+      documentId,
+      businessId: input.businessId,
+      vendorName: raw.vendorName || raw.buyerName,
+      invoiceNumber: raw.invoiceNumber,
+      invoiceDate: validated.invoiceDate,
+      totalMinor: validated.totalMinor,
+      taxableValueMinor: validated.taxableValueMinor,
+      cgstMinor: validated.cgstMinor,
+      sgstMinor: validated.sgstMinor,
+      igstMinor: validated.igstMinor,
+      gstin: raw.gstin,
+      invoiceType: raw.invoiceType,
+    })).catch(() => {});
+
     return { documentId, status: extractionStatus, reviewReasons: validated.reasons };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Document extraction failed.";

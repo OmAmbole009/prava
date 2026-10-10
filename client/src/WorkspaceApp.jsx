@@ -71,9 +71,11 @@ export default function WorkspaceApp() {
             <Route path="/documents/:documentId">{() => <DeferredPage component={DocumentReview}/>}</Route>
             <Route path="/documents">{() => <DeferredPage component={Documents}/>}</Route>
             <Route path="/tax">{() => <DeferredPage component={Tax}/>}</Route>
+            <Route path="/taxes">{() => <DeferredPage component={Tax}/>}</Route>
             <Route path="/ca-review">{() => <DeferredPage component={CaReview}/>}</Route>
             <Route path="/tasks/:taskId">{() => <DeferredPage component={TaskDetail}/>}</Route>
             <Route path="/tasks">{() => <DeferredPage component={Tasks}/>}</Route>
+            <Route path="/things-to-fix">{() => <DeferredPage component={Tasks}/>}</Route>
             <Route path="/billing">{() => <DeferredPage component={Billing}/>}</Route>
             <Route path="/admin/billing">{() => <DeferredPage component={AdminBilling}/>}</Route>
             <Route path="/profile">{() => <DeferredPage component={Profile}/>}</Route>

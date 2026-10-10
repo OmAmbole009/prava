@@ -14,6 +14,7 @@ import {
   generateSchedule3Financials,
   generateForm3CDTaxAudit,
   askCaCopilotRag,
+  askCaCopilotRagVector,
 } from "../caEngine.js";
 import { getBusinessesForUser, getBusinessForUser } from "../db.js";
 import { listDocumentsForUser } from "../operations.js";
@@ -327,8 +328,19 @@ router.post("/ask-copilot", async (req, res) => {
   try {
     const schema = z.object({ query: z.string() });
     const parsed = schema.parse(req.body);
-    const result = await askCaCopilotRag(parsed.query);
+    const result = await askCaCopilotRagVector(parsed.query);
     return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Weaviate Vector DB & RAG Health Status
+router.get("/rag-status", async (_req, res) => {
+  try {
+    const { getVectorDbHealth } = await import("../weaviateVectorDb.js");
+    const health = await getVectorDbHealth();
+    return sendData(res, health);
   } catch (error) {
     return sendError(res, error);
   }

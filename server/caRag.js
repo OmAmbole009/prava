@@ -92,16 +92,43 @@ export const CA_STATUTORY_KNOWLEDGE_BASE = [
   },
   {
     id: "cash-payments-40a3",
-    topic: "Section 40A(3) Cash Payment Prohibition & Audit Flags",
-    sections: ["Section 40A(3)", "Rule 6DD", "Section 269ST"],
-    keywords: ["cash", "40a(3)", "40a3", "10000", "10,000", "cash disallowance", "petty cash"],
+    topic: "Section 40A(3) Cash Payment Prohibition & Contractor Limits",
+    sections: ["Section 40A(3)", "Rule 6DD", "Section 269ST", "Form 3CD Clause 21(d)"],
+    keywords: ["cash", "40a(3)", "40a3", "10000", "10,000", "25000", "25,000", "contractor", "cash payment", "cash to contractor", "petty cash", "disallowance"],
     rules: [
       "Where an assessee incurs any expenditure in respect of which a payment or aggregate of payments made to a person in a single day exceeds ₹10,000 in cash, NO DEDUCTION shall be allowed in respect of such expenditure.",
-      "Limit is ₹35,000 in case of payments made for plying, hiring or leasing of goods carriages (transporters).",
+      "Limit is ₹35,000 only in case of payments made for plying, hiring or leasing of goods carriages (transporters).",
       "Section 269ST: Receipt of ₹2 Lakhs or more in cash in a day or in respect of a single transaction attracts 100% penalty equal to the amount received!",
       "Rule 6DD exceptions: Payments to RBI/banks, payments to farmers for agricultural produce, payments on bank holidays where banking is not available.",
     ],
     actionableAdvice: "Never issue petty cash payments above ₹10,000 to any vendor or contractor. Mandate UPI, IMPS, or NEFT for all vendor disbursements to avoid 100% disallowance under Tax Audit Clause 21(d).",
+  },
+  {
+    id: "itc-capital-goods-software",
+    topic: "ITC on MacBooks, Hardware, Computers & Software Subscriptions",
+    sections: ["Section 16(1) of CGST Act, 2017", "Section 16(9) of CGST Act", "Section 32 of Income Tax Act, 1961", "Section 5(3) of IGST Act (RCM)"],
+    keywords: ["macbook", "laptop", "hardware", "software", "subscriptions", "saas", "computers", "itc on macbook", "capital goods", "apple", "developer tools"],
+    rules: [
+      "Input Tax Credit (18% GST) on MacBooks, laptops, computers, monitors, and developer hardware is 100% ELIGIBLE under Section 16(1) of CGST Act, provided they are capitalized in accounts and used for business.",
+      "Under Section 16(9), if the taxpayer claims depreciation on the GST tax component under Section 32 of Income Tax Act, ITC cannot be availed. Capitalize the base cost and claim the GST component as ITC in GSTR-3B Table 4(A)(5).",
+      "Software and SaaS subscriptions (e.g. AWS, GitHub, Google Workspace, Slack, Jira) are 100% eligible input services (SAC 997331/998314).",
+      "For software invoices issued by overseas vendors without Indian GSTIN, discharge 18% IGST under Reverse Charge Mechanism (RCM u/s 5(3)) and claim 100% ITC back in the same GSTR-3B return.",
+    ],
+    actionableAdvice: "Ensure supplier invoices bear your valid GSTIN and reflect in GSTR-2B. Never claim Section 32 depreciation on the tax component. Pay RCM on foreign SaaS invoices and claim credit simultaneously.",
+  },
+  {
+    id: "gst-notice-asmt10-defense",
+    topic: "Defense of GST ASMT-10 Notice for ITC Mismatch (GSTR-2B vs 3B)",
+    sections: ["Section 61 of CGST Act, 2017", "Rule 99 of CGST Rules", "CBIC Circular No. 183/15/2022-GST", "Circular No. 193/05/2023-GST"],
+    keywords: ["asmt-10", "asmt 10", "notice", "itc mismatch", "drc-06", "scrutiny notice", "defend notice", "2b mismatch", "department notice"],
+    rules: [
+      "Scrutiny notices in Form GST ASMT-10 for GSTR-2B vs 3B ITC mismatches must be replied to within 30 days using Form GST DRC-06.",
+      "Under CBIC Circular 183/15/2022-GST & Circular 193/05/2023-GST, ITC cannot be denied to a genuine purchaser if they hold valid tax invoices and proof of payment through banking channels.",
+      "If the ITC difference per supplier exceeds ₹5 Lakhs, obtain a Chartered Accountant certificate from the supplier certifying tax payment.",
+      "If the difference is up to ₹5 Lakhs, a self-certification from the supplier is legally sufficient.",
+      "Calcutta High Court in Suncraft Energy held that the department cannot demand ITC reversal from the buyer without first proceeding against the defaulting supplier.",
+    ],
+    actionableAdvice: "Submit Form GST DRC-06 within 30 days. Attach tax invoices, bank statements showing payment, and supplier CA certificate or self-declaration to resolve the scrutiny notice without tax reversal or penalty.",
   },
   {
     id: "blocked-itc-section-17-5",
@@ -148,7 +175,7 @@ export const CA_STATUTORY_KNOWLEDGE_BASE = [
 ];
 
 /**
- * Retrieve statutory CA knowledge relevant to the user query
+ * Retrieve statutory CA knowledge relevant to the user query (sync fallback)
  */
 export function retrieveCaKnowledge(query) {
   const normalizedQuery = query.toLowerCase();
@@ -177,11 +204,40 @@ export function retrieveCaKnowledge(query) {
 }
 
 /**
+ * Retrieve statutory CA knowledge using Weaviate Vector DB with local fallback
+ */
+export async function retrieveCaKnowledgeAsync(query) {
+  try {
+    const { searchStatutoryRag } = await import("./weaviateVectorDb.js");
+    const vectorHits = await searchStatutoryRag(query, 3);
+    if (vectorHits && vectorHits.length > 0) {
+      // Map vector hits to full statutory docs
+      const fullDocs = vectorHits.map(vh => {
+        const found = CA_STATUTORY_KNOWLEDGE_BASE.find(d => d.id === vh.id);
+        if (found) return found;
+        return {
+          id: vh.id || "vector-statute",
+          topic: vh.topic,
+          sections: vh.sections,
+          keywords: vh.keywords,
+          rules: vh.rules,
+          actionableAdvice: vh.actionableAdvice,
+        };
+      });
+      return fullDocs;
+    }
+  } catch (err) {
+    console.warn("[caRag] Vector search fallback to rule matching:", err.message);
+  }
+  return retrieveCaKnowledge(query);
+}
+
+/**
  * Autonomous CA Advisory Prompt Builder
  * Injects retrieved statutes + live company financials to generate expert Chartered Accountant guidance
  */
-export function buildCaAdvisoryResponse(query, financials, businessProfile) {
-  const matchedDocs = retrieveCaKnowledge(query);
+export function buildCaAdvisoryResponse(query, financials, businessProfile, customMatchedDocs = null) {
+  const matchedDocs = customMatchedDocs || retrieveCaKnowledge(query);
 
   const fallbackDocs = matchedDocs.length > 0 ? matchedDocs : [
     CA_STATUTORY_KNOWLEDGE_BASE[0], // MSME 43Bh

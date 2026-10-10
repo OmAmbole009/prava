@@ -16,7 +16,9 @@ import {
 import { invokeLLM } from "./_core/llm.js";
 import { getDb } from "./db.js";
 import { formatMinorAmount } from "../shared/locale.js";
-import { buildCaAdvisoryResponse, retrieveCaKnowledge } from "./caRag.js";
+import { buildCaAdvisoryResponse, retrieveCaKnowledgeAsync } from "./caRag.js";
+import { searchBusinessDocumentsRag } from "./weaviateVectorDb.js";
+import { evaluateQueryScope, buildOutOfScopeResponse, buildGreetingResponse } from "./guardrails.js";
 
 export const askPravaInputSchema = z.object({
   businessId: z.number().int().positive(),
@@ -298,16 +300,63 @@ export async function getLiveWorkspaceContext(userId, businessId) {
 export async function askPrava(userId, input) {
   const context = await getLiveWorkspaceContext(userId, input.businessId);
 
+  // Guardrail check: Pre-screen whether the question is within Prava's financial/business scope
+  const scopeEval = evaluateQueryScope(input.message);
+  if (scopeEval.isGreeting) {
+    const greetingRes = buildGreetingResponse(context.workspace);
+    return {
+      ...greetingRes,
+      dataSnapshot: {
+        revenue: context.financials.revenueFormatted,
+        expenses: context.financials.expensesFormatted,
+        cash: context.financials.cashFormatted,
+        gstPosition: context.financials.gstPositionFormatted,
+        receivables: context.financials.receivablesFormatted,
+        payables: context.financials.payablesFormatted,
+      },
+    };
+  }
+
+  if (scopeEval.isOutOfScope) {
+    const outOfScopeRes = buildOutOfScopeResponse(context.workspace, scopeEval.detectedDomain);
+    return {
+      ...outOfScopeRes,
+      dataSnapshot: {
+        revenue: context.financials.revenueFormatted,
+        expenses: context.financials.expensesFormatted,
+        cash: context.financials.cashFormatted,
+        gstPosition: context.financials.gstPositionFormatted,
+        receivables: context.financials.receivablesFormatted,
+        payables: context.financials.payablesFormatted,
+      },
+    };
+  }
+
+  // RAG: Retrieve semantic vector context from Weaviate Vector DB
+  let vectorStatutes = [];
+  let vectorDocs = [];
+  try {
+    vectorStatutes = await retrieveCaKnowledgeAsync(input.message);
+  } catch (err) {
+    console.warn("[askPrava] Vector statutory retrieval fallback:", err.message);
+  }
+  try {
+    vectorDocs = await searchBusinessDocumentsRag(input.businessId, input.message, 3);
+  } catch (err) {
+    console.warn("[askPrava] Vector document retrieval fallback:", err.message);
+  }
+
   // Synthesize context prompt
   const systemPrompt = `You are "Ask Prava", the intelligent financial operations assistant for the business "${context.workspace.name}".
 You help the business owner understand their finances, find missing documents, prepare GST/tax work, track cashflow, and know exactly what requires their attention.
 
 CRITICAL PRINCIPLES:
-1. Ground your answers strictly in the provided verified business data below.
-2. NEVER invent numbers or claim transactions that are not in the context.
-3. Speak in simple, clear, friendly language without confusing accounting jargon (e.g. instead of "Receivables", say "Money owed to you"; instead of "Input Tax Credit Discrepancy", say "GST credit that needs checking").
-4. If the user asks about an action that requires CA or professional approval (such as filing taxes or final submission), remind them that Prava prepares everything and helps send it to their CA/advisor for sign-off.
-5. Provide actionable advice and guide the user on what button/page to check.
+1. Ground your answers strictly in the provided verified business data and RAG vector context below.
+2. GUARDRAIL BOUNDARY: You are strictly limited to business finances, accounting, taxation, invoices, cashflow, and Prava workspace operations for "${context.workspace.name}". If the user's inquiry is out of concept or unrelated to business finance, accounting, or taxes, refuse to answer and start your response with "[GUARDRAIL_NOT_RELATED] This question is not related to your business finances or Prava operations."
+3. NEVER invent numbers or claim transactions that are not in the context.
+4. Speak in simple, clear, friendly language without confusing accounting jargon (e.g. instead of "Receivables", say "Money owed to you"; instead of "Input Tax Credit Discrepancy", say "GST credit that needs checking").
+5. If the user asks about an action that requires CA or professional approval (such as filing taxes or final submission), remind them that Prava prepares everything and helps send it to their CA/advisor for sign-off.
+6. Provide actionable advice and guide the user on what button/page to check.
 
 CURRENT BUSINESS DATA:
 - Business: ${context.workspace.name} (${context.workspace.taxSystem}, Currency: ${context.workspace.currency})
@@ -318,6 +367,12 @@ CURRENT BUSINESS DATA:
 - Money you owe (Payables): ${context.financials.payablesFormatted}
 - Estimated Tax / GST to pay: ${context.financials.gstPositionFormatted}
 
+${vectorStatutes.length > 0 ? `RELEVANT STATUTORY REGULATIONS (Weaviate Vector RAG):
+${vectorStatutes.map(s => `- [${s.topic}] (${s.sections?.join(", ") || "Statute"}): ${s.rules?.slice(0, 2).join("; ") || ""} Advice: ${s.actionableAdvice || ""}`).join("\n")}
+` : ""}
+${vectorDocs.length > 0 ? `MATCHING SOURCE INVOICES & DOCUMENTS (Weaviate Vector RAG):
+${vectorDocs.map(d => `- Doc #${d.documentId} [${d.vendorName || "Commercial Invoice"}]: ${d.content}`).join("\n")}
+` : ""}
 ${context.intelligence ? `BUSINESS HEALTH & PROACTIVE INTELLIGENCE:
 - Health Score: ${context.intelligence.healthScore}/100 (${context.intelligence.healthGradeLabel})
 - Critical Issues: ${context.intelligence.criticalCount}, Warnings: ${context.intelligence.warningCount}
@@ -370,23 +425,30 @@ Always respond with helpful, structured markdown explaining the facts simply and
   });
 
   const rawAnswer = response.choices[0]?.message.content;
+
+  // Post-check: If LLM triggered guardrail refusal
+  if (typeof rawAnswer === "string" && (rawAnswer.includes("[GUARDRAIL_NOT_RELATED]") || rawAnswer.includes("Question Not Related to Business Finances"))) {
+    const outOfScopeRes = buildOutOfScopeResponse(context.workspace);
+    return {
+      ...outOfScopeRes,
+      dataSnapshot: {
+        revenue: context.financials.revenueFormatted,
+        expenses: context.financials.expensesFormatted,
+        cash: context.financials.cashFormatted,
+        gstPosition: context.financials.gstPositionFormatted,
+        receivables: context.financials.receivablesFormatted,
+        payables: context.financials.payablesFormatted,
+      },
+    };
+  }
+
   const lower = input.message.toLowerCase();
 
   const isCaOrTaxTopic =
-    lower.includes("tax") ||
-    lower.includes("advance") ||
-    lower.includes("msme") ||
-    lower.includes("43b") ||
-    lower.includes("gst") ||
-    lower.includes("tds") ||
-    lower.includes("save") ||
-    lower.includes("salary") ||
-    lower.includes("dividend") ||
-    lower.includes("audit") ||
-    lower.includes("itc") ||
-    lower.includes("ca") ||
-    lower.includes("replace") ||
-    lower.includes("rule");
+    /\b(tax|taxes|taxation|advance\s*tax|msme|43b|43b\(h\)|gst|gstr|tds|tcs|itc|audit|dividend)\b/i.test(lower) ||
+    /\b(ca|cas|chartered\s+accountant)\b/i.test(lower) ||
+    (lower.includes("save") && lower.includes("tax")) ||
+    (lower.includes("rule") && (lower.includes("43b") || lower.includes("msme") || lower.includes("tax") || lower.includes("gst")));
 
   let answer =
     typeof rawAnswer === "string" && !rawAnswer.includes("### Financial Analysis & Guidance")
@@ -394,7 +456,7 @@ Always respond with helpful, structured markdown explaining the facts simply and
       : "";
 
   if (isCaOrTaxTopic || !answer) {
-    const caAdvice = buildCaAdvisoryResponse(input.message, context.financials, context.workspace);
+    const caAdvice = buildCaAdvisoryResponse(input.message, context.financials, context.workspace, vectorStatutes);
     answer = `### ⚖️ ${caAdvice.title}
 
 ${caAdvice.analysis}
@@ -410,6 +472,25 @@ ${caAdvice.actionPlan.map((step) => `- ${step}`).join("\n")}
   // Determine contextual action buttons based on user query and intent
   const actions = [];
   const sources = [];
+
+  // Add Weaviate Vector RAG sources
+  if (vectorStatutes.length > 0) {
+    for (const vs of vectorStatutes.slice(0, 2)) {
+      sources.push({
+        title: vs.topic,
+        type: "Statutory Law (Weaviate RAG)",
+      });
+    }
+  }
+  if (vectorDocs.length > 0) {
+    for (const vd of vectorDocs) {
+      sources.push({
+        title: vd.vendorName ? `${vd.vendorName} Invoice` : `Document #${vd.documentId}`,
+        type: "Indexed Invoice (Weaviate RAG)",
+        documentId: vd.documentId,
+      });
+    }
+  }
 
   if (isCaOrTaxTopic) {
     actions.push({ label: "Open CA Replacement Suite", path: "/ca-suite", variant: "default" });
@@ -468,6 +549,7 @@ ${caAdvice.actionPlan.map((step) => `- ${step}`).join("\n")}
     answer,
     actions,
     sources: sources.length > 0 ? sources : undefined,
+    isOutOfScope: false,
     dataSnapshot: {
       revenue: context.financials.revenueFormatted,
       expenses: context.financials.expensesFormatted,

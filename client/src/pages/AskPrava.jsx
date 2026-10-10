@@ -27,6 +27,7 @@ export default function AskPrava() {
                 actions: data.actions,
                 sources: data.sources,
                 dataSnapshot: data.dataSnapshot,
+                isOutOfScope: data.isOutOfScope,
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, assistantMsg]);
@@ -152,7 +153,15 @@ export default function AskPrava() {
 
                 <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 ${msg.role === "user"
                 ? "rounded-tr-none bg-slate-900 text-white dark:bg-white/[0.12] dark:border dark:border-white/20 dark:text-white shadow-sm"
-                : "rounded-tl-none border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-white/[0.08] dark:bg-[#0A0F16] dark:text-[#E2E8F0]"}`}>
+                : msg.isOutOfScope
+                  ? "rounded-tl-none border border-amber-300 bg-amber-50/40 text-slate-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-[#E2E8F0]"
+                  : "rounded-tl-none border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-white/[0.08] dark:bg-[#0A0F16] dark:text-[#E2E8F0]"}`}>
+                  {msg.isOutOfScope && (
+                    <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                      <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Scope Guardrail Active
+                    </div>
+                  )}
                   <div className="leading-relaxed prose-sm dark:prose-invert">
                     <Streamdown>{msg.content}</Streamdown>
                   </div>

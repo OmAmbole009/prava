@@ -15,6 +15,7 @@ import {
   generateSchedule3Financials,
   generateForm3CDTaxAudit,
   askCaCopilotRag,
+  askCaCopilotRagVector,
 } from "./caEngine.js";
 import { runBusinessIntelligence, getDashboardIntelligence } from "./intelligenceEngine.js";
 import { analyzeTdsForBusiness } from "./tdsEngine.js";
@@ -660,7 +661,7 @@ export const appRouter = {
         },
         askCopilot: async (input) => {
           checkUser(ctx);
-          return askCaCopilotRag(input.query);
+          return await askCaCopilotRagVector(input.query);
         },
       },
       intelligence: {

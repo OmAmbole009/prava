@@ -193,8 +193,8 @@ function TodayActionsDrawer({ isOpen, onClose, actions = [], onNavigate }) {
                     {idx + 1}
                   </span>
                   <div>
-                    <h4 className="text-xs font-bold text-foreground">{item.action}</h4>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">{item.why}</p>
+                    <h4 className="text-xs font-bold text-foreground">{item.action || item.title}</h4>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">{item.why || item.plainEnglish}</p>
                     {item.amountLabel && (
                       <span className="mt-1.5 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-600 dark:text-amber-400">
                         {item.amountLabel}

@@ -140,3 +140,4 @@ test-*.jpg
 test-*.jpeg
 test_*.png
 test_*.pdf
+*.traineddata
