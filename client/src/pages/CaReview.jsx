@@ -19,7 +19,7 @@ export default function CaReview() {
         {/* Header */}
         <div className="flex flex-col gap-4 border-b border-slate-200/80 dark:border-white/[0.06] pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="prava-tag-purple">Chartered Accountant Verification Hub</span>
+            <span className="rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold">Chartered Accountant Verification Hub</span>
             <h1 className="font-['Playfair_Display',Georgia,serif] mt-2 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
               Chartered Accountant & <em className="italic font-normal">Audit Verification</em>
             </h1>
@@ -41,19 +41,19 @@ export default function CaReview() {
         </div>
 
         {/* Assigned CA Profile Card */}
-        <div className="prava-panel p-6 border border-purple-400/30 bg-gradient-to-r from-purple-500/[0.06] to-transparent">
+        <div className="prava-panel p-6 border border-blue-500/20 bg-gradient-to-r from-blue-500/[0.05] to-transparent">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-600 dark:text-purple-400 shadow-sm">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400 shadow-sm">
                 <UserCheck className="size-6"/>
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-purple-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                  <span className="rounded-md bg-blue-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-blue-300">
                     Assigned Prava CA
                   </span>
                   <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-slate-900 dark:text-white">
-                    <BadgeCheck className="size-3.5 text-purple-600 dark:text-purple-400"/>
+                    <BadgeCheck className="size-3.5 text-blue-400"/>
                     {assignedCa?.membershipNumber || "ICAI #409212"}
                   </span>
                 </div>
@@ -62,7 +62,7 @@ export default function CaReview() {
                 </h2>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
                   {assignedCa?.firmName || "Verma & Associates Chartered Accountants"} ·{" "}
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                  <span className="text-blue-400 font-semibold">
                     {assignedCa?.specialization || "GST Filings, Direct Tax & Corporate Audit"}
                   </span>
                 </p>
@@ -76,11 +76,11 @@ export default function CaReview() {
             <div className="flex flex-col gap-2 text-xs text-slate-700 dark:text-slate-300 shrink-0 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-white/[0.08] sm:pl-5 pt-3 sm:pt-0">
               <span className="font-mono text-[10px] uppercase text-slate-400 dark:text-slate-500">Direct Contact</span>
               {assignedCa?.email && (<div className="flex items-center gap-1.5 text-xs font-mono text-slate-900 dark:text-white">
-                  <Mail className="size-3.5 text-purple-600 dark:text-purple-400"/>
+                  <Mail className="size-3.5 text-blue-400"/>
                   <span>{assignedCa.email}</span>
                 </div>)}
               {assignedCa?.phone && (<div className="flex items-center gap-1.5 text-xs font-mono text-slate-900 dark:text-white">
-                  <Phone className="size-3.5 text-purple-600 dark:text-purple-400"/>
+                  <Phone className="size-3.5 text-blue-400"/>
                   <span>{assignedCa.phone}</span>
                 </div>)}
               <span className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -105,7 +105,7 @@ export default function CaReview() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {professionalReviews.length > 0 ? (professionalReviews.map((item) => (<div key={item.id} onClick={() => setLocation(`/tasks/${item.taskId}`)} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white/70 p-4 shadow-sm transition hover:border-purple-400 hover:bg-white dark:border-white/[0.06] dark:bg-[#0A0F16] dark:hover:border-purple-500/50 text-xs">
+            {professionalReviews.length > 0 ? (professionalReviews.map((item) => (<div key={item.id} onClick={() => setLocation(`/tasks/${item.taskId}`)} className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white/70 p-4 shadow-sm transition hover:border-blue-400 hover:bg-white dark:border-white/[0.06] dark:bg-[#0A0F16] dark:hover:border-blue-500/40 text-xs">
                   <div className="flex items-center gap-3">
                     <Clock className="size-4 text-amber-500 dark:text-amber-400"/>
                     <div>
@@ -115,7 +115,7 @@ export default function CaReview() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-purple-600 dark:text-purple-400">Inspect Details →</span>
+                  <span className="text-xs font-bold text-blue-400">Inspect Details →</span>
                 </div>))) : (<div className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
                 <CheckCircle2 className="mx-auto size-6 text-emerald-500 dark:text-emerald-400 mb-2"/>
                 All workflows have been reviewed. No returns are currently waiting in the CA queue.
@@ -132,7 +132,7 @@ export default function CaReview() {
                 Signed audit findings and statutory observations from your CA
               </p>
             </div>
-            <span className="font-mono text-xs text-purple-600 dark:text-purple-300 font-semibold">Certified Records</span>
+            <span className="font-mono text-xs text-blue-300 font-semibold">Certified Records</span>
           </div>
 
           <div className="mt-4 space-y-3">

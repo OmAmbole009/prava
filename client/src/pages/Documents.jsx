@@ -274,46 +274,44 @@ export default function Documents() {
         {/* ========================================================= */}
         {/* EXECUTIVE HEADER & ACTIONS                                */}
         {/* ========================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card/95 p-5 shadow-lg backdrop-blur-md">
+        <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#07090E] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
+          <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+              <div className="flex size-8 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
                 <FileCheck className="size-4.5" />
               </div>
-              <h1 className="font-['Playfair_Display',Georgia,serif] text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                 Document & Invoice Intelligence Vault
               </h1>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-emerald-500 border border-emerald-500/20">
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-emerald-400 border border-emerald-500/20">
                 GST Verified
               </span>
-              <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 border border-purple-500/25 flex items-center gap-1.5">
-                <span className={`size-1.5 rounded-full ${ocrStatusQuery.data?.ok ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+              <span className="rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-blue-400 border border-blue-500/25 flex items-center gap-1.5">
+                <span className={`size-1.5 rounded-full ${ocrStatusQuery.data?.ok ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
                 {ocrStatusQuery.data?.ok ? "Qwen2.5-VL-7B Local" : "Ollama Standby"}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-slate-400">
               Autonomous Indian GST tax invoice ingestion: Extracts GSTINs, supplier/buyer parties, invoice numbers, Section 17(5) eligibility, and mathematically balances taxes into your active ledger.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={exportCsvRegister}
-              className="text-xs h-9 gap-1.5 font-semibold border-border hover:bg-accent/60 shadow-sm"
+              className="inline-flex items-center rounded-full border border-white/[0.1] bg-[#0B0E14] px-4 py-2 text-xs font-medium text-slate-300 hover:text-white hover:border-blue-500/40 transition gap-1.5"
             >
-              <Download className="size-3.5 text-emerald-500" />
+              <Download className="size-3.5 text-emerald-400" />
               Export Register (CSV)
-            </Button>
-            <Button
-              size="sm"
+            </button>
+            <button
               onClick={() => setLocation("/ca-suite")}
-              className="text-xs h-9 bg-purple-600 hover:bg-purple-700 text-white font-semibold gap-1.5 shadow-sm"
+              className="inline-flex items-center rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 gap-1.5 shadow-[0_0_15px_rgba(59,130,246,0.25)] transition"
             >
               <Layers className="size-3.5" />
               Autonomous CA Suite
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -321,61 +319,65 @@ export default function Documents() {
         {/* 4 EXECUTIVE KPI CARDS                                     */}
         {/* ========================================================= */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="border-border bg-card/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-blue-500/30">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/35 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400 mb-1">
               <span className="text-xs font-medium">Total Invoices Ingested</span>
-              <FileText className="size-4 text-purple-500" />
+              <FileText className="size-4 text-blue-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-white">
               {rawDocs.length}
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
-              <span className="text-emerald-500 font-semibold">{totalVerifiedCount} Verified & Linked</span>
+            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+              <span className="text-emerald-400 font-semibold">{totalVerifiedCount} Verified & Linked</span>
               <span>100% Traceability</span>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-border bg-card/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-blue-500/30">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/35 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400 mb-1">
               <span className="text-xs font-medium">Gross Invoiced Volume</span>
-              <TrendingUp className="size-4 text-emerald-500" />
+              <TrendingUp className="size-4 text-emerald-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-white">
               {fmt(totalGrossVolumeMinor)}
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
               <span>Balanced Double-Entry</span>
-              <span className="text-emerald-500 font-semibold">Active Ledger</span>
+              <span className="text-emerald-400 font-semibold">Active Ledger</span>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-border bg-card/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-blue-500/30">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/35 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400 mb-1">
               <span className="text-xs font-medium">Claimable ITC (GSTR-2B)</span>
-              <ShieldCheck className="size-4 text-cyan-500" />
+              <ShieldCheck className="size-4 text-blue-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-500">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-blue-400">
               {fmt(totalItcClaimableMinor)}
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
               <span>Purchase GST Recoverable</span>
-              <span className="text-cyan-500 font-semibold">Matched</span>
+              <span className="text-blue-400 font-semibold">Matched</span>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-border bg-card/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)] transition hover:border-blue-500/30">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/35 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400 mb-1">
               <span className="text-xs font-medium">Mathematical Invariant</span>
-              <CheckCircle2 className="size-4 text-emerald-500" />
+              <CheckCircle2 className="size-4 text-emerald-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-500">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400">
               100%
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
               <span>Taxable + CGST + SGST = Total</span>
-              <span className="text-emerald-500 font-semibold">No Discrepancy</span>
+              <span className="text-emerald-400 font-semibold">No Discrepancy</span>
             </div>
-          </Card>
+          </div>
         </div>
 
         {/* ========================================================= */}
@@ -387,15 +389,16 @@ export default function Documents() {
           onDrop={onDrop}
           className={`relative overflow-hidden rounded-2xl border-2 transition-all p-6 sm:p-8 backdrop-blur-xl ${
             isDragging
-              ? "border-purple-500 bg-purple-500/10 shadow-[0_0_30px_rgba(168,85,247,0.2)]"
-              : "border-dashed border-border bg-card/80 hover:border-border/80 shadow-md"
+              ? "border-blue-500 bg-blue-500/10 shadow-[0_0_30px_rgba(59,130,246,0.25)]"
+              : "border-dashed border-white/[0.12] bg-[#07090E] hover:border-blue-500/40 shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
           }`}
         >
+          <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/35 to-transparent" />
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4 text-center md:text-left">
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 cursor-pointer shadow-inner hover:scale-105 transition"
+                className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-400 cursor-pointer shadow-inner hover:scale-105 transition"
               >
                 {upload.isPending ? (
                   <Loader2 className="size-7 animate-spin" />
@@ -404,30 +407,30 @@ export default function Documents() {
                 )}
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-foreground">
+                <h3 className="text-base font-bold text-white">
                   Drop Tax Invoices or Supporting Documents Here
                 </h3>
-                <p className="text-xs text-muted-foreground max-w-xl">
+                <p className="text-xs text-slate-400 max-w-xl">
                   Supports Indian GST Tax Invoices, Purchase Bills, Debit/Credit Notes, and Bank Statements. Automatically extracts supplier and buyer GSTINs, dates, line items, and computes CGST, SGST, IGST tax breakdown.
                 </p>
-                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-                  <span className="rounded bg-secondary px-2 py-0.5 font-mono text-[10px]">PDF (Vector & Scanned)</span>
-                  <span className="rounded bg-secondary px-2 py-0.5 font-mono text-[10px]">PNG / JPEG</span>
-                  <span className="rounded bg-secondary px-2 py-0.5 font-mono text-[10px]">Up to 15 MB</span>
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-400">
+                  <span className="rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-0.5 font-mono text-[10px]">PDF (Vector & Scanned)</span>
+                  <span className="rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-0.5 font-mono text-[10px]">PNG / JPEG</span>
+                  <span className="rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-0.5 font-mono text-[10px]">Up to 15 MB</span>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Label htmlFor="doc-type" className="text-xs text-muted-foreground whitespace-nowrap">
+                <Label htmlFor="doc-type" className="text-xs text-slate-400 whitespace-nowrap">
                   Document Classification:
                 </Label>
                 <select
                   id="doc-type"
                   value={uploadDocType}
                   onChange={(e) => setUploadDocType(e.target.value)}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm outline-none cursor-pointer focus:ring-1 focus:ring-purple-500"
+                  className="rounded-full border border-white/[0.1] bg-[#0B0E14] px-3.5 py-2 text-xs font-semibold text-white shadow-sm outline-none cursor-pointer focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="invoice">Supplier / Sales Tax Invoice</option>
                   <option value="receipt">Commercial Expense Bill</option>
@@ -449,7 +452,7 @@ export default function Documents() {
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={upload.isPending}
-                className="w-full sm:w-auto text-xs h-10 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-bold gap-2 shadow-md rounded-xl"
+                className="w-full sm:w-auto text-xs h-10 px-5 bg-blue-600 hover:bg-blue-500 text-white font-semibold gap-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] rounded-full transition"
               >
                 {upload.isPending ? (
                   <>
@@ -470,15 +473,15 @@ export default function Documents() {
         {/* ========================================================= */}
         {/* SEARCH, FILTER & STATUTORY STATUS TOOLBAR                 */}
         {/* ========================================================= */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-card/90 p-3 rounded-2xl border border-border shadow-sm">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-[#07090E] p-3 rounded-2xl border border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by vendor, buyer, GSTIN, invoice number, or file name…"
-              className="w-full rounded-xl border border-border bg-background pl-10 pr-4 py-2 text-xs text-foreground placeholder:text-muted-foreground shadow-sm outline-none focus:ring-1 focus:ring-purple-500"
+              className="w-full rounded-full border border-white/[0.08] bg-[#0B0E14] pl-10 pr-4 py-2 text-xs text-white placeholder:text-slate-500 shadow-sm outline-none focus:border-blue-500/50"
             />
           </div>
 
@@ -486,7 +489,7 @@ export default function Documents() {
             <select
               value={directionFilter}
               onChange={(e) => setDirectionFilter(e.target.value)}
-              className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm outline-none cursor-pointer"
+              className="rounded-full border border-white/[0.08] bg-[#0B0E14] px-3.5 py-2 text-xs font-semibold text-slate-300 shadow-sm outline-none cursor-pointer hover:text-white"
             >
               <option value="all">All Directions (Sales & Purchase)</option>
               <option value="sales">Sales (Outward Liability)</option>
@@ -496,7 +499,7 @@ export default function Documents() {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm outline-none cursor-pointer"
+              className="rounded-full border border-white/[0.08] bg-[#0B0E14] px-3.5 py-2 text-xs font-semibold text-slate-300 shadow-sm outline-none cursor-pointer hover:text-white"
             >
               <option value="all">All Document Types</option>
               <option value="invoice">Tax Invoices</option>
@@ -507,7 +510,7 @@ export default function Documents() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm outline-none cursor-pointer"
+              className="rounded-full border border-white/[0.08] bg-[#0B0E14] px-3.5 py-2 text-xs font-semibold text-slate-300 shadow-sm outline-none cursor-pointer hover:text-white"
             >
               <option value="all">All Extraction Statuses</option>
               <option value="extracted">Extracted & Verified</option>
@@ -525,7 +528,7 @@ export default function Documents() {
                   setDirectionFilter("all");
                   setStatusFilter("all");
                 }}
-                className="text-xs h-8 px-2 text-muted-foreground hover:text-foreground"
+                className="text-xs h-8 px-2 text-slate-400 hover:text-white"
               >
                 Clear Filters
               </Button>
@@ -536,17 +539,17 @@ export default function Documents() {
         {/* ========================================================= */}
         {/* PRODUCTION DOCUMENTS DATA TABLE                           */}
         {/* ========================================================= */}
-        <div className="rounded-2xl border border-border bg-card/95 shadow-md overflow-hidden">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#07090E] shadow-[0_4px_24px_rgba(0,0,0,0.6)] overflow-hidden">
           {docsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-20 text-xs text-muted-foreground">
-              <Loader2 className="mr-2 size-5 animate-spin text-purple-500" />
+            <div className="flex items-center justify-center py-20 text-xs text-slate-400">
+              <Loader2 className="mr-2 size-5 animate-spin text-blue-400" />
               Loading verified source documents from vault…
             </div>
           ) : filteredDocs.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase text-[10px] tracking-wider">
+                  <tr className="border-b border-white/[0.08] bg-[#0B0E14] text-slate-400 uppercase text-[10px] tracking-wider">
                     <th className="py-3 px-4 font-semibold">Document & Parties</th>
                     <th className="py-3 px-4 font-semibold">Invoice No & Date</th>
                     <th className="py-3 px-4 font-semibold">Direction</th>
@@ -557,7 +560,7 @@ export default function Documents() {
                     <th className="py-3 px-4 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-white/[0.04]">
                   {filteredDocs.map((row) => {
                     const doc = row.document;
                     const ext = row.extraction;
@@ -573,7 +576,7 @@ export default function Documents() {
                         {/* Party & Document Name */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-xs border border-purple-500/20">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 font-bold text-xs border border-blue-500/20">
                               {ext?.vendorName ? ext.vendorName.charAt(0).toUpperCase() : "D"}
                             </div>
                             <div className="min-w-0">
@@ -683,7 +686,7 @@ export default function Documents() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-xs h-7 px-2 font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                              className="text-xs h-7 px-2 font-semibold text-blue-400 hover:bg-blue-500/10"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setLocation(`/documents/${doc.id}`);

@@ -63,14 +63,15 @@ function TdsCalculatorWidget({ currency, locale }) {
   const netPayable = parsedAmount - tdsAmount;
 
   return (
-    <div className="rounded-3xl border border-purple-500/25 bg-purple-500/[0.04] p-6 backdrop-blur-xl">
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
+      <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
       <div className="flex items-center gap-2.5">
-        <span className="flex size-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400">
+        <span className="flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
           <Calculator className="size-4" />
         </span>
         <div>
-          <h3 className="text-sm font-bold text-foreground">Quick TDS Deduction Checker</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-sm font-bold text-white">Quick TDS Deduction Checker</h3>
+          <p className="text-xs text-slate-400">
             Calculate exactly how much to pay a vendor and how much tax to deduct before transferring money.
           </p>
         </div>
@@ -131,24 +132,24 @@ function TdsCalculatorWidget({ currency, locale }) {
       </div>
 
       {parsedAmount > 0 && (
-        <div className="mt-5 rounded-2xl border border-purple-500/20 bg-background/80 p-4">
+        <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4">
           <div className="grid gap-3 sm:grid-cols-3 text-center">
-            <div className="rounded-xl bg-secondary/40 p-3">
-              <p className="text-[10px] uppercase font-mono font-bold text-muted-foreground">Pay to Vendor</p>
-              <p className="mt-1 font-mono text-lg font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="rounded-xl bg-[#07090E] border border-white/[0.06] p-3">
+              <p className="text-[10px] uppercase font-mono font-bold text-slate-400">Pay to Vendor</p>
+              <p className="mt-1 font-mono text-lg font-bold text-emerald-400">
                 ₹{netPayable.toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="rounded-xl bg-secondary/40 p-3">
-              <p className="text-[10px] uppercase font-mono font-bold text-muted-foreground">
+            <div className="rounded-xl bg-[#07090E] border border-white/[0.06] p-3">
+              <p className="text-[10px] uppercase font-mono font-bold text-slate-400">
                 Deduct & Deposit (TDS)
               </p>
-              <p className="mt-1 font-mono text-lg font-bold text-purple-600 dark:text-purple-400">
+              <p className="mt-1 font-mono text-lg font-bold text-blue-400">
                 ₹{tdsAmount.toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="rounded-xl bg-secondary/40 p-3">
-              <p className="text-[10px] uppercase font-mono font-bold text-muted-foreground">Section & Due Date</p>
+            <div className="rounded-xl bg-[#07090E] border border-white/[0.06] p-3">
+              <p className="text-[10px] uppercase font-mono font-bold text-slate-400">Section & Due Date</p>
               <p className="mt-1 text-xs font-bold text-foreground">
                 Section {selectedRule.section} · Due 7th of next month
               </p>
@@ -458,21 +459,21 @@ export default function Money() {
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-bold text-foreground">{v.vendorName}</h4>
                         {v.tdsApplicable && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-purple-600 dark:text-purple-400">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-blue-300 border border-blue-500/20">
                             <ShieldAlert className="size-3" /> TDS Deduction Required
                           </span>
                         )}
                         {v.overdueCount > 0 && (
-                          <span className="rounded-md bg-red-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-red-500">
+                          <span className="rounded-md bg-red-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-red-400 border border-red-500/20">
                             Overdue
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
+                      <p className="mt-1 text-[11px] text-slate-400">
                         {v.billCount} bill{v.billCount !== 1 ? "s" : ""} · GST: {v.vendorGstin || "Unregistered"}
                       </p>
                       {v.tdsApplicable && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                        <p className="mt-1.5 text-[11px] font-semibold text-blue-300">
                           ⚠️ Make sure to deduct applicable TDS before paying! Prava tracks cumulative threshold for
                           this vendor.
                         </p>

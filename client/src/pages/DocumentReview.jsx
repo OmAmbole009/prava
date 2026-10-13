@@ -137,7 +137,7 @@ export default function DocumentReview() {
     return (
       <DashboardLayout>
         <div className="flex min-h-[60vh] items-center justify-center text-xs text-muted-foreground">
-          <Loader2 className="mr-2 size-5 animate-spin text-purple-500" />
+          <Loader2 className="mr-2 size-5 animate-spin text-blue-400" />
           Loading source record…
         </div>
       </DashboardLayout>
@@ -347,7 +347,7 @@ export default function DocumentReview() {
                   />
                   {document.status.replaceAll("_", " ")}
                 </span>
-                <span className="rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/25 px-2 py-0.5 text-[10px] font-mono font-bold">
+                <span className="rounded-full bg-blue-500/10 text-blue-400 border border-purple-500/25 px-2 py-0.5 text-[10px] font-mono font-bold">
                   {extraction.model || "qwen2.5vl:7b"}
                 </span>
               </div>
@@ -358,42 +358,36 @@ export default function DocumentReview() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowPreview(!showPreview)}
-              className="text-xs h-8 gap-1.5 font-semibold"
+              className="inline-flex items-center rounded-full border border-white/[0.1] bg-[#0B0E14] px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:border-blue-500/40 gap-1.5 transition"
             >
-              <Eye className="size-3.5" />
+              <Eye className="size-3.5 text-blue-400" />
               {showPreview ? "Hide Preview" : "Show Document Preview"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            </button>
+            <button
               onClick={downloadVoucherJson}
-              className="text-xs h-8 gap-1.5 font-semibold"
+              className="inline-flex items-center rounded-full border border-white/[0.1] bg-[#0B0E14] px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:border-blue-500/40 gap-1.5 transition"
             >
-              <Download className="size-3.5 text-purple-500" />
+              <Download className="size-3.5 text-blue-400" />
               Download Voucher JSON
-            </Button>
+            </button>
             <a
               href={sourceUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 items-center rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent/60 gap-1.5 transition shadow-sm"
+              className="inline-flex items-center rounded-full border border-white/[0.1] bg-[#0B0E14] px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:border-blue-500/40 gap-1.5 transition shadow-sm"
             >
               <ExternalLink className="size-3.5" />
               Open original
             </a>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowDeleteDialog(true)}
-              className="text-xs h-8 gap-1.5 font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 border-rose-500/20"
+              className="inline-flex items-center rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/20 gap-1.5 transition"
             >
               <Trash2 className="size-3.5" />
               Delete Invoice
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -444,7 +438,7 @@ export default function DocumentReview() {
             <div className="flex flex-col rounded-2xl border border-border bg-card/95 shadow-md overflow-hidden min-h-[600px] max-h-[850px]">
               <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5 text-xs">
                 <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                  <FileText className="size-4 text-purple-500" />
+                  <FileText className="size-4 text-blue-400" />
                   <span className="truncate max-w-[280px] font-mono text-[11px] text-foreground font-semibold">
                     {document.originalName}
                   </span>
@@ -559,10 +553,10 @@ export default function DocumentReview() {
                 <div className="mt-5 pt-5 border-t border-border">
                   <div className="flex items-center justify-between mb-2.5">
                     <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <FileText className="size-3.5 text-purple-500" />
+                      <FileText className="size-3.5 text-blue-400" />
                       Extracted Line Items ({parsedExtractedData.items.length})
                     </h3>
-                    <span className="text-[10px] font-mono font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                    <span className="text-[10px] font-mono font-semibold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
                       {extraction.model || "qwen2.5vl:7b"} Vision Extraction
                     </span>
                   </div>

@@ -393,7 +393,7 @@ export default function CaSuite() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card/95 p-4 sm:p-5 shadow-lg backdrop-blur-md">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+              <div className="flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
                 <Scale className="size-4.5"/>
               </div>
               <h1 className="font-['Playfair_Display',Georgia,serif] text-xl font-bold tracking-tight text-foreground">
@@ -420,7 +420,7 @@ export default function CaSuite() {
             <Button size="sm" onClick={() => {
             setActiveTab("ca-copilot");
             handleAskCopilot("Can I claim ITC on MacBooks and software subscriptions?");
-        }} className="text-xs h-8 bg-purple-600 hover:bg-purple-700 text-white font-semibold gap-1.5 shadow-sm">
+        }} className="text-xs h-8 bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white font-semibold gap-1.5 shadow-sm">
               <Bot className="size-3.5"/>
               Ask AI CA Co-Pilot
             </Button>
@@ -441,7 +441,7 @@ export default function CaSuite() {
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>After ₹{formatInr(gstnData?.itcDetails?.netItcAvailable?.total ?? 0)} Matched ITC</span>
-              <span className="text-purple-600 dark:text-purple-400 font-bold hover:underline">Get JSON →</span>
+              <span className="text-blue-400 font-bold hover:underline">Get JSON →</span>
             </div>
           </Card>
 
@@ -455,7 +455,7 @@ export default function CaSuite() {
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>{msmeData?.overdueInvoicesCount ?? 0} Invoices Overdue</span>
-              <span className="text-purple-600 dark:text-purple-400 font-bold hover:underline">Audit →</span>
+              <span className="text-blue-400 font-bold hover:underline">Audit →</span>
             </div>
           </Card>
 
@@ -469,7 +469,7 @@ export default function CaSuite() {
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>45% Cumulative Due</span>
-              <span className="text-purple-600 dark:text-purple-400 font-bold hover:underline">Challan 280 →</span>
+              <span className="text-blue-400 font-bold hover:underline">Challan 280 →</span>
             </div>
           </Card>
 
@@ -483,7 +483,7 @@ export default function CaSuite() {
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>Balance Sheet Balanced</span>
-              <span className="text-purple-600 dark:text-purple-400 font-bold hover:underline">View MCA →</span>
+              <span className="text-blue-400 font-bold hover:underline">View MCA →</span>
             </div>
           </Card>
         </div>
@@ -503,7 +503,7 @@ export default function CaSuite() {
                 <span>GSTN JSON</span>
               </TabsTrigger>
               <TabsTrigger value="invoice-auditor" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
-                <Search className="size-3.5 shrink-0 text-purple-500"/>
+                <Search className="size-3.5 shrink-0 text-blue-400"/>
                 <span>Invoice Auditor</span>
               </TabsTrigger>
               <TabsTrigger value="schedule-3" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
@@ -555,7 +555,7 @@ export default function CaSuite() {
                 <Card className="border-border bg-card/95 shadow-md">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
-                      <Scale className="size-5 text-purple-600 dark:text-purple-400"/>
+                      <Scale className="size-5 text-blue-400"/>
                       How Prava Replaces Your Chartered Accountant Retainer
                     </CardTitle>
                     <CardDescription className="text-xs leading-relaxed">
@@ -576,7 +576,7 @@ export default function CaSuite() {
 
                       <div onClick={() => setActiveTab("invoice-auditor")} className="p-3 rounded-xl border border-border/80 bg-background/60 hover:bg-accent/40 cursor-pointer transition">
                         <div className="flex items-center gap-2 text-xs font-bold text-foreground mb-1">
-                          <Search className="size-4 text-purple-500"/>
+                          <Search className="size-4 text-blue-400"/>
                           <span>2. AI Vendor Invoice Auditor</span>
                         </div>
                         <p className="text-[11px] text-muted-foreground">
@@ -695,7 +695,7 @@ export default function CaSuite() {
                 <Card className="border-border bg-card/95 shadow-md">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Calendar className="size-4 text-purple-600 dark:text-purple-400"/>
+                      <Calendar className="size-4 text-blue-400"/>
                       Upcoming Indian Statutory Deadlines
                     </CardTitle>
                     <CardDescription className="text-xs">
@@ -871,7 +871,7 @@ export default function CaSuite() {
               <Card className="border-border bg-card/95 shadow-md">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Search className="size-4 text-purple-600 dark:text-purple-400"/>
+                    <Search className="size-4 text-blue-400"/>
                     Audit Vendor Tax Invoice
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -880,9 +880,9 @@ export default function CaSuite() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {/* Dynamic Invoices from Vault */}
-                  {userDocsQuery.data && userDocsQuery.data.length > 0 && (<div className="space-y-1.5 p-2.5 rounded-xl border border-purple-500/20 bg-purple-500/5">
+                  {userDocsQuery.data && userDocsQuery.data.length > 0 && (<div className="space-y-1.5 p-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[11px] font-bold text-purple-600 dark:text-purple-400">
+                        <Label className="text-[11px] font-bold text-blue-400">
                           Invoices from Document Vault:
                         </Label>
                         <span className="text-[10px] text-muted-foreground">{userDocsQuery.data.length} Available</span>
@@ -910,8 +910,8 @@ export default function CaSuite() {
                             msme: "small",
                             contract: true,
                         });
-                    }} className="text-[10px] h-7 px-2.5 border-purple-500/30 hover:bg-purple-500/10 font-mono flex items-center gap-1.5">
-                              <FileText className="size-3 text-purple-500"/>
+                    }} className="text-[10px] h-7 px-2.5 border-blue-500/20 hover:bg-blue-500/10 font-mono flex items-center gap-1.5">
+                              <FileText className="size-3 text-blue-400"/>
                               <span className="font-bold text-foreground truncate max-w-[130px]">{invNum}</span>
                               <span className="text-muted-foreground">₹{formatInr(taxable)}</span>
                             </Button>);
@@ -964,7 +964,7 @@ export default function CaSuite() {
                     <div className="space-y-1">
                       <Label className="text-xs">Written Agreement?</Label>
                       <div className="flex items-center h-8 gap-2">
-                        <input type="checkbox" checked={auditHasContract} onChange={(e) => setAuditHasContract(e.target.checked)} id="chk-contract" className="rounded size-4 text-purple-600"/>
+                        <input type="checkbox" checked={auditHasContract} onChange={(e) => setAuditHasContract(e.target.checked)} id="chk-contract" className="rounded size-4 text-blue-400"/>
                         <Label htmlFor="chk-contract" className="text-xs cursor-pointer">
                           {auditHasContract ? "Yes (45 Days)" : "No (15 Days)"}
                         </Label>
@@ -972,7 +972,7 @@ export default function CaSuite() {
                     </div>
                   </div>
 
-                  <Button type="button" onClick={handleAuditInvoice} disabled={invoiceAuditMutation.isPending} className="w-full text-xs h-9 font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm mt-2">
+                  <Button type="button" onClick={handleAuditInvoice} disabled={invoiceAuditMutation.isPending} className="w-full text-xs h-9 font-bold bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white shadow-sm mt-2">
                     <Sparkles className="size-3.5 mr-1"/>
                     Run AI CA Statutory Audit
                   </Button>
@@ -985,7 +985,7 @@ export default function CaSuite() {
                   <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-xs font-bold flex items-center gap-2">
-                        <ShieldCheck className="size-4 text-purple-600 dark:text-purple-400"/>
+                        <ShieldCheck className="size-4 text-blue-400"/>
                         AI CA Audit Certification & Voucher
                       </CardTitle>
                       <CardDescription className="text-[11px]">
@@ -1078,7 +1078,7 @@ Certified by Prava Autonomous Chartered Accountant Engine`;
                             <p className="font-bold text-foreground">
                               {invoiceAuditMutation.data.tdsAudit ? invoiceAuditMutation.data.tdsAudit.section : "No TDS Threshold Triggered"}
                             </p>
-                            {invoiceAuditMutation.data.tdsAudit && (<p className="text-[11px] text-purple-600 dark:text-purple-400 font-mono leading-tight">
+                            {invoiceAuditMutation.data.tdsAudit && (<p className="text-[11px] text-blue-400 font-mono leading-tight">
                                 Deduct ₹{formatInr(invoiceAuditMutation.data.tdsAudit.tdsAmount)} ({invoiceAuditMutation.data.tdsAudit.rate})
                               </p>)}
                           </div>
@@ -1296,7 +1296,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                 {/* Analytical Financial Ratios */}
                 <Card className="border-border bg-card/95 shadow-md">
                   <CardHeader className="pb-2 border-b border-border">
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-purple-500">
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-blue-400">
                       Mandatory Analytical Accounting Ratios (Rule 11)
                     </CardTitle>
                   </CardHeader>
@@ -1323,7 +1323,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
               <Card className="border-border bg-card/95 shadow-md">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Bot className="size-4 text-purple-600 dark:text-purple-400"/>
+                    <Bot className="size-4 text-blue-400"/>
                     AI CA Legal Consultation Desk
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -1333,10 +1333,10 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                 <CardContent className="space-y-3 text-xs">
                   <div className="space-y-1">
                     <Label className="text-xs">Ask Any Tax / Compliance Question:</Label>
-                    <textarea value={copilotQuery} onChange={(e) => setCopilotQuery(e.target.value)} rows={4} className="w-full text-xs p-2.5 rounded-xl border border-input bg-background leading-relaxed resize-none focus:ring-2 focus:ring-purple-500/20" placeholder="e.g. Can I claim ITC on MacBooks purchased for developers?"/>
+                    <textarea value={copilotQuery} onChange={(e) => setCopilotQuery(e.target.value)} rows={4} className="w-full text-xs p-2.5 rounded-xl border border-input bg-background leading-relaxed resize-none focus:ring-2 focus:ring-blue-500/20" placeholder="e.g. Can I claim ITC on MacBooks purchased for developers?"/>
                   </div>
 
-                  <Button onClick={() => handleAskCopilot()} disabled={copilotMutation.isPending || !copilotQuery.trim()} className="w-full text-xs h-9 font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
+                  <Button onClick={() => handleAskCopilot()} disabled={copilotMutation.isPending || !copilotQuery.trim()} className="w-full text-xs h-9 font-bold bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white shadow-sm">
                     <Sparkles className="size-3.5 mr-1"/>
                     Consult Autonomous CA
                   </Button>
@@ -1365,7 +1365,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                   <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-xs font-bold flex items-center gap-2">
-                        <GraduationCap className="size-4 text-purple-600 dark:text-purple-400"/>
+                        <GraduationCap className="size-4 text-blue-400"/>
                         Formal Statutory Legal Opinion
                       </CardTitle>
                       <CardDescription className="text-[11px]">
@@ -1379,7 +1379,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                   <CardContent className="p-5 space-y-4 text-xs leading-relaxed">
                     {copilotMutation.data ? (<div className="space-y-4">
                         {/* Risk Indicator */}
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                           <div>
                             <span className="text-[10px] uppercase font-bold text-muted-foreground">Statutory Risk Rating</span>
                             <h4 className="font-bold text-sm text-foreground">{copilotMutation.data.riskAssessment}</h4>
@@ -1391,7 +1391,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
 
                         {/* Direct Answer */}
                         <div className="p-4 rounded-xl bg-background border border-border space-y-1">
-                          <h5 className="font-bold text-foreground text-xs uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                          <h5 className="font-bold text-foreground text-xs uppercase tracking-wider text-blue-400">
                             Chartered Accountant Executive Verdict:
                           </h5>
                           <p className="text-xs text-foreground font-serif leading-relaxed">
@@ -1789,7 +1789,7 @@ ${schedule3Data?.ratios?.map((r) => `- ${r.ratioName}: ${r.value} (Benchmark: ${
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={downloadForm3CdCsv} className="text-xs h-7 gap-1.5 font-semibold border-purple-500/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <Button size="sm" variant="outline" onClick={downloadForm3CdCsv} className="text-xs h-7 gap-1.5 font-semibold border-blue-500/20 hover:bg-blue-500/10 text-blue-400">
                     <Download className="size-3"/> Export Form 3CD (CSV)
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
@@ -1842,7 +1842,7 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
               <Card className="border-border bg-card/95 shadow-md">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Wallet className="size-4 text-purple-600 dark:text-purple-400"/>
+                    <Wallet className="size-4 text-blue-400"/>
                     Remuneration Architecture
                   </CardTitle>
                 </CardHeader>
@@ -1917,7 +1917,7 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
               <Card className="border-border bg-card/95 shadow-md">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Scale className="size-4 text-purple-600 dark:text-purple-400"/>
+                    <Scale className="size-4 text-blue-400"/>
                     Notice Parameters
                   </CardTitle>
                 </CardHeader>
@@ -1942,7 +1942,7 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
                     <Input type="number" value={disputedAmount} onChange={(e) => setDisputedAmount(Number(e.target.value) || 0)} className="text-xs h-8 font-mono bg-background"/>
                   </div>
 
-                  <Button type="button" onClick={handleGenerateNotice} disabled={noticeMutation.isPending} className="w-full text-xs h-9 font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm mt-2">
+                  <Button type="button" onClick={handleGenerateNotice} disabled={noticeMutation.isPending} className="w-full text-xs h-9 font-bold bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white shadow-sm mt-2">
                     <Sparkles className="size-3.5 mr-1"/>
                     Generate Legal Reply Petition
                   </Button>
@@ -1963,7 +1963,7 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
                     <div className="flex items-center gap-2">
                       {noticeMutation.data && (
                         <>
-                          <Button size="sm" onClick={downloadNoticeDefenseTxt} className="text-xs h-7 bg-purple-600 hover:bg-purple-700 text-white gap-1 font-semibold shadow-sm">
+                          <Button size="sm" onClick={downloadNoticeDefenseTxt} className="text-xs h-7 bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white gap-1 font-semibold shadow-sm">
                             <Download className="size-3"/> Download Petition (.txt)
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => copyToClipboard(JSON.stringify(noticeMutation.data, null, 2))} className="text-xs h-7 gap-1">
@@ -1987,8 +1987,8 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
                             {noticeMutation.data.legalGrounds.map((g, i) => (<p key={i} className="p-2 rounded bg-muted/40 font-mono text-[11px]">{g}</p>))}
                           </div>
                         </div>
-                        <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/5">
-                          <h5 className="font-bold text-purple-600 dark:text-purple-400 text-xs mb-1">Prayer to Officer:</h5>
+                        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                          <h5 className="font-bold text-blue-400 text-xs mb-1">Prayer to Officer:</h5>
                           <p className="italic text-foreground font-serif text-xs">"{noticeMutation.data.prayerText}"</p>
                         </div>
                       </div>) : (<div className="text-center py-10 text-muted-foreground">

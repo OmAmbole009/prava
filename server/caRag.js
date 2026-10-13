@@ -267,51 +267,191 @@ export function buildCaAdvisoryResponse(query, financials, businessProfile, cust
     };
   }
 
-  // 2. MSME 43B(h) question
-  if (q.includes("msme") || q.includes("43b") || q.includes("vendor") || q.includes("45 days") || q.includes("15 days")) {
+  // 2. ITC (Input Tax Credit) question
+  if (q.includes("itc") || q.includes("input tax credit") || q.includes("input credit") || (q.includes("credit") && q.includes("tax"))) {
     return {
-      title: "Section 43B(h) MSME Disallowance Audit & Protocol",
-      sectionsReferenced: ["Section 43B(h) of Income Tax Act, 1961", "Section 15 of MSMED Act, 2006"],
-      analysis: `Section 43B(h) mandates that all payments to Micro and Small suppliers must be cleared within 15 days (or 45 days if contractual agreement exists). For your business (${businessProfile?.name || "Prava Technologies"}), unpaid MSME dues at year-end are disallowed as expenditure and added to taxable profit at 25% corporate tax!`,
-      actionPlan: [
-        "1. Obtain Udyam Registration certificates from all active vendors.",
-        "2. Sign written purchase agreements specifying 45-day payment terms (otherwise defaults to 15 days).",
-        "3. Prioritize MSME payables in your treasury schedule before the end of the financial year.",
-        "4. Note: Medium enterprises and retail/wholesale traders are exempt from 43B(h).",
+      title: "Input Tax Credit (ITC) Statutory Architecture & Claim Rules",
+      sectionsReferenced: [
+        "Section 16(2) of CGST Act (Four Mandatory Eligibility Conditions)",
+        "Section 16(2)(aa) & Rule 36(4) (GSTR-2B Mandatory Reflection)",
+        "Section 17(5) of CGST Act (Blocked / Ineligible Credits)",
+        "Rule 37 of CGST Rules (180-Day Payment Reversal Mandate)",
+        "Section 50(3) (Interest on Wrongly Claimed & Utilized ITC)",
       ],
-      warning: "Failure to pay within 45 days adds the entire unpaid bill to your taxable profits, plus mandatory non-deductible compound interest at 3x RBI bank rate.",
+      analysis: `**Input Tax Credit (ITC)** is the core mechanism of the Goods and Services Tax (GST) system that eliminates the cascading effect of double taxation. When your business purchases raw materials, capital goods, or operational services, the GST paid to suppliers is not an expense—it is recorded as a tax asset (Input Tax Credit) that directly reduces the output GST you owe on your customer sales.\n\n### ⚖️ The 4 Statutory Conditions to Claim ITC (Section 16(2)):\n1. **Tax Invoice Possession**: You must hold a valid tax invoice or debit note issued by a registered GST supplier containing your business GSTIN.\n2. **GSTR-2B Reflection (Strict Rule)**: Under Section 16(2)(aa), the invoice MUST be uploaded by the vendor in their GSTR-1 and must appear in your auto-generated **GSTR-2B statement**. No provisional or manual ITC without 2B reflection is allowed!\n3. **Receipt of Goods/Services**: You must have actually received the goods or services.\n4. **Supplier Tax Payment**: The supplier must have actually deposited the GST collected from you to the government and filed GSTR-3B.\n\n### 🚫 Blocked Credits (Section 17(5) - Ineligible Even with Valid Invoice):\n- Motor vehicles with seating capacity ≤ 13 (unless used for passenger transport, driving school, or vehicle sales).\n- Food, beverages, outdoor catering, health/club memberships, and beauty treatment.\n- Works contract for construction of immovable property on own account (capitalized to building).\n- Goods or services used for personal consumption, or goods lost, stolen, destroyed, or written off.\n\n### ⏱️ The 180-Day Payment Rule (Rule 37):\nYou must settle the supplier's bill (value + GST) within **180 days** from the invoice date. If unpaid after 180 days, you are legally required to reverse the claimed ITC in Form GSTR-3B along with **18% per annum interest** from the date of credit utilization under Section 50(3). Once payment is made, the credit can be reclaimed in full.`,
+      actionPlan: [
+        "1. Perform automated weekly matching between your purchase bills in Prava and Form GSTR-2B prior to the 11th of each month.",
+        "2. Never claim ITC in GSTR-3B Table 4 exceeding the eligible credit appearing in GSTR-2B.",
+        "3. Review aging accounts payable to ensure no supplier bills exceed 180 days without settlement.",
+        "4. Flag and segregate Section 17(5) blocked expenses (staff refreshments, personal transport) into non-credit tax expense accounts.",
+      ],
+      warning: "Claiming and utilizing ITC that does not appear in your Form GSTR-2B constitutes a non-compliance violation under Rule 36(4) and attracts mandatory 18% per annum interest, reversal demands, and potential scrutiny notices (Form DRC-01C).",
+      statutoryKnowledge: fallbackDocs.find(d => d.id === "itc-section-16-2-aa") || fallbackDocs[0],
+    };
+  }
+
+  // 3. TDS (Tax Deducted at Source) question
+  if (q.includes("tds") || q.includes("tax deducted at source") || q.includes("194c") || q.includes("194j") || q.includes("194q") || q.includes("194i")) {
+    return {
+      title: "Tax Deducted at Source (TDS) Compliance Architecture & Disallowance Rules",
+      sectionsReferenced: [
+        "Section 194C (Contractors & Sub-contractors)",
+        "Section 194J (Professional & Technical Fees)",
+        "Section 194I (Rent on Land, Building & Machinery)",
+        "Section 194Q (Purchase of Goods > ₹50 Lakhs)",
+        "Section 40(a)(ia) (30% Statutory Expenditure Disallowance)",
+        "Section 201(1A) (Interest for Delayed Deduction / Deposit)",
+      ],
+      analysis: `**Tax Deducted at Source (TDS)** is a statutory obligation where the payer (your business) deducts income tax before releasing payments to vendors, contractors, landlords, and consultants, and deposits it directly to the Central Government.\n\n### 📋 Primary TDS Rates & Thresholds for Businesses:\n- **Section 194C (Contractors / Vendors)**: **1%** for individuals/HUF contractors, **2%** for companies/firms. Threshold: Single bill > ₹30,000 or aggregate annual payout > ₹1,00,000.\n- **Section 194J (Professional & Technical Fees)**: **10%** for professional/legal/director fees, **2%** for technical/call-center services. Threshold: ₹30,000 per financial year.\n- **Section 194I (Rent)**: **10%** for commercial/residential building rent (threshold ₹2,40,000/year); **2%** for plant & machinery hire.\n- **Section 194Q (Purchase of Goods)**: **0.1%** on purchases exceeding ₹50 Lakhs in a FY from a seller (applies to buyers whose turnover exceeded ₹10 Cr in the preceding FY).\n\n### ⚠️ The Dangerous 30% Disallowance Penalty (Section 40(a)(ia)):\nIf you fail to deduct TDS, or deduct it but fail to deposit it to the government on or before the ITR filing due date, **THIRTY PERCENT (30%) of the entire vendor invoice value is disallowed as business expenditure** and added directly to your taxable profit at corporate tax rates!`,
+      actionPlan: [
+        "1. Deduct TDS at the point of invoice booking or payment release (whichever happens earlier).",
+        "2. Deposit all deducted TDS on or before the 7th of the following month (or 30th April for March deductions) via Challan 281.",
+        "3. File quarterly Form 26Q TDS returns strictly before quarterly deadlines (July 31, Oct 31, Jan 31, May 31).",
+        "4. Issue Form 16A TDS certificates to your vendors within 15 days of filing Form 26Q.",
+      ],
+      warning: "Non-deduction of TDS attracts 1% per month interest under Section 201(1A); failure to deposit deducted tax attracts 1.5% per month interest, plus late filing fees of ₹200/day under Section 234E for Form 26Q delays.",
+      statutoryKnowledge: fallbackDocs.find(d => d.id === "tds-compliance-40a-ia") || fallbackDocs[0],
+    };
+  }
+
+  // 4. Presumptive Taxation (Section 44AD / 44ADA)
+  if (q.includes("44ad") || q.includes("44ada") || q.includes("presumptive")) {
+    return {
+      title: "Presumptive Taxation Framework (Section 44AD & 44ADA)",
+      sectionsReferenced: [
+        "Section 44AD (Eligible Small Businesses)",
+        "Section 44ADA (Eligible Professionals & Consultants)",
+        "Section 44AA (Maintenance of Books Exemption)",
+        "Section 44AB (Audit Exemption Thresholds)",
+      ],
+      analysis: `**Presumptive Taxation** allows eligible small businesses and professionals to declare taxable income on a deemed percentage basis without the burden of maintaining detailed books of accounts (Section 44AA) or undergoing a Chartered Accountant Tax Audit (Section 44AB).\n\n### 🏢 Section 44AD (For Small Businesses):\n- **Eligibility**: Turnover up to **₹2 Crore** (relaxed to **₹3 Crore** if total cash receipts do not exceed 5%).\n- **Deemed Profit Rate**: **6%** on digital, banking, and online turnover; **8%** on cash turnover.\n- **Benefit**: No audit required; entire balance (92%-94%) is treated as commercial expenses without needing receipts.\n\n### 💻 Section 44ADA (For Professionals - IT, Tech, Legal, CA, Doctors):\n- **Eligibility**: Gross professional receipts up to **₹50 Lakhs** (relaxed to **₹75 Lakhs** if cash receipts ≤ 5%).\n- **Deemed Profit Rate**: Exactly **50%** of gross receipts.\n- **Benefit**: The remaining 50% is deemed business expenses without bookkeeping or voucher scrutiny!\n\n### ⏱️ Advance Tax Under Presumptive Taxation:\nTaxpayers opting for 44AD/44ADA are exempt from paying quarterly advance tax; **100% of advance tax can be deposited in a single installment by 15th March**!`,
+      actionPlan: [
+        "1. For tech consultants, agencies, and service providers with high profit margins and low overheads, Section 44ADA saves up to ₹1,50,000+ in CA bookkeeping and audit fees.",
+        "2. Ensure cash receipts remain strictly below 5% to take advantage of the higher ₹75L / ₹3Cr eligibility thresholds.",
+        "3. Deposit estimated tax via Challan 280 on or before 15th March to avoid interest under Section 234C.",
+      ],
+      warning: "If you declare profits lower than the prescribed 6%/8% (44AD) or 50% (44ADA) rates, you lose presumptive relief, must maintain comprehensive books of accounts under Section 44AA, and undergo compulsory Tax Audit under Section 44AB.",
+      statutoryKnowledge: fallbackDocs.find(d => d.id === "presumptive-taxation-44ad-44ada") || fallbackDocs[0],
+    };
+  }
+
+  // 5. Reverse Charge Mechanism (RCM)
+  if (q.includes("rcm") || q.includes("reverse charge")) {
+    return {
+      title: "Reverse Charge Mechanism (RCM) Provisions & Compliance Under GST",
+      sectionsReferenced: [
+        "Section 9(3) & 9(4) of CGST Act, 2017",
+        "Notification No. 13/2017-Central Tax (Rate)",
+      ],
+      analysis: `Under the normal GST mechanism, the supplier charges tax and pays it to the government. Under **Reverse Charge Mechanism (RCM)**, the statutory liability to pay GST is legally shifted to the recipient (your business) of the goods or services.\n\n### 📦 Common Supplies Subject to Mandatory RCM (Section 9(3)):\n1. **Goods Transport Agency (GTA)**: Freight paid to road transporters where GTA does not charge 12% (attracts 5% RCM GST).\n2. **Legal Services**: Fees paid to individual advocates, senior advocates, or firm of advocates for legal representation or advisory.\n3. **Director Services**: Remuneration, sitting fees, or commission paid to independent/non-executive directors (salaried executive directors under employment contract are exempt under Schedule III).\n4. **Security / Manpower Services**: Services provided by non-corporate entities to a registered person.\n5. **Sponsorship Services**: Any sponsorship consideration paid to any body corporate or partnership firm.\n\n### 🚨 Crucial RCM Payment & Credit Rule:\n- RCM tax liability **CANNOT be settled using Input Tax Credit (ITC)** from your electronic credit ledger! It must be paid **100% in CASH** through your electronic cash ledger in Form GSTR-3B Table 3.1(d).\n- Once paid in cash, **100% of this RCM tax becomes eligible as Input Tax Credit** in the same tax period under GSTR-3B Table 4(A)(3)!`,
+      actionPlan: [
+        "1. Identify all transport (bilty), advocate legal bills, and director sitting vouchers.",
+        "2. Generate self-invoices for RCM purchases from unregistered suppliers under Section 31(3)(f).",
+        "3. Top up electronic cash ledger on the GST portal to pay RCM liability in GSTR-3B.",
+        "4. Simultaneously claim full ITC in Table 4(A)(3) so the net cash impact is neutral after the filing cycle.",
+      ],
+      warning: "Failure to pay RCM liability in cash is treated as tax evasion under Section 73/74, attracting mandatory 18% per annum interest and 10% penalty, even if you had sufficient surplus ITC in your credit ledger.",
+      statutoryKnowledge: fallbackDocs[0],
+    };
+  }
+
+  // 6. GST Return Architecture (GSTR-1, GSTR-3B, GSTR-2B)
+  if (q.includes("gstr-1") || q.includes("gstr-3b") || q.includes("gstr 1") || q.includes("gstr 3b") || q.includes("return filing") || q.includes("gst filing")) {
+    return {
+      title: "GST Return Filing Cycle: GSTR-1, GSTR-2B & GSTR-3B Architecture",
+      sectionsReferenced: [
+        "Section 37 (GSTR-1 Outward Supplies)",
+        "Section 38 & Rule 60 (GSTR-2B Static Auto-Drafted Statement)",
+        "Section 39 (GSTR-3B Monthly Summary & Tax Payment Return)",
+        "Section 47 (Late Filing Fees) & Section 50 (Interest)",
+      ],
+      analysis: `The Indian GST compliance architecture follows a interconnected monthly timeline across 3 primary forms:\n\n1. **Form GSTR-1 (Due 11th of every month)**:\n   - This is your Outward Supplies return where you report all sales invoices, B2B supplies with customer GSTIN, B2C sales, exports, credit notes, and HSN summary.\n   - Filing GSTR-1 is critical because your customers cannot claim ITC unless your GSTR-1 is filed!\n\n2. **Form GSTR-2B (Auto-Generated on 14th of every month)**:\n   - This is a static, read-only monthly statement generated by the GST portal containing all purchases and expenses uploaded by your suppliers in their GSTR-1.\n   - GSTR-2B is the single source of truth for eligible Input Tax Credit.\n\n3. **Form GSTR-3B (Due 20th of every month)**:\n   - This is your self-assessed monthly summary return where you declare total output tax liability, claim eligible ITC from GSTR-2B, set off output tax against credit, and pay the remaining balance in cash.\n   - Filing GSTR-3B is mandatory even if you had zero transactions (Nil Return).`,
+      actionPlan: [
+        "1. Reconcile sales invoices and upload GSTR-1 on or before the 11th.",
+        "2. On the 14th, download Form GSTR-2B and run Prava auto-matching against your purchase register.",
+        "3. Send chase notifications to vendors whose invoices are missing from GSTR-2B.",
+        "4. Pay net tax and file Form GSTR-3B on or before the 20th to avoid late fees.",
+      ],
+      warning: "Late filing of GSTR-3B attracts a statutory late fee of ₹50/day (₹20/day for Nil returns) under Section 47, plus 18% per annum interest on net cash tax liability under Section 50. Missing two consecutive returns blocks E-Way Bill generation and triggers portal registration cancellation.",
+      statutoryKnowledge: fallbackDocs[0],
+    };
+  }
+
+  // 7. MSME 43B(h) question
+  if (q.includes("msme") || q.includes("43b") || q.includes("43bh") || q.includes("vendor") || q.includes("45 days") || q.includes("15 days")) {
+    return {
+      title: "Section 43B(h) MSME Disallowance Audit & Payment Timelines",
+      sectionsReferenced: ["Section 43B(h) of Income Tax Act, 1961", "Section 15 & 16 of MSMED Act, 2006"],
+      analysis: `Section 43B(h) mandates that any sum payable to a **Micro or Small enterprise** (registered on the MSME Udyam portal) must be settled strictly within the statutory timeframe, failing which the entire unpaid expenditure is **disallowed as a tax deduction** in that financial year and added back to your taxable profits!\n\n### ⏱️ Statutory Payment Limits:\n- **With Written Agreement**: Maximum **45 days** from the date of acceptance/delivery of goods or services.\n- **Without Written Agreement**: Maximum **15 days** from delivery.\n\n### 🏢 Who is Covered vs Who is Exempt:\n- **Covered**: Micro enterprises (Investment ≤ ₹1 Cr & Turnover ≤ ₹5 Cr) and Small enterprises (Investment ≤ ₹10 Cr & Turnover ≤ ₹50 Cr) engaged in Manufacturing or Services.\n- **Exempt**: Medium enterprises (Turnover > ₹50 Cr) and Traders (wholesale and retail traders are exempt from Section 43B(h)).`,
+      actionPlan: [
+        "1. Collect and store Udyam registration certificates from all active suppliers.",
+        "2. Ensure written purchase contracts or purchase orders explicitly specify a 45-day payment clause.",
+        "3. Run weekly accounts payable aging audits in Prava [Tasks](/tasks) and settle all Micro/Small dues before March 31.",
+      ],
+      warning: "Unpaid MSME dues at year-end are taxed at your full corporate tax rate, plus you are liable to pay mandatory non-deductible compound interest at 3 times the RBI bank rate under Section 16 of the MSMED Act.",
       statutoryKnowledge: fallbackDocs.find(d => d.id === "sec-43bh-msme") || fallbackDocs[0],
     };
   }
 
-  // 3. Tax saving / Founder remuneration question
-  if (q.includes("save tax") || q.includes("salary") || q.includes("dividend") || q.includes("reduce tax") || q.includes("tax planning")) {
+  // 8. Tax saving / Founder remuneration question
+  if (q.includes("save tax") || q.includes("salary") || q.includes("dividend") || q.includes("reduce tax") || q.includes("tax planning") || q.includes("remuneration")) {
     return {
-      title: "Corporate Tax Optimization & Remuneration Strategy",
-      sectionsReferenced: ["Section 37(1)", "Section 80CCD(2)", "Section 32 (Depreciation)"],
-      analysis: `As a private limited company with verified net operating profit of ₹${(Math.max(0, financials.revenueMinor - financials.expensesMinor) / 100).toLocaleString("en-IN")}, the most effective legal tax reduction levers are:`,
+      title: "Corporate Tax Optimization & Founder Remuneration Strategy",
+      sectionsReferenced: ["Section 37(1)", "Section 80CCD(2)", "Section 32 (Depreciation)", "Section 115BAA"],
+      analysis: `For a private limited company with verified net operating profits, the most tax-efficient structure combines Director Remuneration, Employer NPS, and accelerated capital depreciation:\n\n1. **Founder Remuneration u/s 37(1)**: Director salary is an allowable commercial deduction for the company, immediately saving 22.88% corporate tax. In personal hands, use new tax regime slabs (0-15L taxed at low marginal rates) plus standard deduction.\n2. **Employer NPS u/s 80CCD(2)**: The company can contribute up to **14% of basic salary** directly to the National Pension System on behalf of the director. This is **100% tax-deductible for the company** and completely tax-free in the director's hands with no monetary cap!\n3. **Depreciation Acceleration u/s 32**: Computers, servers, and software enjoy 40% WDV depreciation. Purchasing capital assets before September 30 captures full 12-month depreciation write-offs.`,
       actionPlan: [
-        "1. Founder Remuneration u/s 37(1): Paying market remuneration to director-promoters directly saves 22.88% corporate tax. In personal hands, use new tax regime slabs (0-15L taxed at low marginal rates).",
-        "2. Employer NPS u/s 80CCD(2): Contribute up to 14% of basic salary to National Pension System. This is 100% tax-free for the company and 100% tax-free for the employee with no cap!",
-        "3. Depreciation Acceleration u/s 32: Tech hardware, servers, and laptops enjoy 40% WDV depreciation. Purchase assets before September 30 to claim full year depreciation.",
-        "4. R&D & Software Licenses: Immediate write-off of cloud hosting and software subscriptions under revenue expenditure.",
+        "1. Structure founder remuneration with optimal basic salary and 14% Section 80CCD(2) Employer NPS contribution.",
+        "2. Avoid declaring Dividends. Dividends are taxed twice (company pays corporate tax first, then founder pays up to 39% personal slab tax). Always route surplus through allowable expenses and remuneration.",
+        "3. Review capital expenditure timing to maximize Section 32 depreciation.",
       ],
-      warning: "Do not withdraw surplus as Dividends. Dividends are taxed twice (company pays corporate tax first, then founder pays up to 39% personal slab tax). Always structure through salary + NPS.",
+      warning: "Director remuneration must be reasonable and justifiable under Section 40A(2) against market benchmarks to prevent scrutiny disallowance.",
       statutoryKnowledge: fallbackDocs.find(d => d.id === "founder-salary-vs-dividend") || fallbackDocs[0],
     };
   }
 
-  // 4. Default comprehensive CA guidance
+  // 9. Depreciation (Section 32)
+  if (q.includes("depreciation") || q.includes("asset") || q.includes("block of assets") || q.includes("section 32")) {
+    return {
+      title: "Statutory Tax Depreciation & Asset Accounting (Section 32)",
+      sectionsReferenced: ["Section 32 of Income Tax Act", "Rule 5 of Income Tax Rules (Depreciation Schedule)"],
+      analysis: `Under Indian Income Tax Act (Section 32), depreciation is calculated using the **Written Down Value (WDV) method** on defined **Blocks of Assets**, rather than straight-line book depreciation:\n\n### 💻 Primary WDV Depreciation Rates:\n- **Computers, Laptops & Software**: **40%** per annum.\n- **Plant & Machinery (General)**: **15%** per annum.\n- **Commercial Buildings**: **10%** per annum.\n- **Furniture & Fixtures**: **10%** per annum.\n- **Motor Vehicles (Commercial/Passenger)**: **15%** (30% for commercial hire).\n\n### ⏱️ The 180-Day Rule for New Acquisitions:\nIf an asset is acquired and put to use for **less than 180 days** during the financial year (i.e., put to use on or after October 3rd in a standard FY), only **50% of the normal depreciation rate** is allowable for that year (e.g., 20% on computers instead of 40%).`,
+      actionPlan: [
+        "1. Maintain a detailed Fixed Asset Register linking purchase invoices to physical assets.",
+        "2. Ensure capital purchases are put to commercial use prior to September 30 to claim 100% full-year depreciation.",
+        "3. Factor timing into annual tax planning to legally minimize corporate taxable income.",
+      ],
+      warning: "Books depreciation under Schedule III of Companies Act differs from Section 32 Income Tax depreciation. The difference must be recorded as Deferred Tax Asset/Liability (DTA/DTL) under AS-22 / Ind AS 12.",
+      statutoryKnowledge: fallbackDocs[0],
+    };
+  }
+
+  // 10. Cashflow vs Profit
+  if (q.includes("cashflow") || q.includes("cash flow") || q.includes("working capital") || q.includes("liquidity")) {
+    return {
+      title: "Cash Flow Liquidity vs Accounting Profit & Working Capital Control",
+      sectionsReferenced: ["Working Capital Optimization", "Operating Cash Flow vs Net Margin"],
+      analysis: `A fundamental principle of financial operations is that **profit does not equal cash**. A company can report strong net profits on its Profit & Loss statement while experiencing acute cash insolvency because of delayed customer receivables, unrecovered GST refunds, or inventory lockups.\n\n### 🔄 The Working Capital Cash Conversion Cycle:\n1. **Days Sales Outstanding (DSO)**: How long customers take to pay. If invoice terms are 30 days but clients pay in 75 days, your working capital is funding their operations.\n2. **Days Payable Outstanding (DPO)**: How long you hold supplier funds without breaching MSME 43B(h) limits.\n3. **Net Cash Position**: Verified available liquidity = Cash at Bank + Liquid Investments - Immediate Liabilities.`,
+      actionPlan: [
+        "1. Monitor overdue receivables weekly and enforce automated payment reminders in Prava.",
+        "2. Request 30%-50% advance milestone payments on larger commercial contracts.",
+        "3. Maintain a minimum liquidity runway of 3 to 6 months of fixed operating overheads in liquid bank accounts.",
+      ],
+      warning: "Never use statutory tax funds (collected GST or deducted TDS) for operating working capital. Statutory funds are held in fiduciary trust for the government; diverting them triggers severe interest and personal director liability.",
+      statutoryKnowledge: fallbackDocs[0],
+    };
+  }
+
+  // 11. Default authoritative CA advisory
   return {
-    title: "Autonomous CA Legal & Compliance Advisory",
+    title: "Autonomous Chartered Accountant Legal & Financial Advisory",
     sectionsReferenced: fallbackDocs.flatMap(d => d.sections),
-    analysis: `I have examined your query against the Income Tax Act 1961 and CGST Act 2017 in relation to ${businessProfile?.name || "Prava Technologies Private Limited"}. Current verified turnover stands at ₹${(financials.revenueMinor / 100).toLocaleString("en-IN")} with ₹${(financials.cashMinor / 100).toLocaleString("en-IN")} in verified cash/bank reserves.`,
+    analysis: `I have analyzed your inquiry against the Income Tax Act 1961, CGST Act 2017, and Indian accounting standards for ${businessProfile?.name || "your business"}.\n\n- **Operating Revenue**: Verified at ₹${(financials.revenueMinor / 100).toLocaleString("en-IN")}\n- **Expenses & Purchases**: Recorded at ₹${(financials.expensesMinor / 100).toLocaleString("en-IN")}\n- **Available Liquidity**: Bank cash balance of ₹${(financials.cashMinor / 100).toLocaleString("en-IN")}\n\n${fallbackDocs[0]?.rules?.slice(0, 3).map(r => `• ${r}`).join("\n") || "Ensure all business transactions are backed by compliant tax invoices and reconciled weekly against bank statements and statutory returns."}`,
     actionPlan: [
-      `Primary Compliance: ${fallbackDocs[0]?.rules[0] || "Maintain timely statutory filings."}`,
-      `Statutory Timing: ${fallbackDocs[0]?.rules[1] || "Adhere to the 15th/20th monthly cutoff."}`,
-      `CA Audit Recommendation: ${fallbackDocs[0]?.actionableAdvice || "Reconcile books weekly."}`,
+      `1. Primary Compliance: ${fallbackDocs[0]?.rules[0] || "Maintain timely statutory filings."}`,
+      `2. Statutory Timing: ${fallbackDocs[0]?.rules[1] || "Adhere to the 15th/20th monthly cutoff."}`,
+      `3. CA Recommendation: ${fallbackDocs[0]?.actionableAdvice || "Reconcile books weekly in your Prava workspace."}`,
     ],
-    warning: "Ensure source invoice evidence is backed by Form GSTR-2B reflection to protect Input Tax Credit claims u/s 16(2)(aa).",
+    warning: "Ensure all source invoice evidence is backed by Form GSTR-2B reflection and matched against banking entries before certifying tax filings.",
     statutoryKnowledge: fallbackDocs[0],
   };
 }

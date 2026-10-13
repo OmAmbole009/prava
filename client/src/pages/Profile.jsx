@@ -13,9 +13,6 @@ import {
   KeyRound,
   Lock,
   LogOut,
-  Mail,
-  Phone,
-  ShieldAlert,
   ShieldCheck,
   Smartphone,
   User,
@@ -120,18 +117,18 @@ export default function Profile() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 max-w-5xl mx-auto pb-12">
+      <div className="space-y-6 max-w-5xl mx-auto pb-12 py-2">
         {/* Page Title Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/60 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.08] pb-6">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-500 mb-2">
-              <ShieldCheck className="size-3.5" />
-              <span>Identity & Security Telemetry</span>
-            </div>
-            <h1 className="font-['Playfair_Display',Georgia,serif] text-3xl font-bold tracking-tight text-foreground">
+            <span className="eyebrow-chip inline-flex items-center gap-1.5 mb-2 border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+              <ShieldCheck className="size-3 text-cyan-400" />
+              IDENTITY & SECURITY TELEMETRY
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
               Account Security & Profile
             </h1>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Manage multi-factor authentication, cryptographic passwords, and active workspace permissions.
             </p>
           </div>
@@ -140,7 +137,7 @@ export default function Profile() {
             variant="outline"
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
-            className="h-9 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-semibold"
+            className="h-9 rounded-full border border-[#C0625F]/30 bg-transparent text-[#C0625F] hover:bg-[#C0625F]/10 text-xs font-medium"
           >
             <LogOut className="mr-2 size-3.5" />
             Sign Out
@@ -149,55 +146,55 @@ export default function Profile() {
 
         <div className="grid gap-6 md:grid-cols-[1fr_1fr]">
           {/* -------------------- 1. IDENTITY & STATUS CARD -------------------- */}
-          <Card className="rounded-2xl border-border bg-card shadow-sm">
+          <Card className="rounded-2xl border-white/[0.08] bg-gradient-to-b from-[#0B0F19] to-[#070A12] shadow-xs">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <User className="size-4 text-primary" />
+                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                  <User className="size-4 text-sky-400" />
                   Account Identity
                 </CardTitle>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-emerald-500/25">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
                   ACTIVE // VERIFIED
                 </span>
               </div>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs text-slate-400">
                 Your authenticated profile identity across this organization workspace.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3.5 space-y-2.5">
+              <div className="rounded-xl border border-white/[0.06] bg-[#0E1424] p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Display Name</span>
-                  <span className="font-semibold text-foreground">{user?.name || "Business User"}</span>
+                  <span className="text-slate-400">Display Name</span>
+                  <span className="font-medium text-white">{user?.name || "Business User"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Primary Email</span>
-                  <span className="font-mono text-foreground">{user?.email || "Not registered"}</span>
+                  <span className="text-slate-400">Primary Email</span>
+                  <span className="font-mono text-white">{user?.email || "Not registered"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Mobile Phone</span>
-                  <span className="font-mono text-foreground">{user?.phone || "Not registered"}</span>
+                  <span className="text-slate-400">Mobile Phone</span>
+                  <span className="font-mono text-white">{user?.phone || "Not registered"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Account Role</span>
-                  <span className="font-mono font-bold uppercase text-primary">
+                  <span className="text-slate-400">Account Role</span>
+                  <span className="font-mono font-medium uppercase text-sky-400">
                     {user?.role === "admin" ? "Super Administrator" : user?.role || "Workspace Owner"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Associated Business</span>
-                  <span className="font-semibold text-foreground">{business?.name || "Prava Technologies"}</span>
+                  <span className="text-slate-400">Associated Business</span>
+                  <span className="font-medium text-white">{business?.name || "Prava Technologies"}</span>
                 </div>
               </div>
 
               {/* 2FA Enforced Card */}
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
+              <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-3.5 space-y-2">
+                <div className="flex items-center gap-2 font-medium text-sky-400 text-xs">
                   <Smartphone className="size-4" />
                   <span>Two-Step OTP Security Enforced</span>
                 </div>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-[11px] leading-relaxed text-slate-400">
                   Every sign-in requires a valid 6-digit one-time passcode delivered through your registered Mobile SMS or Gmail address.
                 </p>
               </div>
@@ -205,26 +202,26 @@ export default function Profile() {
           </Card>
 
           {/* -------------------- 2. CHANGE PASSWORD CARD -------------------- */}
-          <Card className="rounded-2xl border-border bg-card shadow-sm">
+          <Card className="rounded-2xl border-white/[0.08] bg-gradient-to-b from-[#0B0F19] to-[#070A12] shadow-xs">
             <CardHeader className="pb-4">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <KeyRound className="size-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                <KeyRound className="size-4 text-sky-400" />
                 Change Password
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs text-slate-400">
                 Update your account password with cryptographic salted scrypt hashing.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {/* Alert Feedback */}
               {errorMessage && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400">
                   <AlertCircle className="size-4 shrink-0 mt-0.5" />
                   <div className="flex-1 font-medium">{errorMessage}</div>
                 </div>
               )}
               {successMessage && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400">
                   <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
                   <div className="flex-1 font-medium">{successMessage}</div>
                 </div>
@@ -232,11 +229,11 @@ export default function Profile() {
 
               <form onSubmit={handlePasswordChange} className="space-y-3.5">
                 <div className="space-y-1">
-                  <Label htmlFor="curr-pass" className="text-xs font-medium text-foreground">
+                  <Label htmlFor="curr-pass" className="text-xs font-medium text-[#8A9591]">
                     Current Password
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
                     <Input
                       id="curr-pass"
                       type={showCurrent ? "text" : "password"}
@@ -244,12 +241,12 @@ export default function Profile() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="pl-9 pr-9 text-xs bg-background h-10 rounded-xl"
+                      className="pl-9 pr-9 text-xs bg-[#0E1424] border border-white/[0.08] text-white h-10 rounded-xl focus-visible:ring-1 focus-visible:ring-cyan-400"
                     />
                     <button
                       type="button"
                       onClick={() => setShowCurrent(!showCurrent)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                     >
                       {showCurrent ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                     </button>
@@ -257,11 +254,11 @@ export default function Profile() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="new-pass" className="text-xs font-medium text-foreground">
+                  <Label htmlFor="new-pass" className="text-xs font-medium text-slate-300">
                     New Password (min 8 characters)
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
                     <Input
                       id="new-pass"
                       type={showNew ? "text" : "password"}
@@ -269,12 +266,12 @@ export default function Profile() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="At least 8 characters"
-                      className="pl-9 pr-9 text-xs bg-background h-10 rounded-xl"
+                      className="pl-9 pr-9 text-xs bg-[#0E1424] border border-white/[0.08] text-white h-10 rounded-xl focus-visible:ring-1 focus-visible:ring-cyan-400"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNew(!showNew)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                     >
                       {showNew ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                     </button>
@@ -282,11 +279,11 @@ export default function Profile() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="confirm-pass" className="text-xs font-medium text-foreground">
+                  <Label htmlFor="confirm-pass" className="text-xs font-medium text-slate-300">
                     Confirm New Password
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
                     <Input
                       id="confirm-pass"
                       type="password"
@@ -294,7 +291,7 @@ export default function Profile() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter new password"
-                      className="pl-9 text-xs bg-background h-10 rounded-xl"
+                      className="pl-9 text-xs bg-[#0E1424] border border-white/[0.08] text-white h-10 rounded-xl focus-visible:ring-1 focus-visible:ring-cyan-400"
                     />
                   </div>
                 </div>
@@ -302,7 +299,7 @@ export default function Profile() {
                 <Button
                   type="submit"
                   disabled={changePasswordMutation.isPending || !currentPassword || newPassword.length < 8}
-                  className="w-full h-10 rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-md hover:opacity-90 active:scale-[0.99] transition mt-2"
+                  className="w-full h-10 rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 shadow-md transition mt-2"
                 >
                   {changePasswordMutation.isPending ? "Updating Security Credentials…" : "Update Security Password"}
                 </Button>

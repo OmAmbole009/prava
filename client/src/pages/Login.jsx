@@ -1,5 +1,5 @@
 import { PravaMark } from "@/components/PravaMark";
-import ThemeToggle from "@/components/ThemeToggle";
+import { ElectricHorizonBackground } from "@/components/ElectricHorizonBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -346,63 +346,65 @@ export default function Login() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20">
+    <div className="relative flex min-h-screen flex-col bg-[#030405] text-[#F5F7FA] overflow-hidden selection:bg-blue-600/30 selection:text-white">
+      {/* Planetary Horizon Glow */}
+      <ElectricHorizonBackground variant="hero" />
+
       {/* Top Navbar */}
-      <header className="border-b border-border/60 bg-card/60 px-6 py-4 backdrop-blur-xl">
+      <header className="relative z-10 border-b border-white/[0.08] bg-[#030405]/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setLocation("/")}>
             <PravaMark size="md" />
-            <span className="font-['Playfair_Display',Georgia,serif] text-xl font-bold tracking-tight text-foreground">
+            <span className="text-xl font-bold tracking-tight text-white">
               Prava
             </span>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setLocation("/ca/login")}
-              className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 transition hover:bg-purple-500/20"
+              className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3.5 py-1.5 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20"
             >
-              <GraduationCap className="size-3.5" />
+              <GraduationCap className="size-3.5 text-blue-400" />
               <span>CA Verification Portal</span>
             </button>
-            <ThemeToggle />
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-10 sm:px-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-10 sm:px-6">
         <div className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           {/* Left Column: Context & Overview */}
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+              <span className="size-2 rounded-full bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
               <span>Production-Grade Authentication & Vault</span>
             </div>
 
-            <h1 className="font-['Playfair_Display',Georgia,serif] text-4xl sm:text-5xl font-normal leading-[1.15] tracking-tight text-foreground">
-              Autonomous Tax, Ledgers & <em className="italic font-normal">Audit Compliance</em>.
+            <h1 className="text-4xl sm:text-5xl font-bold leading-[1.15] tracking-tight text-white">
+              Autonomous Tax, Ledgers & <span className="text-blue-400">Audit Compliance</span>.
             </h1>
 
-            <p className="text-sm leading-relaxed text-muted-foreground">
+            <p className="text-sm leading-relaxed text-slate-400">
               Two-step verified authentication ensures that corporate returns, Section 43B(h) MSME compliance ledgers, and Supabase cloud document vaults remain strictly isolated and cryptographically secured.
             </p>
 
             <div className="space-y-3 pt-2">
-              <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-3.5 backdrop-blur-sm">
-                <ShieldCheck className="size-5 shrink-0 text-emerald-500 mt-0.5" />
+              <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#07090E] p-3.5">
+                <ShieldCheck className="size-5 shrink-0 text-emerald-400 mt-0.5" />
                 <div className="text-xs">
-                  <span className="font-semibold text-foreground">Two-Step Security Pipeline: </span>
-                  <span className="text-muted-foreground">
+                  <span className="font-semibold text-white">Two-Step Security Pipeline: </span>
+                  <span className="text-slate-400">
                     Password verification is coupled with an enforced 6-digit one-time passcode sent directly to your verified email or mobile phone.
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-3.5 backdrop-blur-sm">
-                <Building2 className="size-5 shrink-0 text-primary mt-0.5" />
+              <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#07090E] p-3.5">
+                <Building2 className="size-5 shrink-0 text-blue-400 mt-0.5" />
                 <div className="text-xs">
-                  <span className="font-semibold text-foreground">Audited Access Control: </span>
-                  <span className="text-muted-foreground">
+                  <span className="font-semibold text-white">Audited Access Control: </span>
+                  <span className="text-slate-400">
                     Role-verified sessions protect GSTIN filings, cash reconciliation tasks, and proprietary financial ledgers.
                   </span>
                 </div>
@@ -412,10 +414,13 @@ export default function Login() {
 
           {/* Right Column: Interactive Login Box */}
           <div>
-            <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-card p-6 sm:p-7 shadow-2xl backdrop-blur-2xl">
+            <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-[#07090E] p-6 sm:p-7 shadow-[0_8px_32px_rgba(0,0,0,0.8)]">
+              <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent" />
+              <div className="pointer-events-none absolute left-1/2 -top-12 h-20 w-1/2 -translate-x-1/2 rounded-full bg-blue-500/10 blur-xl" />
+
               {/* Mode Selector (When not in OTP step or forgot password reset) */}
               {loginStep === "credentials" && forgotStep === "request" && (
-                <div className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-secondary/60 p-1 border border-border/60">
+                <div className="relative z-10 mb-6 grid grid-cols-2 gap-1 rounded-full bg-[#0B0E14] p-1 border border-white/[0.08]">
                   <button
                     type="button"
                     onClick={() => {
@@ -423,10 +428,10 @@ export default function Login() {
                       setErrorMessage("");
                       setSuccessMessage("");
                     }}
-                    className={`rounded-xl py-2 text-xs font-bold transition-all ${
+                    className={`rounded-full py-2 text-xs font-semibold transition-all ${
                       mode === "login"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                        : "text-slate-400 hover:text-white"
                     }`}
                   >
                     Business Sign In
@@ -438,10 +443,10 @@ export default function Login() {
                       setErrorMessage("");
                       setSuccessMessage("");
                     }}
-                    className={`rounded-xl py-2 text-xs font-bold transition-all ${
+                    className={`rounded-full py-2 text-xs font-semibold transition-all ${
                       mode === "register"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                        : "text-slate-400 hover:text-white"
                     }`}
                   >
                     Register Business

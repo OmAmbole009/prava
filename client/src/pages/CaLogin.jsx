@@ -1,4 +1,4 @@
-import ThemeToggle from "@/components/ThemeToggle";
+import { ElectricHorizonBackground } from "@/components/ElectricHorizonBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,90 +45,97 @@ export default function CaLogin() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background text-foreground">
+    <div className="relative flex min-h-screen flex-col bg-[#030405] text-[#F5F7FA] overflow-hidden selection:bg-blue-600/30 selection:text-white">
+      {/* Planetary Horizon Glow */}
+      <ElectricHorizonBackground variant="hero" />
+
       {/* Top Header */}
-      <header className="border-b border-slate-200/80 dark:border-white/[0.06] bg-white/80 dark:bg-[#080B0F]/80 backdrop-blur-xl px-6 py-4">
+      <header className="relative z-10 border-b border-white/[0.08] bg-[#030405]/80 backdrop-blur-md px-6 py-4">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 shadow-sm">
+            <div className="flex size-9 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-sm">
               <UserCheck className="size-5" />
             </div>
             <div>
-              <span className="font-['Playfair_Display',Georgia,serif] text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                Prava <span className="font-mono text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">CA Portal</span>
+              <span className="text-lg font-bold tracking-tight text-white">
+                Prava <span className="font-mono text-xs font-semibold uppercase tracking-wider text-blue-400">CA Portal</span>
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="hidden sm:inline">Need client or administrator access?</span>
             <button
               onClick={() => setLocation("/admin/login")}
-              className="font-bold text-slate-900 dark:text-white hover:underline"
+              className="font-semibold text-white hover:text-blue-400 transition"
             >
               Admin Login
             </button>
             <span>·</span>
             <button
               onClick={() => setLocation("/dashboard")}
-              className="font-bold text-slate-900 dark:text-white hover:underline"
+              className="font-semibold text-white hover:text-blue-400 transition"
             >
               Workspace
             </button>
-            <ThemeToggle />
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-12 sm:px-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-12 sm:px-6">
         <div className="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           {/* Left Info Column */}
           <div className="space-y-6">
-            <span className="prava-tag-purple">In-House Professional Verification</span>
-            <h1 className="font-['Playfair_Display',Georgia,serif] text-4xl sm:text-5xl font-normal leading-[1.08] tracking-tight text-slate-900 dark:text-white">
-              Qualified Chartered <em className="italic font-normal">Accountant Portal</em>.
+            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+              In-House Professional Verification
+            </span>
+            <h1 className="text-4xl sm:text-5xl font-bold leading-[1.08] tracking-tight text-white">
+              Qualified Chartered <span className="text-blue-400">Accountant Portal</span>.
             </h1>
-            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            <p className="text-sm leading-relaxed text-slate-400">
               Prava assigns dedicated Chartered Accountants to examine client tax returns, verify source invoice evidence, and provide statutory sign-offs before tax authorities receive any filing.
             </p>
 
-            <div className="space-y-3.5 border-t border-slate-200/80 dark:border-white/[0.08] pt-6">
-              <div className="flex items-start gap-3 text-xs text-slate-700 dark:text-slate-300">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="space-y-3.5 border-t border-white/[0.08] pt-6">
+              <div className="flex items-start gap-3 text-xs text-slate-300">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-400" />
                 <span>
-                  <strong className="text-slate-900 dark:text-white">Admin-Provisioned Access:</strong> CA credentials are created and managed exclusively by Prava Administrators.
+                  <strong className="text-white">Admin-Provisioned Access:</strong> CA credentials are created and managed exclusively by Prava Administrators.
                 </span>
               </div>
-              <div className="flex items-start gap-3 text-xs text-slate-700 dark:text-slate-300">
-                <FileCheck2 className="mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+              <div className="flex items-start gap-3 text-xs text-slate-300">
+                <FileCheck2 className="mt-0.5 size-4 shrink-0 text-blue-400" />
                 <span>
-                  <strong className="text-slate-900 dark:text-white">Independent Statutory Audit:</strong> Review ITC computations, sales registers, and issue official CA certificates.
+                  <strong className="text-white">Independent Statutory Audit:</strong> Review ITC computations, sales registers, and issue official CA certificates.
                 </span>
               </div>
-              <div className="flex items-start gap-3 text-xs text-slate-700 dark:text-slate-300">
-                <Lock className="mt-0.5 size-4 shrink-0 text-purple-600 dark:text-purple-400" />
+              <div className="flex items-start gap-3 text-xs text-slate-300">
+                <Lock className="mt-0.5 size-4 shrink-0 text-blue-400" />
                 <span>
-                  <strong className="text-slate-900 dark:text-white">Multi-Tenant Confidentiality:</strong> CAs only access client businesses explicitly assigned to them.
+                  <strong className="text-white">Multi-Tenant Confidentiality:</strong> CAs only access client businesses explicitly assigned to them.
                 </span>
               </div>
             </div>
           </div>
 
           {/* Right Login Card */}
-          <div className="prava-panel p-8 shadow-2xl border border-slate-200/80 dark:border-white/10 sm:p-10">
-            <div className="mb-6">
-              <div className="flex size-11 items-center justify-center rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400 shadow-sm">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-[#07090E] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.8)] sm:p-10">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent" />
+            <div className="pointer-events-none absolute left-1/2 -top-12 h-20 w-1/2 -translate-x-1/2 rounded-full bg-blue-500/10 blur-xl" />
+
+            <div className="relative z-10 mb-6">
+              <div className="flex size-11 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/15 text-blue-400 shadow-sm">
                 <KeyRound className="size-5" />
               </div>
-              <h2 className="font-['Playfair_Display',Georgia,serif] mt-4 text-2xl font-normal text-slate-900 dark:text-white">CA Sign In</h2>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              <h2 className="mt-4 text-2xl font-bold text-white">CA Sign In</h2>
+              <p className="mt-1 text-xs text-slate-400">
                 Enter your administrator-granted Chartered Accountant credentials to open your review desk.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="ca-email" className="text-xs text-slate-700 dark:text-slate-300">
+                <Label htmlFor="ca-email" className="text-xs text-slate-300">
                   Account Email
                 </Label>
                 <div className="relative">
@@ -140,13 +147,13 @@ export default function CaLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ca.name@prava.audit"
-                    className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-xs text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#0D131A] dark:text-white shadow-sm"
+                    className="h-11 rounded-xl border-white/[0.1] bg-[#0B0E14] pl-10 text-xs text-white placeholder:text-slate-500 shadow-sm focus:border-blue-500/60"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="ca-password" className="text-xs text-slate-700 dark:text-slate-300">
+                <Label htmlFor="ca-password" className="text-xs text-slate-300">
                   Password
                 </Label>
                 <div className="relative">
@@ -158,15 +165,15 @@ export default function CaLogin() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-xs text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#0D131A] dark:text-white shadow-sm"
+                    className="h-11 rounded-xl border-white/[0.1] bg-[#0B0E14] pl-10 text-xs text-white placeholder:text-slate-500 shadow-sm focus:border-blue-500/60"
                   />
                 </div>
               </div>
 
-              <Button
+              <button
                 type="submit"
                 disabled={caLogin.isPending || !email || !password}
-                className="mt-2 h-11 w-full rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-md transition hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100"
+                className="mt-2 h-11 w-full inline-flex items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:bg-blue-500 transition disabled:opacity-50"
               >
                 {caLogin.isPending ? (
                   <>
@@ -179,7 +186,7 @@ export default function CaLogin() {
                     <ArrowRight className="ml-2 size-4" />
                   </>
                 )}
-              </Button>
+              </button>
             </form>
           </div>
         </div>

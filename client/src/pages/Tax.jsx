@@ -117,7 +117,7 @@ export default function Tax() {
               onClick={() => setLocation("/ca-review")}
               className="rounded-xl text-xs font-semibold"
             >
-              <UserCheck className="mr-1.5 size-3.5 text-purple-600 dark:text-purple-400" />
+              <UserCheck className="mr-1.5 size-3.5 text-blue-400" />
               CA Review Desk
             </Button>
           </div>
@@ -146,24 +146,25 @@ export default function Tax() {
           </div>
 
           {/* TDS Obligation Card */}
-          <div className="rounded-3xl border border-purple-500/30 bg-purple-500/[0.04] p-5 backdrop-blur-xl">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090E] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono uppercase font-bold text-muted-foreground">
+              <span className="text-[11px] font-mono uppercase font-bold text-slate-400">
                 TDS Deductions Pending
               </span>
-              <span className="rounded-md bg-purple-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-purple-600 dark:text-purple-400">
+              <span className="rounded-md bg-blue-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-blue-300 border border-blue-500/20">
                 Challan 281
               </span>
             </div>
-            <p className="font-mono mt-3 text-2xl font-bold text-purple-600 dark:text-purple-400">{fmt(totalTdsMinor)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="font-mono mt-3 text-2xl font-bold text-blue-400">{fmt(totalTdsMinor)}</p>
+            <p className="mt-1 text-xs text-slate-400">
               {tdsData?.vendorsWithTdsObligation
                 ? `Required for ${tdsData.vendorsWithTdsObligation} vendor${tdsData.vendorsWithTdsObligation !== 1 ? "s" : ""}. Deposit by 7th of next month.`
                 : "No pending TDS deductions identified on current payments."}
             </p>
             <button
               onClick={() => setLocation("/money")}
-              className="mt-3 flex items-center gap-1 text-[11px] font-bold text-purple-600 hover:underline dark:text-purple-400"
+              className="mt-3 flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:underline"
             >
               Check vendor payments →
             </button>
@@ -281,18 +282,18 @@ export default function Tax() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
             <div>
               <div className="flex items-center gap-2">
-                <span className="flex size-7 items-center justify-center rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   <Receipt className="size-4" />
                 </span>
-                <h2 className="text-lg font-bold text-foreground">Tax Deducted at Source (TDS) Status</h2>
+                <h2 className="text-lg font-bold text-white">Tax Deducted at Source (TDS) Status</h2>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-slate-400">
                 TDS must be deducted from vendor payments and deposited to the government by the 7th of each month.
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-mono uppercase font-bold text-muted-foreground">Monthly Deposit Deadline</p>
-              <p className="font-mono text-sm font-bold text-purple-600 dark:text-purple-400">7th of Next Month</p>
+              <p className="text-[10px] font-mono uppercase font-bold text-slate-400">Monthly Deposit Deadline</p>
+              <p className="font-mono text-sm font-bold text-blue-400">7th of Next Month</p>
             </div>
           </div>
 

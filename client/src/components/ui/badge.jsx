@@ -2,21 +2,49 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
-const badgeVariants = cva("inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden", {
+
+const badgeVariants = cva(
+  "inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1.5 [&>svg]:pointer-events-none transition-colors duration-180 overflow-hidden",
+  {
     variants: {
-        variant: {
-            default: "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-            secondary: "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-            destructive: "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-            outline: "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        },
+      variant: {
+        default:
+          "border-white/[0.08] bg-[#0B0F19] text-white",
+        secondary:
+          "border-white/[0.06] bg-[#0E1424] text-slate-400",
+        destructive:
+          "border-rose-500/30 bg-rose-500/10 text-rose-400",
+        outline:
+          "border-white/[0.08] bg-transparent text-slate-400",
+        eyebrow:
+          "border-white/[0.08] bg-[#0B0F19] text-slate-400 lowercase tracking-normal pl-2 pr-2.5",
+        success:
+          "border-emerald-500/25 bg-emerald-500/10 text-emerald-400",
+        warning:
+          "border-amber-500/25 bg-amber-500/10 text-amber-400",
+        danger:
+          "border-rose-500/25 bg-rose-500/10 text-rose-400",
+        info:
+          "border-sky-500/25 bg-sky-500/10 text-sky-400",
+        accent:
+          "border-sky-500/30 bg-sky-500/15 text-sky-300 shadow-[0_0_8px_rgba(56,189,248,0.15)]",
+      },
     },
     defaultVariants: {
-        variant: "default",
+      variant: "default",
     },
-});
+  }
+);
+
 function Badge({ className, variant, asChild = false, ...props }) {
-    const Comp = asChild ? Slot : "span";
-    return (<Comp data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props}/>);
+  const Comp = asChild ? Slot : "span";
+  return (
+    <Comp
+      data-slot="badge"
+      className={cn(badgeVariants({ variant }), className)}
+      {...props}
+    />
+  );
 }
+
 export { Badge, badgeVariants };

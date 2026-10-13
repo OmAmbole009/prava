@@ -80,10 +80,10 @@ export default function CaDashboard() {
     return (<DashboardLayout>
       <div className="mx-auto max-w-6xl space-y-7 py-2">
         {/* CA Hero Header */}
-        <section className="prava-panel relative overflow-hidden p-7 sm:p-9 border border-purple-400/30 bg-gradient-to-r from-purple-500/[0.08] to-transparent">
+        <section className="prava-panel relative overflow-hidden p-7 sm:p-9 border border-blue-500/20 bg-gradient-to-r from-blue-500/[0.05] to-transparent">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <span className="prava-tag-purple">Prava In-House Chartered Accountant</span>
+              <span className="rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold">Prava In-House Chartered Accountant</span>
               <h1 className="font-['Playfair_Display',Georgia,serif] mt-3 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
                 {caProfile?.fullName || "Chartered Accountant"} <em className="italic font-normal">Review Desk</em>
               </h1>
@@ -94,7 +94,7 @@ export default function CaDashboard() {
                 <span>·</span>
                 <span>{caProfile?.firmName || "Verma & Associates CA"}</span>
                 <span>·</span>
-                <span className="text-purple-600 dark:text-purple-400 font-semibold">{caProfile?.specialization || "GST & Direct Tax Audit"}</span>
+                <span className="text-blue-400 font-semibold">{caProfile?.specialization || "GST & Direct Tax Audit"}</span>
               </div>
               <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600 dark:text-slate-400">
                 {caProfile?.bio ||
@@ -103,7 +103,7 @@ export default function CaDashboard() {
             </div>
 
             <div className="flex flex-col gap-2 shrink-0">
-              <span className="rounded-xl border border-purple-400/30 bg-purple-500/10 px-3.5 py-1.5 text-center font-mono text-xs font-bold text-purple-700 dark:text-purple-300">
+              <span className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3.5 py-1.5 text-center font-mono text-xs font-bold text-blue-300">
                 Verified Partner Status: Active
               </span>
             </div>
@@ -325,7 +325,7 @@ export default function CaDashboard() {
         <DialogContent className="max-w-2xl bg-white dark:bg-[#0F1620] border-slate-200 dark:border-white/10 text-slate-900 dark:text-white shadow-2xl">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
                 <ShieldCheck className="size-5"/>
               </div>
               <div>
@@ -344,7 +344,7 @@ export default function CaDashboard() {
             {selectedTask?.gstPreparation && (<div className="rounded-xl border border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-[#080B0F] p-4 text-xs">
                 <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-white/[0.06] pb-2">
                   <span>Computed Tax Summary</span>
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold">Quarterly GSTR-3B Return</span>
+                  <span className="text-blue-400 font-semibold">Quarterly GSTR-3B Return</span>
                 </div>
                 <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
                   <div>

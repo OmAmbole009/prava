@@ -321,7 +321,7 @@ export default function TaskDetail() {
                 {isPreparing ? "Preparing…" : isCashReconciliation ? "Prepare intake review" : `Prepare ${taxName} summary`}
               </Button>
               <Button variant="outline" disabled={requestReview.isPending} onClick={() => requestReview.mutate({ taskId })} className="rounded-xl border-slate-300 bg-white/80 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08]">
-                <UserRoundCheck className="mr-1.5 size-3.5 text-purple-600 dark:text-purple-400"/>
+                <UserRoundCheck className="mr-1.5 size-3.5 text-blue-400"/>
                 Send to CA for review
               </Button>
             </div>

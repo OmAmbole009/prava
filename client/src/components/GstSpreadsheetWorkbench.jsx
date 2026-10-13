@@ -206,12 +206,12 @@ export function GstSpreadsheetWorkbench({ businessId }) {
             <span className="text-[9px] text-slate-500">Net Cash Outflow</span>
           </div>
 
-          <div className="prava-card p-3.5 dark:bg-black/40 border border-purple-500/20 dark:border-purple-500/30">
-            <span className="text-[10px] font-mono uppercase text-purple-600 dark:text-purple-400 font-bold">
+          <div className="prava-card p-3.5 dark:bg-black/40 border border-blue-500/20 dark:border-blue-500/20">
+            <span className="text-[10px] font-mono uppercase text-blue-400 font-bold">
               RAG Audit Score
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="prava-mono text-base font-bold text-purple-600 dark:text-purple-400">
+              <span className="prava-mono text-base font-bold text-blue-400">
                 {totals?.ragMatchRate}%
               </span>
               <span className="text-[10px] text-slate-500">
@@ -244,7 +244,7 @@ export function GstSpreadsheetWorkbench({ businessId }) {
 
             {/* CA Compliance Certificate Print */}
             <Button variant="outline" size="sm" onClick={() => exportComplianceCertMutation.mutate({ businessId: effectiveBusinessId, period })} disabled={exportComplianceCertMutation.isPending} className="rounded-xl border-slate-300 bg-white/80 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08] shadow-xs">
-              <Printer className="mr-1.5 size-3.5 text-purple-500"/>
+              <Printer className="mr-1.5 size-3.5 text-blue-400"/>
               CA Compliance Certificate
             </Button>
           </div>
@@ -524,14 +524,14 @@ export function GstSpreadsheetWorkbench({ businessId }) {
             </div>
 
             {/* Assigned CA Card */}
-            <div className="prava-panel p-5 border border-purple-500/25 dark:border-purple-500/30 dark:bg-[#090d16]/85 flex flex-col justify-between">
+            <div className="prava-panel p-5 border border-purple-500/25 dark:border-blue-500/20 dark:bg-[#090d16]/85 flex flex-col justify-between">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-purple-500/15 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                  <span className="rounded bg-blue-500/10 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-blue-300">
                     Designated ICAI Auditor
                   </span>
                   <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-slate-900 dark:text-white">
-                    <BadgeCheck className="size-3.5 text-purple-500"/>
+                    <BadgeCheck className="size-3.5 text-blue-400"/>
                     {summary?.assignedCa?.membershipNumber}
                   </span>
                 </div>
@@ -552,7 +552,7 @@ export function GstSpreadsheetWorkbench({ businessId }) {
                 <div className="text-[10px] font-mono text-slate-500">
                   UDIN: 26409212BGST{period.replace("-", "")}Y9281
                 </div>
-                <Button onClick={() => exportComplianceCertMutation.mutate({ businessId: effectiveBusinessId, period })} size="sm" className="rounded-xl bg-purple-600 text-xs font-semibold text-white hover:bg-purple-700 shadow-sm">
+                <Button onClick={() => exportComplianceCertMutation.mutate({ businessId: effectiveBusinessId, period })} size="sm" className="rounded-xl bg-blue-600 text-xs font-semibold text-white hover:bg-blue-500 shadow-sm">
                   <Printer className="mr-1.5 size-3.5"/>
                   Print Compliance Certificate
                 </Button>

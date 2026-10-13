@@ -17,8 +17,11 @@
 import { useEffect, useRef } from "react";
 export function CursorTube() {
     const canvasRef = useRef(null);
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        return null;
+    }
     useEffect(() => {
-        if (typeof window === "undefined")
+        if (typeof window === "undefined" || window.location.pathname !== "/")
             return;
         const canvas = canvasRef.current;
         if (!canvas)
