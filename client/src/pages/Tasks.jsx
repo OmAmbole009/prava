@@ -16,7 +16,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { AnimatedSection, AnimatedList, AnimatedRow, FadeInView } from "@/lib/animations";
+import { AnimatedSection, AnimatedList, AnimatedRow, FadeInView } from "@/components/AnimatedPage";
 
 const workflowOptions = {
     monthly_close: {

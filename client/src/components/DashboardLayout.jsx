@@ -35,6 +35,7 @@ import {
     Coins,
     CreditCard,
     FileText,
+    FilePenLine,
     LayoutDashboard,
     Loader2,
     LogOut,
@@ -74,6 +75,7 @@ const navGroups = [
         category: "// 02 · LEDGER & INVOICES",
         items: [
             { icon: WalletCards, label: "Money In & Out", path: "/money" },
+            { icon: FilePenLine, label: "Invoice & Bill Studio", path: "/invoice-studio", badge: "PDF" },
             { icon: FileText, label: "Invoices & Receipts", path: "/documents", badge: "OCR" },
             { icon: ClipboardCheck, label: "Things to Fix", path: "/tasks" },
         ],

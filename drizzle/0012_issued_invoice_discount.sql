@@ -1,0 +1,2 @@
+ALTER TABLE `issuedInvoices` ADD `discountType` enum('none','percent','amount') DEFAULT 'none' NOT NULL;--> statement-breakpoint
+ALTER TABLE `issuedInvoices` ADD `discountValue` varchar(32) DEFAULT '0' NOT NULL;

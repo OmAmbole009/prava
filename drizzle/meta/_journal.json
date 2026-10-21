@@ -78,6 +78,20 @@
       "when": 1788255088235,
       "tag": "0010_icy_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1792571542290,
+      "tag": "0011_issued_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1792572718738,
+      "tag": "0012_issued_invoice_discount",
+      "breakpoints": true
     }
   ]
 }

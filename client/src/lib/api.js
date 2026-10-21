@@ -58,6 +58,19 @@ export const api = {
     },
     get: (id) => apiFetch(`/invoices/${id}`),
     delete: (id) => apiFetch(`/invoices/${id}`, { method: "DELETE" }),
+    listIssued: (params) => {
+      const sp = new URLSearchParams();
+      if (params?.businessId) sp.set("businessId", params.businessId);
+      if (params?.documentKind) sp.set("documentKind", params.documentKind);
+      if (params?.status) sp.set("status", params.status);
+      const q = sp.toString() ? `?${sp.toString()}` : "";
+      return apiFetch(`/invoices/issued${q}`);
+    },
+    createIssued: (body) => apiFetch("/invoices/issued", { method: "POST", body: JSON.stringify(body) }),
+    getIssued: (id) => apiFetch(`/invoices/issued/${id}`),
+    updateIssued: (id, body) => apiFetch(`/invoices/issued/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    deleteIssued: (id) => apiFetch(`/invoices/issued/${id}`, { method: "DELETE" }),
+    downloadIssuedPdf: (id) => apiFetch(`/invoices/issued/${id}/pdf`),
   },
   businesses: {
     list: () => apiFetch("/businesses"),

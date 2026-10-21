@@ -439,6 +439,51 @@ export const documentExtractions = mysqlTable(
   table => [uniqueIndex("document_extractions_document_unique").on(table.documentId)]
 );
 
+export const issuedInvoices = mysqlTable(
+  "issuedInvoices",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    businessId: int("businessId").notNull().references(() => businesses.id),
+    createdByUserId: int("createdByUserId").references(() => users.id),
+    documentKind: mysqlEnum("documentKind", ["invoice", "bill"]).default("invoice").notNull(),
+    invoiceNumber: varchar("invoiceNumber", { length: 64 }).notNull(),
+    invoiceDate: timestamp("invoiceDate").notNull(),
+    dueDate: timestamp("dueDate"),
+    status: mysqlEnum("status", ["draft", "issued", "paid", "void"]).default("draft").notNull(),
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    taxMode: mysqlEnum("taxMode", ["none", "flat", "gst"]).default("gst").notNull(),
+    taxRate: int("taxRate").default(0).notNull(),
+    partyName: varchar("partyName", { length: 200 }).notNull(),
+    partyEmail: varchar("partyEmail", { length: 320 }),
+    partyPhone: varchar("partyPhone", { length: 32 }),
+    partyAddressLine1: varchar("partyAddressLine1", { length: 200 }),
+    partyCity: varchar("partyCity", { length: 96 }),
+    partyState: varchar("partyState", { length: 96 }),
+    partyPostalCode: varchar("partyPostalCode", { length: 24 }),
+    partyCountry: varchar("partyCountry", { length: 2 }),
+    partyTaxId: varchar("partyTaxId", { length: 32 }),
+    partyPlaceOfSupply: varchar("partyPlaceOfSupply", { length: 96 }),
+    lineItems: text("lineItems").notNull(),
+    subtotalMinor: bigint("subtotalMinor", { mode: "number" }).default(0).notNull(),
+    discountMinor: bigint("discountMinor", { mode: "number" }).default(0).notNull(),
+    discountType: mysqlEnum("discountType", ["none", "percent", "amount"]).default("none").notNull(),
+    discountValue: varchar("discountValue", { length: 32 }).default("0").notNull(),
+    taxMinor: bigint("taxMinor", { mode: "number" }).default(0).notNull(),
+    totalMinor: bigint("totalMinor", { mode: "number" }).default(0).notNull(),
+    amountPaidMinor: bigint("amountPaidMinor", { mode: "number" }).default(0).notNull(),
+    notes: text("notes"),
+    terms: text("terms"),
+    issuedAt: timestamp("issuedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("issued_invoices_business_created_idx").on(table.businessId, table.createdAt),
+    index("issued_invoices_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("issued_invoices_business_number_unique").on(table.businessId, table.documentKind, table.invoiceNumber),
+  ]
+);
+
 export const accountingEntries = mysqlTable(
   "accountingEntries",
   {

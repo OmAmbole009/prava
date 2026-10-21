@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const AskPrava = lazy(() => import("@/pages/AskPrava"));
 const Money = lazy(() => import("@/pages/Money"));
 const Documents = lazy(() => import("@/pages/Documents"));
+const InvoiceStudio = lazy(() => import("@/pages/InvoiceStudio"));
 const Tax = lazy(() => import("@/pages/Tax"));
 const CaReview = lazy(() => import("@/pages/CaReview"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
@@ -73,6 +74,7 @@ export default function WorkspaceApp() {
               <Route path="/money">{() => <DeferredPage component={Money}/>}</Route>
               <Route path="/documents/:documentId">{() => <DeferredPage component={DocumentReview}/>}</Route>
               <Route path="/documents">{() => <DeferredPage component={Documents}/>}</Route>
+              <Route path="/invoice-studio">{() => <DeferredPage component={InvoiceStudio}/>}</Route>
               <Route path="/tax">{() => <DeferredPage component={Tax}/>}</Route>
               <Route path="/taxes">{() => <DeferredPage component={Tax}/>}</Route>
               <Route path="/ca-review">{() => <DeferredPage component={CaReview}/>}</Route>
