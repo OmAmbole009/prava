@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ElectricHorizonBackground from "@/components/ElectricHorizonBackground";
 import { startLogin } from "@/const";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { countryOptions, currencyCodes, profileForCountry } from "@shared/locale";
-import { ArrowLeft, ArrowRight, Building2, Check, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, Edit3, Globe, Loader2, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -18,8 +18,19 @@ export default function Onboarding() {
     const [, setLocation] = useLocation();
     const [step, setStep] = useState(1);
     const [localError, setLocalError] = useState("");
+    const [isEditing, setIsEditing] = useState(false);
+    const [isCompleted, setIsCompleted] = useState(false);
     const queryClient = useQueryClient();
     const defaultProfile = profileForCountry("IN");
+
+    const businessesQuery = useQuery({
+        queryKey: ["businesses", "list"],
+        queryFn: () => api.businesses.list(),
+        enabled: Boolean(isAuthenticated && user),
+    });
+
+    const existingBusiness = businessesQuery.data?.[0];
+
     const [form, setForm] = useState({
         name: "",
         legalName: "",
@@ -31,22 +42,51 @@ export default function Onboarding() {
         timezone: defaultProfile.timezone,
         taxSystem: defaultProfile.taxSystem,
         financialYear: "April–March",
+        email: "",
         phone: "",
+        addressLine1: "",
         city: "Mumbai",
         state: "Maharashtra",
+        postalCode: "",
         gstin: "",
         gstStatus: "registered",
     });
 
+    // Populate from existing persisted profile if available
     useEffect(() => {
-        if (user?.name && user.name !== "Business User" && !form.name) {
-            setForm((prev) => ({
-                ...prev,
-                name: user.name || "",
-                legalName: user.name || "",
-            }));
+        if (existingBusiness) {
+            setForm({
+                name: existingBusiness.name || "",
+                legalName: existingBusiness.legalName || existingBusiness.name || "",
+                businessType: existingBusiness.businessType || "Private Limited Company",
+                industry: existingBusiness.industry || "Software & Cloud Services",
+                country: existingBusiness.country || defaultProfile.code,
+                currency: existingBusiness.currency || defaultProfile.currency,
+                locale: existingBusiness.locale || defaultProfile.locale,
+                timezone: existingBusiness.timezone || defaultProfile.timezone,
+                taxSystem: existingBusiness.taxSystem || defaultProfile.taxSystem,
+                financialYear: existingBusiness.financialYear || "April–March",
+                email: existingBusiness.email || "",
+                phone: existingBusiness.phone || "",
+                addressLine1: existingBusiness.addressLine1 || "",
+                city: existingBusiness.city || "Mumbai",
+                state: existingBusiness.state || "Maharashtra",
+                postalCode: existingBusiness.postalCode || "",
+                gstin: existingBusiness.gstin || "",
+                gstStatus: existingBusiness.gstStatus || "registered",
+            });
+
+            const completed = Boolean(
+                existingBusiness.onboardingCompletedAt ||
+                (existingBusiness.onboardingStep && existingBusiness.onboardingStep >= 3)
+            );
+            setIsCompleted(completed);
+
+            if (!completed && existingBusiness.onboardingStep) {
+                setStep(Math.min(2, Math.max(1, existingBusiness.onboardingStep)));
+            }
         }
-    }, [user]);
+    }, [existingBusiness]);
 
     const update = (k, v) => {
         setForm((prev) => ({ ...prev, [k]: v }));
@@ -59,10 +99,27 @@ export default function Onboarding() {
             toast.success("Business command center initialized successfully.", {
                 description: `Workspace '${data.name}' ready for CA audits and invoice processing.`,
             });
+            setIsCompleted(true);
+            setIsEditing(false);
             setLocation("/dashboard");
         },
         onError: (err) => {
             toast.error(err.message || "Could not initialize workspace.");
+        },
+    });
+
+    const updateWorkspace = useMutation({
+        mutationFn: (body) => api.businesses.updateProfile(body),
+        onSuccess: (data) => {
+            void queryClient.invalidateQueries({ queryKey: ["businesses"] });
+            toast.success("Business profile updated successfully.", {
+                description: `Workspace '${data.name}' configuration saved.`,
+            });
+            setIsCompleted(true);
+            setIsEditing(false);
+        },
+        onError: (err) => {
+            toast.error(err.message || "Could not update business profile.");
         },
     });
 
@@ -85,7 +142,8 @@ export default function Onboarding() {
             setLocalError("Please enter your business name.");
             return;
         }
-        createWorkspace.mutate({
+
+        const payload = {
             name: form.name.trim(),
             legalName: form.legalName?.trim() || undefined,
             businessType: form.businessType,
@@ -96,14 +154,30 @@ export default function Onboarding() {
             timezone: form.timezone,
             taxSystem: form.taxSystem,
             financialYear: form.financialYear,
-            phone: form.phone.trim() || undefined,
-            city: form.city.trim() || undefined,
-            state: form.state.trim() || undefined,
-            gstin: form.gstin.trim() || undefined,
-        });
+            email: form.email?.trim() || undefined,
+            phone: form.phone?.trim() || undefined,
+            addressLine1: form.addressLine1?.trim() || undefined,
+            city: form.city?.trim() || undefined,
+            state: form.state?.trim() || undefined,
+            postalCode: form.postalCode?.trim() || undefined,
+            gstin: form.gstin?.trim() || undefined,
+            gstStatus: form.gstStatus,
+        };
+
+        if (existingBusiness?.id) {
+            updateWorkspace.mutate({
+                businessId: existingBusiness.id,
+                ...payload,
+            });
+        } else {
+            createWorkspace.mutate(payload);
+        }
     };
 
-    if (loading) {
+    const isPending = createWorkspace.isPending || updateWorkspace.isPending;
+    const mutationError = createWorkspace.error || updateWorkspace.error;
+
+    if (loading || businessesQuery.isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#030712] text-xs text-slate-400">
                 <Loader2 className="size-5 animate-spin text-cyan-400" />
@@ -199,252 +273,410 @@ export default function Onboarding() {
 
                     {/* Right Form Console */}
                     <section className="p-7 sm:p-10 bg-[#0B0F19]">
-                        <form onSubmit={submit} className="mx-auto max-w-lg space-y-6">
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                                Stage {step} of 2 // Configuration
-                            </span>
-
-                            {step === 1 ? (
-                                <>
+                        {isCompleted && !isEditing ? (
+                            <div className="mx-auto max-w-lg space-y-6">
+                                <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
                                     <div>
-                                        <h2 className="text-lg font-medium text-white">Entity Profile & Classification</h2>
-                                        <p className="mt-1 text-xs text-slate-400">
-                                            Enter your commercial name and industry.
-                                        </p>
+                                        <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                            <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                                            ACTIVE & VERIFIED WORKSPACE
+                                        </span>
+                                        <h2 className="text-xl font-semibold text-white mt-1">
+                                            {existingBusiness?.name || form.name}
+                                        </h2>
+                                        {existingBusiness?.legalName && (
+                                            <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                                                Legal Entity: {existingBusiness.legalName}
+                                            </p>
+                                        )}
                                     </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setIsEditing(true)}
+                                        className="h-8 rounded-full border-cyan-500/30 bg-cyan-500/10 px-3 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20"
+                                    >
+                                        <Edit3 className="mr-1.5 size-3" />
+                                        Edit Profile
+                                    </Button>
+                                </div>
 
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-slate-300">Business name *</label>
-                                            <Input
-                                                value={form.name}
-                                                onChange={(e) => update("name", e.target.value)}
-                                                placeholder="e.g. Prava Innovations Pvt Ltd"
-                                                className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                                autoFocus
-                                            />
+                                {/* Metadata Details Grid */}
+                                <div className="grid gap-3 rounded-xl border border-white/[0.06] bg-[#0E1424] p-4 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Entity Type</span>
+                                        <span className="font-medium text-white">{existingBusiness?.businessType || form.businessType}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Industry Sector</span>
+                                        <span className="font-medium text-white">{existingBusiness?.industry || form.industry}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Tax Identifier / GSTIN</span>
+                                        <span className="font-mono font-medium text-cyan-400">{existingBusiness?.gstin || form.gstin || "Not Registered"}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Registration Status</span>
+                                        <span className="font-mono uppercase text-slate-300">{existingBusiness?.gstStatus || form.gstStatus}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Tax System</span>
+                                        <span className="text-white">{existingBusiness?.taxSystem || form.taxSystem}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Operating Currency</span>
+                                        <span className="font-mono font-medium text-white">{existingBusiness?.currency || form.currency}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-400">Financial Year</span>
+                                        <span className="font-mono text-white">{existingBusiness?.financialYear || form.financialYear}</span>
+                                    </div>
+                                    {(existingBusiness?.city || existingBusiness?.state || existingBusiness?.addressLine1) && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400">Location</span>
+                                            <span className="text-white text-right max-w-[240px] truncate">
+                                                {[existingBusiness?.addressLine1, existingBusiness?.city, existingBusiness?.state, existingBusiness?.postalCode].filter(Boolean).join(", ")}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {(existingBusiness?.phone || existingBusiness?.email) && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-400">Contact</span>
+                                            <span className="font-mono text-white">
+                                                {[existingBusiness?.phone, existingBusiness?.email].filter(Boolean).join(" • ")}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {existingBusiness?.updatedAt && (
+                                        <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[11px] text-slate-500">
+                                            <span>Last Persisted</span>
+                                            <span>{new Date(existingBusiness.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-2.5 pt-2">
+                                    <Button
+                                        type="button"
+                                        onClick={() => setLocation("/dashboard")}
+                                        className="w-full h-10 rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 transition shadow-md"
+                                    >
+                                        <Building2 className="mr-2 size-3.5" />
+                                        Return to Dashboard & Command Center
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setIsEditing(true)}
+                                        className="w-full h-9 rounded-full text-xs text-slate-400 hover:text-white hover:bg-white/[0.05]"
+                                    >
+                                        Modify Registration or Regional Settings
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <form onSubmit={submit} className="mx-auto max-w-lg space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                                        Stage {step} of 2 // {isEditing ? "Editing Saved Profile" : "Configuration"}
+                                    </span>
+                                    {isCompleted && isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditing(false)}
+                                            className="text-xs text-slate-400 hover:text-white underline"
+                                        >
+                                            Cancel & View Saved Profile
+                                        </button>
+                                    )}
+                                </div>
+
+                                {step === 1 ? (
+                                    <>
+                                        <div>
+                                            <h2 className="text-lg font-medium text-white">Entity Profile & Classification</h2>
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                Enter your commercial trade name, legal structure, and registered location.
+                                            </p>
                                         </div>
 
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-slate-300">
-                                                Legal Entity Name <span className="font-normal text-slate-500">(Optional)</span>
-                                            </label>
-                                            <Input
-                                                value={form.legalName}
-                                                onChange={(e) => update("legalName", e.target.value)}
-                                                placeholder="If different from commercial trade name"
-                                                className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                            />
-                                        </div>
-
-                                        <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-4">
                                             <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Business type</label>
-                                                <select
-                                                    value={form.businessType}
-                                                    onChange={(e) => update("businessType", e.target.value)}
-                                                    className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
-                                                >
-                                                    <option value="Private Limited Company">Private Limited Company</option>
-                                                    <option value="Proprietorship">Proprietorship</option>
-                                                    <option value="Partnership">Partnership</option>
-                                                    <option value="LLP">LLP</option>
-                                                    <option value="Corporation">Corporation</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
+                                                <label className="text-xs font-medium text-slate-300">Business name *</label>
+                                                <Input
+                                                    value={form.name}
+                                                    onChange={(e) => update("name", e.target.value)}
+                                                    placeholder="e.g. Prava Innovations Pvt Ltd"
+                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    autoFocus
+                                                />
                                             </div>
 
                                             <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Industry Sector *</label>
+                                                <label className="text-xs font-medium text-slate-300">
+                                                    Legal Entity Name <span className="font-normal text-slate-500">(Optional - for statutory documents)</span>
+                                                </label>
                                                 <Input
-                                                    value={form.industry}
-                                                    onChange={(e) => update("industry", e.target.value)}
-                                                    placeholder="e.g. Technology & SaaS"
+                                                    value={form.legalName}
+                                                    onChange={(e) => update("legalName", e.target.value)}
+                                                    placeholder="Registered legal corporate name"
                                                     className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
                                                 />
                                             </div>
-                                        </div>
 
-                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Business type</label>
+                                                    <select
+                                                        value={form.businessType}
+                                                        onChange={(e) => update("businessType", e.target.value)}
+                                                        className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
+                                                    >
+                                                        <option value="Private Limited Company">Private Limited Company</option>
+                                                        <option value="Public Limited Company">Public Limited Company</option>
+                                                        <option value="Proprietorship">Proprietorship</option>
+                                                        <option value="Partnership">Partnership</option>
+                                                        <option value="LLP">LLP</option>
+                                                        <option value="Corporation">Corporation</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Industry Sector *</label>
+                                                    <Input
+                                                        value={form.industry}
+                                                        onChange={(e) => update("industry", e.target.value)}
+                                                        placeholder="e.g. Technology & SaaS"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
+                                            </div>
+
                                             <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">City</label>
+                                                <label className="text-xs font-medium text-slate-300">Registered Office Address</label>
                                                 <Input
-                                                    value={form.city}
-                                                    onChange={(e) => update("city", e.target.value)}
-                                                    placeholder="e.g. Mumbai"
-                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    value={form.addressLine1}
+                                                    onChange={(e) => update("addressLine1", e.target.value)}
+                                                    placeholder="Street address, building, suite"
+                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-cyan-400"
                                                 />
                                             </div>
 
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Phone</label>
-                                                <Input
-                                                    value={form.phone}
-                                                    onChange={(e) => update("phone", e.target.value)}
-                                                    placeholder="+91..."
-                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                            <div className="grid gap-4 sm:grid-cols-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">City</label>
+                                                    <Input
+                                                        value={form.city}
+                                                        onChange={(e) => update("city", e.target.value)}
+                                                        placeholder="e.g. Mumbai"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
 
-                                    {localError && (
-                                        <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-400">
-                                            {localError}
-                                        </div>
-                                    )}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">State / Province</label>
+                                                    <Input
+                                                        value={form.state}
+                                                        onChange={(e) => update("state", e.target.value)}
+                                                        placeholder="e.g. Maharashtra"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
 
-                                    <Button
-                                        type="button"
-                                        onClick={continueToDetails}
-                                        className="w-full rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 transition shadow-md"
-                                    >
-                                        Continue to Tax & Finance Regime
-                                        <ArrowRight className="ml-2 size-3.5" />
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h2 className="text-lg font-medium text-white">Tax & Finance Regime</h2>
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                Country rules and statutory filing settings.
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setStep(1)}
-                                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white"
-                                        >
-                                            <ArrowLeft className="size-3" />
-                                            Back
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Primary Country</label>
-                                                <select
-                                                    value={form.country}
-                                                    onChange={(e) => {
-                                                        const p = profileForCountry(e.target.value);
-                                                        update("country", p.code);
-                                                        update("currency", p.currency);
-                                                        update("locale", p.locale);
-                                                        update("timezone", p.timezone);
-                                                        update("taxSystem", p.taxSystem);
-                                                        update(
-                                                            "financialYear",
-                                                            p.fiscalYearStartMonth === 4
-                                                                ? "April–March"
-                                                                : p.fiscalYearStartMonth === 7
-                                                                    ? "July–June"
-                                                                    : "Custom fiscal calendar"
-                                                        );
-                                                    }}
-                                                    className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
-                                                >
-                                                    {countryOptions.map((c) => (
-                                                        <option key={c.code} value={c.code}>
-                                                            {c.flag} {c.name} ({c.symbol})
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Postal PIN</label>
+                                                    <Input
+                                                        value={form.postalCode}
+                                                        onChange={(e) => update("postalCode", e.target.value)}
+                                                        placeholder="e.g. 400069"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
                                             </div>
 
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Tax System</label>
-                                                <Input
-                                                    value={form.taxSystem}
-                                                    onChange={(e) => update("taxSystem", e.target.value)}
-                                                    placeholder="e.g. GST, VAT"
-                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                                />
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Business Email</label>
+                                                    <Input
+                                                        value={form.email}
+                                                        type="email"
+                                                        onChange={(e) => update("email", e.target.value)}
+                                                        placeholder="contact@company.in"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Contact Phone</label>
+                                                    <Input
+                                                        value={form.phone}
+                                                        onChange={(e) => update("phone", e.target.value)}
+                                                        placeholder="+91..."
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">
-                                                    Tax ID / GSTIN <span className="font-normal text-slate-500">(Optional)</span>
-                                                </label>
-                                                <Input
-                                                    value={form.gstin}
-                                                    onChange={(e) => update("gstin", e.target.value)}
-                                                    placeholder="e.g. 27AAAAA0000A1Z5"
-                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white uppercase font-mono focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                                />
+                                        {localError && (
+                                            <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-400">
+                                                {localError}
                                             </div>
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Registration status</label>
-                                                <select
-                                                    value={form.gstStatus}
-                                                    onChange={(e) => update("gstStatus", e.target.value)}
-                                                    className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
-                                                >
-                                                    <option value="not_registered">Not Registered</option>
-                                                    <option value="registered">Registered</option>
-                                                    <option value="pending">Registration Pending</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Operating Currency</label>
-                                                <select
-                                                    value={form.currency}
-                                                    onChange={(e) => update("currency", e.target.value)}
-                                                    className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
-                                                >
-                                                    {currencyCodes.map((cur) => (
-                                                        <option key={cur} value={cur}>
-                                                            {cur}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-slate-300">Fiscal Year Cycle</label>
-                                                <Input
-                                                    value={form.financialYear}
-                                                    onChange={(e) => update("financialYear", e.target.value)}
-                                                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {createWorkspace.error && (
-                                        <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-400">
-                                            {createWorkspace.error.message}
-                                        </div>
-                                    )}
-
-                                    <Button
-                                        type="submit"
-                                        disabled={createWorkspace.isPending}
-                                        className="w-full rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 transition shadow-md"
-                                    >
-                                        {createWorkspace.isPending ? (
-                                            <>
-                                                <Loader2 className="mr-2 size-3.5 animate-spin" />
-                                                Initializing Workspace…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Building2 className="mr-2 size-3.5" />
-                                                Launch Command Center
-                                            </>
                                         )}
-                                    </Button>
-                                </>
-                            )}
-                        </form>
+
+                                        <Button
+                                            type="button"
+                                            onClick={continueToDetails}
+                                            className="w-full rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 transition shadow-md"
+                                        >
+                                            Continue to Tax & Finance Regime
+                                            <ArrowRight className="ml-2 size-3.5" />
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h2 className="text-lg font-medium text-white">Tax & Finance Regime</h2>
+                                                <p className="mt-1 text-xs text-slate-400">
+                                                    Country rules, GSTIN identification, and statutory reporting settings.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setStep(1)}
+                                                className="flex items-center gap-1 text-xs text-slate-400 hover:text-white"
+                                            >
+                                                <ArrowLeft className="size-3" />
+                                                Back
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Primary Country</label>
+                                                    <select
+                                                        value={form.country}
+                                                        onChange={(e) => {
+                                                            const p = profileForCountry(e.target.value);
+                                                            update("country", p.code);
+                                                            update("currency", p.currency);
+                                                            update("locale", p.locale);
+                                                            update("timezone", p.timezone);
+                                                            update("taxSystem", p.taxSystem);
+                                                            update(
+                                                                "financialYear",
+                                                                p.fiscalYearStartMonth === 4
+                                                                    ? "April–March"
+                                                                    : p.fiscalYearStartMonth === 7
+                                                                        ? "July–June"
+                                                                        : "Custom fiscal calendar"
+                                                            );
+                                                        }}
+                                                        className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
+                                                    >
+                                                        {countryOptions.map((c) => (
+                                                            <option key={c.code} value={c.code}>
+                                                                {c.flag} {c.name} ({c.symbol})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Tax System</label>
+                                                    <Input
+                                                        value={form.taxSystem}
+                                                        onChange={(e) => update("taxSystem", e.target.value)}
+                                                        placeholder="e.g. GST, VAT"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">
+                                                        Tax ID / GSTIN <span className="font-normal text-slate-500">(Optional)</span>
+                                                    </label>
+                                                    <Input
+                                                        value={form.gstin}
+                                                        onChange={(e) => update("gstin", e.target.value)}
+                                                        placeholder="e.g. 27AAAAA0000A1Z5"
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white uppercase font-mono focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Registration status</label>
+                                                    <select
+                                                        value={form.gstStatus}
+                                                        onChange={(e) => update("gstStatus", e.target.value)}
+                                                        className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
+                                                    >
+                                                        <option value="not_registered">Not Registered</option>
+                                                        <option value="registered">Registered</option>
+                                                        <option value="pending">Registration Pending</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Operating Currency</label>
+                                                    <select
+                                                        value={form.currency}
+                                                        onChange={(e) => update("currency", e.target.value)}
+                                                        className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E1424] px-3 text-xs text-white outline-none cursor-pointer focus:ring-1 focus:ring-cyan-400"
+                                                    >
+                                                        {currencyCodes.map((cur) => (
+                                                            <option key={cur} value={cur}>
+                                                                {cur}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-slate-300">Fiscal Year Cycle</label>
+                                                    <Input
+                                                        value={form.financialYear}
+                                                        onChange={(e) => update("financialYear", e.target.value)}
+                                                        className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {mutationError && (
+                                            <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-400">
+                                                {mutationError.message}
+                                            </div>
+                                        )}
+
+                                        <Button
+                                            type="submit"
+                                            disabled={isPending}
+                                            className="w-full rounded-full bg-white text-xs font-semibold text-black hover:bg-slate-200 transition shadow-md"
+                                        >
+                                            {isPending ? (
+                                                <>
+                                                    <Loader2 className="mr-2 size-3.5 animate-spin" />
+                                                    {existingBusiness?.id ? "Saving Changes…" : "Initializing Workspace…"}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Building2 className="mr-2 size-3.5" />
+                                                    {existingBusiness?.id ? "Save Business Profile Changes" : "Launch Command Center"}
+                                                </>
+                                            )}
+                                        </Button>
+                                    </>
+                                )}
+                            </form>
+                        )}
                     </section>
                 </main>
             </div>

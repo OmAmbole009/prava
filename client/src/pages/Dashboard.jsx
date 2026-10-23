@@ -656,24 +656,6 @@ function WorkspaceOverview({ business }) {
     >
       {/* ── 1. Hero & BrandGenie Horizon Composition ─────────────────────── */}
       <motion.div variants={fadeUp} className="relative z-10 pt-6 pb-4 text-center">
-        {/* Social Proof / Trust Pill Eyebrow (Matching Avatar Stack + Rating from Photo) */}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <div className="eyebrow-chip inline-flex items-center gap-2">
-            {/* Overlapping Avatar Stack */}
-            <div className="flex -space-x-1.5 overflow-hidden">
-              <span className="inline-flex size-5 rounded-full ring-1 ring-[#030712] bg-gradient-to-tr from-sky-500 to-blue-600 text-[8px] font-bold text-white items-center justify-center">O</span>
-              <span className="inline-flex size-5 rounded-full ring-1 ring-[#030712] bg-gradient-to-tr from-indigo-500 to-purple-600 text-[8px] font-bold text-white items-center justify-center">P</span>
-              <span className="inline-flex size-5 rounded-full ring-1 ring-[#030712] bg-gradient-to-tr from-emerald-500 to-teal-600 text-[8px] font-bold text-white items-center justify-center">C</span>
-            </div>
-            <span className="text-xs font-semibold text-white">Rated 5/5 by 7,000+ businesses</span>
-          </div>
-
-          <div className="eyebrow-chip inline-flex items-center gap-1.5">
-            <span className="flex text-amber-400 text-xs">★★★★★</span>
-            <span className="text-xs text-slate-300">ICAI Certified Desk</span>
-          </div>
-        </div>
-
         {/* Hero Headline (Crisp pure white typography with tight tracking) */}
         <h1 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white max-w-3xl mx-auto leading-[1.12]">
           Autonomous Intelligence for Your Business Finances

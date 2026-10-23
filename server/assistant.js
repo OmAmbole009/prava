@@ -19,6 +19,7 @@ import { formatMinorAmount } from "../shared/locale.js";
 import { buildCaAdvisoryResponse, retrieveCaKnowledgeAsync } from "./caRag.js";
 import { searchBusinessDocumentsRag } from "./weaviateVectorDb.js";
 import { evaluateQueryScope, buildOutOfScopeResponse, buildGreetingResponse } from "./guardrails.js";
+import { resolveIntelligentAnswer } from "./assistantEngine.js";
 
 export const askPravaInputSchema = z.object({
   businessId: z.number().int().positive(),
@@ -360,27 +361,12 @@ export async function getLiveWorkspaceContext(userId, businessId) {
 export async function askPrava(userId, input) {
   const context = await getLiveWorkspaceContext(userId, input.businessId);
 
-  // Guardrail check: Pre-screen whether the question is within Prava's financial/business scope
+  // Guardrail check: Pre-screen greetings
   const scopeEval = evaluateQueryScope(input.message);
   if (scopeEval.isGreeting) {
     const greetingRes = buildGreetingResponse(context.workspace);
     return {
       ...greetingRes,
-      dataSnapshot: {
-        revenue: context.financials.revenueFormatted,
-        expenses: context.financials.expensesFormatted,
-        cash: context.financials.cashFormatted,
-        gstPosition: context.financials.gstPositionFormatted,
-        receivables: context.financials.receivablesFormatted,
-        payables: context.financials.payablesFormatted,
-      },
-    };
-  }
-
-  if (scopeEval.isOutOfScope) {
-    const outOfScopeRes = buildOutOfScopeResponse(context.workspace, scopeEval.detectedDomain);
-    return {
-      ...outOfScopeRes,
       dataSnapshot: {
         revenue: context.financials.revenueFormatted,
         expenses: context.financials.expensesFormatted,
@@ -404,6 +390,25 @@ export async function askPrava(userId, input) {
     vectorDocs = await searchBusinessDocumentsRag(input.businessId, input.message, 3);
   } catch (err) {
     console.warn("[askPrava] Vector document retrieval fallback:", err.message);
+  }
+
+  // Check if intelligent knowledge engine has a direct, authoritative answer
+  const intelligent = resolveIntelligentAnswer(input.message, context, vectorStatutes, vectorDocs);
+
+  // If guardrail flags out of scope AND intelligent engine has no answer:
+  if (scopeEval.isOutOfScope && !intelligent) {
+    const outOfScopeRes = buildOutOfScopeResponse(context.workspace, scopeEval.detectedDomain);
+    return {
+      ...outOfScopeRes,
+      dataSnapshot: {
+        revenue: context.financials.revenueFormatted,
+        expenses: context.financials.expensesFormatted,
+        cash: context.financials.cashFormatted,
+        gstPosition: context.financials.gstPositionFormatted,
+        receivables: context.financials.receivablesFormatted,
+        payables: context.financials.payablesFormatted,
+      },
+    };
   }
 
   // Build full invoices database section
@@ -567,8 +572,24 @@ Always respond with structured, concise, friendly markdown. If the question asks
   // Use the LLM's intelligent response if present and substantive
   let answer = typeof rawAnswer === "string" && rawAnswer.trim().length > 0 ? rawAnswer : "";
 
-  // If local fallback mock ran OR specific invoice lookup / conceptual CA guidance requested
-  if (isSpecificMissingLookup || (rawAnswer?.includes("### Financial Analysis & Guidance") && queriedVendorOrNumber && matchingInvoices.length === 0)) {
+  // Determine contextual action buttons and redirection flags
+  const actions = [];
+  const sources = [];
+
+  const isRedirectRequest = /\b(redirect|take\s+me\s+to|navigate\s+to|go\s+to|open|switch\s+to|bring\s+me\s+to|show\s+me\s+page)\b/i.test(lower);
+
+  // If intelligent knowledge engine matched, prioritize its exact, trash-free answer!
+  if (intelligent?.answer) {
+    answer = intelligent.answer;
+    if (intelligent.actions && intelligent.actions.length > 0) {
+      for (const act of intelligent.actions) {
+        actions.push({ ...act, isRedirect: isRedirectRequest });
+      }
+    }
+    if (intelligent.sources && intelligent.sources.length > 0) {
+      sources.push(...intelligent.sources);
+    }
+  } else if (isSpecificMissingLookup || (rawAnswer?.includes("### Financial Analysis & Guidance") && queriedVendorOrNumber && matchingInvoices.length === 0)) {
     answer = `We do not have record of an invoice for **"${queriedVendorOrNumber}"** in your business documents.\n\nIf you have this document, you can upload it at [Invoices & Receipts](/documents) to have Prava process and record it into your ledger.`;
   } else if (rawAnswer?.includes("### Financial Analysis & Guidance") && matchingInvoices.length > 0) {
     const inv = matchingInvoices[0];
@@ -580,12 +601,6 @@ Always respond with structured, concise, friendly markdown. If the question asks
       answer = `### ⚖️ ${caAdvice.title}\n\n${caAdvice.analysis}\n\n#### 📋 Statutory Protocol & Action Plan:\n${caAdvice.actionPlan.map((step) => `- ${step}`).join("\n")}\n\n> ⚠️ **Autonomous CA Advisory Warning**: ${caAdvice.warning}\n\n*Statutory Reference: ${caAdvice.sectionsReferenced.join(", ")}*`;
     }
   }
-
-  // Determine contextual action buttons and redirection flags
-  const actions = [];
-  const sources = [];
-
-  const isRedirectRequest = /\b(redirect|take\s+me\s+to|navigate\s+to|go\s+to|open|switch\s+to|bring\s+me\s+to|show\s+me\s+page)\b/i.test(lower);
 
   // Add matching sources from invoices
   if (invoicesList.length > 0) {

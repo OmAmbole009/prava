@@ -468,3 +468,20 @@ export function calculateTdsForPayment({
   };
 }
 
+export function calculateTds({ vendor = "", amount = 0, description = "", section = null } = {}) {
+  const result = calculateTdsForPayment({
+    amount,
+    vendorName: vendor,
+    description: description || vendor,
+    section,
+  });
+  return {
+    applicable: result.isApplicable,
+    section: result.section,
+    rate: result.applicableRate,
+    deductionAmount: result.tdsAmount,
+    description: result.reason,
+    ...result,
+  };
+}
+

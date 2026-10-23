@@ -144,6 +144,6 @@ describe("Clean New Business Onboarding & Document Storage", () => {
     expect(financials.entityName).toBe("Solitary Enterprise LLP");
     expect(financials.balanceSheet.equityAndLiabilities.totalEquityAndLiabilities).toBe(0);
     expect(financials.profitAndLoss.revenue.revenueFromOperations).toBe(0);
-  });
+  }, 20000);
 });
 

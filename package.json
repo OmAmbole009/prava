@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch-path=server server/_core/index.js",
     "build": "vite build && esbuild server/_core/index.js --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "node dist/index.js",
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

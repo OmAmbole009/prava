@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/DashboardLayout";
+import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -150,15 +150,15 @@ export default function AdminCaManagement() {
     const activeCasCount = casList.filter((c) => c.status === "active").length;
     const totalAssignmentsCount = casList.reduce((acc, c) => acc + (c.assignedBusinesses?.length ?? 0), 0);
     if (casQuery.error) {
-        return (<DashboardLayout>
+        return (<AdminLayout title="Chartered Accountants Management">
         <div className="mx-auto mt-16 max-w-xl rounded-2xl border border-destructive/20 bg-destructive/10 p-7 text-foreground">
           <AlertCircle className="size-5 text-destructive"/>
           <h1 className="font-serif mt-3 text-lg font-bold">Administrative access is required.</h1>
           <p className="mt-2 text-xs text-muted-foreground">{casQuery.error.message}</p>
         </div>
-      </DashboardLayout>);
+      </AdminLayout>);
     }
-    return (<DashboardLayout>
+    return (<AdminLayout title="Chartered Accountants Management" subtitle="Chartered Accountant onboarding, firm credential verification, and workspace assignment matrix.">
       <div className="mx-auto max-w-6xl space-y-7 py-2">
         {/* CA Management Banner */}
         <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card/90 via-card/50 to-card/90 p-7 shadow-xl backdrop-blur-xl sm:p-9">
@@ -507,5 +507,5 @@ export default function AdminCaManagement() {
           </form>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>);
+    </AdminLayout>);
 }

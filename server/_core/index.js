@@ -1,7 +1,16 @@
 import "dotenv/config";
+
+if (!process.env.NODE_ENV) {
+  const currentPath = (process.argv[1] || import.meta.url || "").replace(/\\/g, "/");
+  if (currentPath.includes("/dist/")) {
+    process.env.NODE_ENV = "production";
+  }
+}
+
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+// Prava Core Server Runtime - Environment Synced
 import { registerOAuthRoutes } from "./oauth.js";
 import { registerStorageProxy } from "./storageProxy.js";
 import apiRouter from "../routes/index.js";
@@ -88,8 +97,8 @@ async function startServer() {
       console.warn("[Weaviate] Background Vector DB initialization:", err.message);
     });
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${port}/`);
   });
 }
 

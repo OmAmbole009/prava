@@ -205,15 +205,8 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     const transporter = getSmtpTransporter();
     if (!transporter) {
       if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          `\n┌──────────────────────────────────────────────────────────────────┐\n` +
-          `│  [PRAVA SMTP EMAIL SERVICE - CONFIGURATION NOTICE]               │\n` +
-          `│  Recipient: ${to.padEnd(52)} │\n` +
-          `│  YOUR 6-DIGIT VERIFICATION CODE: ${otp}                         │\n` +
-          `│  (SMTP credentials not yet set in .env: SMTP_USER & SMTP_PASS)  │\n` +
-          `└──────────────────────────────────────────────────────────────────┘\n`
-        );
-        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp", devOtpCode: otp };
+        console.warn(`[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`);
+        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
       }
       throw new HttpError(
         500,
@@ -230,19 +223,16 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
         html: htmlBody,
       });
       console.log(`[EmailService] Verification email delivered to ${maskEmail(to)} via SMTP (Message ID: ${info.messageId})`);
-      return { success: true, provider: "smtp", id: info.messageId };
+      return {
+        success: true,
+        provider: "smtp",
+        id: info.messageId,
+      };
     } catch (err) {
       console.error(`[EmailService] SMTP delivery failure for ${maskEmail(to)}:`, err.message);
       if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          `\n┌──────────────────────────────────────────────────────────────────┐\n` +
-          `│  [PRAVA SMTP EMAIL SERVICE - TRANSMISSION ERROR]                 │\n` +
-          `│  Recipient: ${to.padEnd(52)} │\n` +
-          `│  YOUR 6-DIGIT VERIFICATION CODE: ${otp}                         │\n` +
-          `│  Notice: ${err.message.slice(0, 56).padEnd(56)} │\n` +
-          `└──────────────────────────────────────────────────────────────────┘\n`
-        );
-        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp", devOtpCode: otp };
+        console.warn(`[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${err.message}`);
+        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
       }
       throw new HttpError(500, `Failed to deliver verification email via SMTP (${err.message}).`);
     }
@@ -281,15 +271,8 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
         console.error(`[EmailService] Resend delivery error for ${maskEmail(to)}:`, rawMessage);
 
         if (process.env.NODE_ENV !== "production") {
-          console.warn(
-            `\n┌──────────────────────────────────────────────────────────────────┐\n` +
-            `│  [PRAVA AUTHENTICATION OTP SERVICE - RESEND FALLBACK]            │\n` +
-            `│  Recipient: ${to.padEnd(52)} │\n` +
-            `│  YOUR 6-DIGIT VERIFICATION CODE: ${otp}                         │\n` +
-            `│  Notice: ${rawMessage.slice(0, 56).padEnd(56)} │\n` +
-            `└──────────────────────────────────────────────────────────────────┘\n`
-          );
-          return { success: true, provider: "resend_sandbox_fallback", id: "dev-sandbox-otp", devOtpCode: otp };
+          console.warn(`[EmailService] Resend fallback notice for ${maskEmail(to)}: ${rawMessage}`);
+          return { success: true, provider: "resend_sandbox_fallback", id: "dev-sandbox-otp" };
         }
 
         throw new HttpError(500, `Failed to deliver verification email (${rawMessage}).`);
@@ -297,7 +280,11 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
 
       const data = await res.json();
       console.log(`[EmailService] Verification email successfully dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`);
-      return { success: true, provider: "resend", id: data.id };
+      return {
+        success: true,
+        provider: "resend",
+        id: data.id,
+      };
     } catch (err) {
       if (err instanceof HttpError) throw err;
       console.error(`[EmailService] Network exception sending email via Resend to ${maskEmail(to)}:`, err.message);
@@ -320,4 +307,139 @@ export async function sendLoginOtpEmail({ to, otp, expiryMinutes = 5 }) {
  */
 export async function sendPasswordResetOtpEmail({ to, otp, expiryMinutes = 5 }) {
   return sendOtpEmail({ to, otp, purpose: "password_reset", expiryMinutes });
+}
+
+/**
+ * Verifies SMTP configuration and connection handshake.
+ * Returns structured health report without throwing.
+ */
+export async function verifySmtpConnection() {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim();
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+
+  if (!user || !pass) {
+    return {
+      ok: false,
+      configured: false,
+      message: "SMTP credentials missing. Please set SMTP_USER and SMTP_PASS in environment.",
+    };
+  }
+
+  const transporter = getSmtpTransporter();
+  if (!transporter) {
+    return {
+      ok: false,
+      configured: false,
+      message: "Could not create SMTP transport with provided settings.",
+    };
+  }
+
+  try {
+    await transporter.verify();
+    return {
+      ok: true,
+      configured: true,
+      host,
+      port,
+      secure,
+      message: `SMTP connection verified successfully to ${host}:${port}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      host,
+      port,
+      error: err.message,
+      message: `SMTP verification failed: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Dispatches enterprise transactional emails with Prava branded templates.
+ */
+export async function sendTransactionalNotification({ to, templateType, templateData = {} }) {
+  if (!to || !to.includes("@")) {
+    throw new HttpError(400, "Valid recipient email address is required.");
+  }
+
+  const {
+    renderAccountVerificationEmail,
+    renderPasswordResetEmail,
+    renderSecurityEventEmail,
+    renderOnboardingCompletionEmail,
+    renderComplianceReminderEmail,
+    renderOverdueTaskEmail,
+    renderOcrFailureReviewEmail,
+    renderFailedIntegrationEmail,
+  } = await import("./emailTemplates.js");
+
+  let rendered;
+  switch (templateType) {
+    case "account_verification":
+      rendered = renderAccountVerificationEmail(templateData);
+      break;
+    case "password_reset":
+      rendered = renderPasswordResetEmail(templateData);
+      break;
+    case "security_event":
+      rendered = renderSecurityEventEmail(templateData);
+      break;
+    case "onboarding_completion":
+      rendered = renderOnboardingCompletionEmail(templateData);
+      break;
+    case "compliance_reminder":
+      rendered = renderComplianceReminderEmail(templateData);
+      break;
+    case "overdue_task":
+      rendered = renderOverdueTaskEmail(templateData);
+      break;
+    case "ocr_failure":
+      rendered = renderOcrFailureReviewEmail(templateData);
+      break;
+    case "failed_integration":
+      rendered = renderFailedIntegrationEmail(templateData);
+      break;
+    default:
+      throw new HttpError(400, `Unknown transactional email template "${templateType}".`);
+  }
+
+  const fromAddress = `${process.env.SMTP_FROM_NAME || "Prava Financial Cloud"} <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "notifications@prava.in"}>`;
+
+  // Record dispatched notification for test verification
+  testDispatchedNotifications.push({
+    to,
+    templateType,
+    subject: rendered.subject,
+    text: rendered.text,
+    timestamp: new Date().toISOString(),
+  });
+
+  const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+  if (isTest) {
+    return { success: true, provider: "test_mock", templateType, id: `test-msg-${Date.now()}` };
+  }
+
+  const transporter = getSmtpTransporter();
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to,
+        subject: rendered.subject,
+        text: rendered.text,
+        html: rendered.html,
+      });
+      return { success: true, provider: "smtp", id: info.messageId, templateType };
+    } catch (err) {
+      console.error(`[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`, err.message);
+      return { success: true, provider: "smtp_error_logged", error: err.message };
+    }
+  }
+
+  return { success: true, provider: "dev_sandbox_logged", templateType };
 }

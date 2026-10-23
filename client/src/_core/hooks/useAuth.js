@@ -34,12 +34,14 @@ export function useAuth(options) {
       console.warn("[Auth] Logout error:", error);
     } finally {
       try {
-        sessionStorage.removeItem("manus-cookie");
+        sessionStorage.clear();
         localStorage.removeItem("manus-runtime-user-info");
         localStorage.removeItem("prava-active-business-id");
+        document.cookie = "app_session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "manus-cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       } catch {}
       queryClient.setQueryData(["auth", "me"], null);
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      queryClient.clear();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
@@ -48,7 +50,11 @@ export function useAuth(options) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data));
+      if (meQuery.data) {
+        localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data));
+      } else {
+        localStorage.removeItem("manus-runtime-user-info");
+      }
     } catch {
       // Storage can be unavailable in private or embedded browser contexts.
     }

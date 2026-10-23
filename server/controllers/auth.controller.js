@@ -55,16 +55,24 @@ export const loginCredentialsSchema = z.object({
 export const loginOtpSchema = z.object({
   challengeId: z.string().trim().min(1).optional(),
   challengeToken: z.string().trim().min(1).optional(),
-  otp: z.string().trim().length(6, "Verification code must be exactly 6 digits.").optional(),
-  code: z.string().trim().length(6, "Verification code must be exactly 6 digits.").optional(),
-}).refine(data => Boolean((data.challengeId || data.challengeToken) && (data.otp || data.code)), {
+  token: z.string().trim().min(1).optional(),
+  otp: z.string().trim().optional(),
+  code: z.string().trim().optional(),
+  otpCode: z.string().trim().optional(),
+  verificationCode: z.string().trim().optional(),
+}).refine(data => {
+  const challenge = data.challengeId || data.challengeToken || data.token;
+  const rawCode = data.otp || data.code || data.otpCode || data.verificationCode;
+  return Boolean(challenge && rawCode && String(rawCode).replace(/\D/g, "").length === 6);
+}, {
   message: "Challenge ID and 6-digit OTP code are required.",
 });
 
 export const resendOtpSchema = z.object({
   challengeId: z.string().trim().min(1).optional(),
   challengeToken: z.string().trim().min(1).optional(),
-}).refine(data => Boolean(data.challengeId || data.challengeToken), {
+  token: z.string().trim().min(1).optional(),
+}).refine(data => Boolean(data.challengeId || data.challengeToken || data.token), {
   message: "Challenge ID is required.",
 });
 
@@ -144,7 +152,6 @@ export async function loginStep1(ctx, rawInput) {
       method: "email",
       maskedTarget: challenge.maskedTarget,
       expiryMinutes: challenge.expiryMinutes,
-      devOtpCode: challenge.devOtpCode,
       message: challenge.message,
     };
   }
@@ -187,7 +194,6 @@ export async function loginStep1(ctx, rawInput) {
     method: "email",
     maskedTarget: challenge.maskedTarget,
     expiryMinutes: challenge.expiryMinutes,
-    devOtpCode: challenge.devOtpCode,
     message: challenge.message,
   };
 }
@@ -198,14 +204,17 @@ export async function loginStep1(ctx, rawInput) {
  */
 export async function loginStep2(ctx, rawInput) {
   const input = loginOtpSchema.parse(rawInput);
-  const challengeId = input.challengeId || input.challengeToken;
-  const otpCode = input.otp || input.code;
+  const challengeId = input.challengeId || input.challengeToken || input.token;
+  const rawCode = input.otp || input.code || input.otpCode || input.verificationCode;
+  const otpCode = String(rawCode).replace(/\D/g, "");
 
   const verified = await verifyOtpChallenge({
     challengeId,
     challengeToken: challengeId,
+    token: challengeId,
     otp: otpCode,
     code: otpCode,
+    otpCode,
     expectedPurpose: "login",
   });
 
@@ -313,7 +322,6 @@ export async function registerAccount(ctx, rawInput) {
     method: "email",
     maskedTarget: challenge.maskedTarget,
     expiryMinutes: challenge.expiryMinutes,
-    devOtpCode: challenge.devOtpCode,
     message: challenge.message,
   };
 }
@@ -347,7 +355,6 @@ export async function forgotPasswordRequest(rawInput) {
     method: "email",
     maskedTarget: challenge.maskedTarget,
     expiryMinutes: challenge.expiryMinutes,
-    devOtpCode: challenge.devOtpCode,
     message: challenge.message,
   };
 }

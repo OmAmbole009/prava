@@ -85,4 +85,68 @@ describe("Ask Prava Assistant backend", () => {
     expect(response.answer).toMatch(/TDS/i);
     expect(response.isOutOfScope).toBe(false);
   });
+
+  it("accurately answers general finance question 'What is EBITDA?' with formula and zero trash", async () => {
+    const response = await askPrava(1, {
+      businessId: 1,
+      message: "What is EBITDA?",
+    });
+    expect(response).toBeDefined();
+    expect(typeof response.answer).toBe("string");
+    expect(response.answer).toMatch(/EBITDA/i);
+    expect(response.answer).toMatch(/Earnings Before Interest/i);
+    expect(response.answer).toMatch(/Operating Expenses/i);
+    expect(response.answer).not.toContain("### Financial Analysis & Guidance");
+    expect(response.isOutOfScope).toBe(false);
+  });
+
+  it("accurately answers website inquiry 'How do I upload an invoice on this website?' with actionable steps", async () => {
+    const response = await askPrava(1, {
+      businessId: 1,
+      message: "How do I upload an invoice on this website?",
+    });
+    expect(response).toBeDefined();
+    expect(typeof response.answer).toBe("string");
+    expect(response.answer).toMatch(/Invoices & Receipts/i);
+    expect(response.answer).toMatch(/Supported Formats/i);
+    expect(response.actions.some((a) => a.path === "/documents")).toBe(true);
+    expect(response.isOutOfScope).toBe(false);
+  });
+
+  it("accurately answers business identity inquiry 'What is our legal company name and GSTIN?'", async () => {
+    const response = await askPrava(1, {
+      businessId: 1,
+      message: "What is our company name and legal details?",
+    });
+    expect(response).toBeDefined();
+    expect(typeof response.answer).toBe("string");
+    expect(response.answer).toMatch(/Prava Technologies Private Limited/i);
+    expect(response.answer).toMatch(/27AABCP8821F1Z2/i);
+    expect(response.isOutOfScope).toBe(false);
+  });
+
+  it("accurately answers 'What is our available bank balance?' with live cash numbers", async () => {
+    const response = await askPrava(1, {
+      businessId: 1,
+      message: "What is our available bank balance?",
+    });
+    expect(response).toBeDefined();
+    expect(typeof response.answer).toBe("string");
+    expect(response.answer).toMatch(/Available Cash in Bank/i);
+    expect(response.answer).toContain("₹");
+    expect(response.actions.some((a) => a.path === "/money")).toBe(true);
+    expect(response.isOutOfScope).toBe(false);
+  });
+
+  it("accurately answers 'What is COGS?' with clear formula and components", async () => {
+    const response = await askPrava(1, {
+      businessId: 1,
+      message: "What is COGS?",
+    });
+    expect(response).toBeDefined();
+    expect(typeof response.answer).toBe("string");
+    expect(response.answer).toMatch(/Cost of Goods Sold/i);
+    expect(response.answer).toMatch(/Beginning Inventory/i);
+    expect(response.isOutOfScope).toBe(false);
+  });
 });

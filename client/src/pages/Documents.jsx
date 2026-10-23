@@ -288,8 +288,8 @@ export default function Documents() {
                 GST Verified
               </span>
               <span className="rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-blue-400 border border-blue-500/25 flex items-center gap-1.5">
-                <span className={`size-1.5 rounded-full ${ocrStatusQuery.data?.ok ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-                {ocrStatusQuery.data?.ok ? "Qwen2.5-VL-7B Local" : "Ollama Standby"}
+                <span className={`size-1.5 rounded-full ${ocrStatusQuery.data?.ok ? "bg-emerald-400 animate-pulse" : "bg-emerald-400"}`} />
+                {ocrStatusQuery.data?.label || (ocrStatusQuery.data?.ok ? "AI Vision Online" : "OCR Engine Online")}
               </span>
             </div>
             <p className="text-xs text-slate-400">

@@ -63,22 +63,28 @@ function loadStateFromDisk() {
     if (fs.existsSync(STATE_FILE)) {
       const raw = fs.readFileSync(STATE_FILE, "utf-8");
       const data = JSON.parse(raw);
-      if (Array.isArray(data.documents) && inMemoryDocuments.length === 0) {
+      if (Array.isArray(data.documents)) {
+        inMemoryDocuments.length = 0;
         inMemoryDocuments.push(...data.documents);
       }
-      if (Array.isArray(data.extractions) && inMemoryExtractions.length === 0) {
+      if (Array.isArray(data.extractions)) {
+        inMemoryExtractions.length = 0;
         inMemoryExtractions.push(...data.extractions);
       }
-      if (Array.isArray(data.tasks) && inMemoryTasks.length === 0) {
+      if (Array.isArray(data.tasks)) {
+        inMemoryTasks.length = 0;
         inMemoryTasks.push(...data.tasks);
       }
-      if (Array.isArray(data.actionItems) && inMemoryActionItems.length === 0) {
+      if (Array.isArray(data.actionItems)) {
+        inMemoryActionItems.length = 0;
         inMemoryActionItems.push(...data.actionItems);
       }
-      if (Array.isArray(data.accountingEntries) && inMemoryAccountingEntries.length === 0) {
+      if (Array.isArray(data.accountingEntries)) {
+        inMemoryAccountingEntries.length = 0;
         inMemoryAccountingEntries.push(...data.accountingEntries);
       }
-      if (Array.isArray(data.reconciliationItems) && inMemoryReconciliationItems.length === 0) {
+      if (Array.isArray(data.reconciliationItems)) {
+        inMemoryReconciliationItems.length = 0;
         inMemoryReconciliationItems.push(...data.reconciliationItems);
       }
 
@@ -156,6 +162,15 @@ export const reviewDocumentSchema = z.object({
   total: z.string().max(32),
   placeOfSupply: z.string().max(96),
   invoiceType: z.enum(["sales", "purchase", "unknown"]),
+  items: z.array(z.object({
+    description: z.string().optional(),
+    hsn_sac: z.string().nullable().optional(),
+    quantity: z.number().optional(),
+    unit: z.string().nullable().optional(),
+    rate: z.number().optional(),
+    tax_rate: z.number().nullable().optional(),
+    amount: z.number().optional(),
+  })).optional(),
 });
 export const authorizedSubmissionRequestSchema = z.object({
   taskId: z.number().int().positive(),
@@ -667,8 +682,21 @@ export async function uploadAndProcessDocument(userId, input) {
     try {
       const raw = await extractInvoice(stored.key, input.mimeType, bytes, input.originalName, business);
       const validated = validateExtraction(raw);
-      reasons = validated.reasons;
-      extractionStatus = validated.reasons.length ? "needs_review" : "extracted";
+      reasons = [...validated.reasons];
+
+      // Check for duplicate invoice in this business workspace
+      if (raw.invoiceNumber && raw.invoiceNumber.length >= 3 && !raw.invoiceNumber.startsWith("INV-")) {
+        const isDup = inMemoryDocuments.some(d => {
+          if (d.document?.businessId !== input.businessId || d.document?.id === documentId) return false;
+          const ext = inMemoryExtractions.find(e => e.documentId === d.document?.id);
+          return ext && ext.invoiceNumber && ext.invoiceNumber.toLowerCase() === raw.invoiceNumber.toLowerCase();
+        });
+        if (isDup) {
+          reasons.push(`Duplicate document detected: Invoice "${raw.invoiceNumber}" is already recorded in this workspace.`);
+        }
+      }
+
+      extractionStatus = reasons.length ? "needs_review" : "extracted";
       const resolvedType = resolveDocumentType(raw.documentType, input.documentType);
       documentRecord.documentType = resolvedType;
       extractionRecord = {
@@ -688,7 +716,7 @@ export async function uploadAndProcessDocument(userId, input) {
         totalMinor: validated.totalMinor,
         placeOfSupply: raw.placeOfSupply || null,
         invoiceType: raw.invoiceType || "purchase",
-        extractedData: JSON.stringify({ ...raw, reviewReasons: validated.reasons }),
+        extractedData: JSON.stringify({ ...raw, reviewReasons: reasons }),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -1152,6 +1180,7 @@ export async function reviewDocumentForUser(userId, input) {
     total: input.total,
     placeOfSupply: input.placeOfSupply,
     invoiceType: input.invoiceType,
+    items: input.items || [],
     reviewReasons: [],
   };
   const validated = validateExtraction(raw);
@@ -1180,11 +1209,56 @@ export async function reviewDocumentForUser(userId, input) {
         docEntry.extraction.invoiceType = raw.invoiceType;
         try {
           const parsed = JSON.parse(docEntry.extraction.extractedData || "{}");
-          docEntry.extraction.extractedData = JSON.stringify({ ...parsed, ...raw, reviewReasons: validated.reasons });
+          docEntry.extraction.extractedData = JSON.stringify({
+            ...parsed,
+            ...raw,
+            items: input.items || parsed.items || [],
+            reviewReasons: validated.reasons,
+          });
         } catch {
-          // ignore
+          docEntry.extraction.extractedData = JSON.stringify({ ...raw, reviewReasons: validated.reasons });
         }
       }
+
+      // Update or create corresponding accounting entry
+      if (input.decision === "approve" && validated.totalMinor !== null) {
+        const isCredit = docEntry.document.documentType === "credit_note";
+        let entryType = raw.invoiceType === "sales"
+          ? (isCredit ? "debit" : "credit")
+          : (isCredit ? "credit" : "debit");
+        let category = raw.invoiceType === "sales"
+          ? (isCredit ? "sales_return" : "revenue")
+          : (isCredit ? "purchase_return" : "operating_expense");
+        let accountName = raw.invoiceType === "sales"
+          ? (raw.buyerName ? `Customer: ${raw.buyerName}` : "Customer Receivables")
+          : (raw.vendorName ? `Vendor: ${raw.vendorName}` : "Commercial Vendor");
+
+        const existingEntry = inMemoryAccountingEntries.find(e => e.documentId === input.documentId);
+        if (existingEntry) {
+          existingEntry.entryDate = validated.invoiceDate || new Date();
+          existingEntry.accountName = accountName;
+          existingEntry.entryType = entryType;
+          existingEntry.amountMinor = validated.totalMinor;
+          existingEntry.category = category;
+          existingEntry.reviewStatus = "approved";
+        } else {
+          inMemoryAccountingEntries.push({
+            id: inMemoryAccountingEntries.length + 1,
+            businessId: docEntry.document.businessId,
+            taskId: docEntry.document.taskId ?? null,
+            documentId: input.documentId,
+            entryDate: validated.invoiceDate || new Date(),
+            accountName,
+            entryType,
+            amountMinor: validated.totalMinor,
+            category,
+            reviewStatus: "approved",
+            source: "document_extraction",
+            createdAt: new Date(),
+          });
+        }
+      }
+
       saveStateToDisk();
     }
     await audit(detail.document.businessId, userId, input.decision === "approve" ? "document.approved" : "document.corrected_needs_review", "document", String(input.documentId), detail.document.taskId ?? undefined, { reviewReasons: validated.reasons });

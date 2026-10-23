@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Building2,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -20,10 +21,12 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { logout } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -52,6 +55,71 @@ export default function Profile() {
   const user = authQuery.data;
   const profile = profileQuery.data;
   const business = businessesQuery.data?.[0];
+
+  // Business Profile Form States
+  const [bizForm, setBizForm] = useState({
+    name: "",
+    legalName: "",
+    businessType: "Private Limited Company",
+    industry: "Financial Technology",
+    gstin: "",
+    email: "",
+    phone: "",
+    addressLine1: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    financialYear: "April–March",
+    currency: "INR",
+  });
+  const [bizSaveSuccess, setBizSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (business) {
+      setBizForm({
+        name: business.name || "",
+        legalName: business.legalName || business.name || "",
+        businessType: business.businessType || "Private Limited Company",
+        industry: business.industry || "Software & Technology",
+        gstin: business.gstin || "",
+        email: business.email || "",
+        phone: business.phone || "",
+        addressLine1: business.addressLine1 || "",
+        city: business.city || "",
+        state: business.state || "",
+        postalCode: business.postalCode || "",
+        financialYear: business.financialYear || "April–March",
+        currency: business.currency || "INR",
+      });
+    }
+  }, [business]);
+
+  const updateBusinessMutation = useMutation({
+    mutationFn: (body) => api.businesses.updateProfile(body),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["businesses"] });
+      setBizSaveSuccess(true);
+      setTimeout(() => setBizSaveSuccess(false), 4000);
+      toast.success("Business profile saved successfully.", {
+        description: `Workspace '${data.name}' settings updated.`,
+      });
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update business profile.");
+    },
+  });
+
+  const handleBusinessSave = (e) => {
+    e.preventDefault();
+    if (!business?.id) {
+      toast.error("No active business workspace detected.");
+      return;
+    }
+    updateBusinessMutation.mutate({
+      businessId: business.id,
+      ...bizForm,
+    });
+  };
 
   // Change Password Mutation
   const changePasswordMutation = useMutation({
@@ -135,8 +203,7 @@ export default function Profile() {
 
           <Button
             variant="outline"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
+            onClick={() => void logout()}
             className="h-9 rounded-full border border-[#C0625F]/30 bg-transparent text-[#C0625F] hover:bg-[#C0625F]/10 text-xs font-medium"
           >
             <LogOut className="mr-2 size-3.5" />
@@ -303,6 +370,189 @@ export default function Profile() {
                 >
                   {changePasswordMutation.isPending ? "Updating Security Credentials…" : "Update Security Password"}
                 </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* -------------------- 3. BUSINESS PROFILE & LEGAL ENTITY CARD -------------------- */}
+        <div className="mt-6">
+          <Card className="rounded-2xl border-white/[0.08] bg-gradient-to-b from-[#0B0F19] to-[#070A12] shadow-xs">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                  <Building2 className="size-4 text-sky-400" />
+                  Business Profile & Legal Entity Settings
+                </CardTitle>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-mono font-medium text-sky-400 border border-sky-500/20">
+                  <span className="size-1.5 rounded-full bg-sky-400" />
+                  PERSISTENT WORKSPACE REGISTRATION
+                </span>
+              </div>
+              <CardDescription className="text-xs text-slate-400">
+                Update legal entity details, official GSTIN, registered corporate address, and financial year cycles.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {bizSaveSuccess && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400">
+                  <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium">Business profile successfully updated in database.</div>
+                </div>
+              )}
+
+              <form onSubmit={handleBusinessSave} className="space-y-4 text-xs">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Commercial / Trade Name *</Label>
+                    <Input
+                      required
+                      value={bizForm.name}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Prava Technologies"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Legal Entity Corporate Name</Label>
+                    <Input
+                      value={bizForm.legalName}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, legalName: e.target.value }))}
+                      placeholder="Full statutory registered name"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Business Structure</Label>
+                    <Input
+                      value={bizForm.businessType}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, businessType: e.target.value }))}
+                      placeholder="e.g. Private Limited Company, LLP, Proprietorship"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Industry Sector</Label>
+                    <Input
+                      value={bizForm.industry}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, industry: e.target.value }))}
+                      placeholder="e.g. Software, Financial Services, Manufacturing"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Tax Identifier / GSTIN</Label>
+                    <Input
+                      value={bizForm.gstin}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. 27AABCP8821F1Z2"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white uppercase font-mono focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Operating Currency</Label>
+                    <Input
+                      value={bizForm.currency}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
+                      placeholder="INR, USD, EUR"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white uppercase font-mono focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Financial Year Cycle</Label>
+                    <Input
+                      value={bizForm.financialYear}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, financialYear: e.target.value }))}
+                      placeholder="April–March"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-slate-300">Registered Office Address</Label>
+                  <Input
+                    value={bizForm.addressLine1}
+                    onChange={(e) => setBizForm((prev) => ({ ...prev, addressLine1: e.target.value }))}
+                    placeholder="Floor, building, street, tech park"
+                    className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">City</Label>
+                    <Input
+                      value={bizForm.city}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, city: e.target.value }))}
+                      placeholder="e.g. Mumbai"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">State / Region</Label>
+                    <Input
+                      value={bizForm.state}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, state: e.target.value }))}
+                      placeholder="e.g. Maharashtra"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Postal PIN</Label>
+                    <Input
+                      value={bizForm.postalCode}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, postalCode: e.target.value }))}
+                      placeholder="e.g. 400069"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Business Billing Email</Label>
+                    <Input
+                      type="email"
+                      value={bizForm.email}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="billing@prava.in"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-slate-300">Official Contact Phone</Label>
+                    <Input
+                      value={bizForm.phone}
+                      onChange={(e) => setBizForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      placeholder="+91 98200 12345"
+                      className="h-10 rounded-xl border border-white/[0.08] bg-[#0E1424] text-xs text-white focus-visible:ring-1 focus-visible:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end pt-2">
+                  <Button
+                    type="submit"
+                    disabled={updateBusinessMutation.isPending}
+                    className="h-10 rounded-full bg-white px-6 text-xs font-semibold text-black hover:bg-slate-200 shadow-md transition"
+                  >
+                    {updateBusinessMutation.isPending ? "Persisting Business Profile…" : "Save Business Profile Changes"}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

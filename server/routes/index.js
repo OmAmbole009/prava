@@ -21,6 +21,7 @@ import systemRouter from "./system.js";
 import userRouter from "./user.js";
 import invoicesRouter from "./invoices.js";
 import intelligenceRouter from "./intelligence.js";
+import remindersRouter from "./reminders.js";
 
 const apiRouter = Router();
 
@@ -48,5 +49,6 @@ apiRouter.use("/ca", caRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/system", systemRouter);
 apiRouter.use("/intelligence", intelligenceRouter);
+apiRouter.use("/reminders", remindersRouter);
 
 export default apiRouter;

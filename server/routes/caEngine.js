@@ -346,4 +346,116 @@ router.get("/rag-status", async (_req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// High-Value Autonomous CA Workflows
+// -----------------------------------------------------------------------------
+import {
+  analyzeAndDraftGstNotice,
+  prepareAuditWorkspace,
+  analyzeBooksCleanup,
+  analyzeTdsWorkflow,
+  reconcilePartyLedgers,
+  getCompanyRocCompliance,
+  getUnifiedComplianceCalendar,
+} from "../services/businessWorkflows.js";
+
+// 1. GST Notice Management & DRC-06 Defense
+router.post("/gst-notice-defense", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.body.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = analyzeAndDraftGstNotice(business, req.body);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 2. Audit Preparation Workspace
+router.get("/audit-workspace", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = prepareAuditWorkspace(business);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 3. Accounting Books Cleanup & Suspense Clearance
+router.get("/books-cleanup", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = analyzeBooksCleanup(business);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 4. TDS Compliance Workflow & 26Q Status
+router.get("/tds-workflow", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = analyzeTdsWorkflow(business);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 5. Vendor & Customer Ledger Reconciliation
+router.post("/ledger-reconciliation", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.body.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const partyName = req.body.partyName || "AWS India";
+    const result = reconcilePartyLedgers(business, partyName);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 6. ROC and Corporate Compliance
+router.get("/roc-compliance", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = getCompanyRocCompliance(business);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// 7. Unified Compliance Calendar
+router.get("/unified-calendar", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessId(req.user.id, req.query.businessId);
+    const business = await getBusinessForUser(businessId, req.user.id);
+    if (!business) return sendError(res, new Error("Business workspace not found."), 404);
+
+    const result = getUnifiedComplianceCalendar(business);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 export default router;

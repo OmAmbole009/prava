@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { COOKIE_NAME } from "@shared/const";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -54,7 +55,6 @@ export default function Login() {
   const [maskedTarget, setMaskedTarget] = useState("");
   const [otpMethod, setOtpMethod] = useState("email");
   const [otpCode, setOtpCode] = useState("");
-  const [devOtpCode, setDevOtpCode] = useState(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Forgot password reset token
@@ -62,6 +62,9 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Google Identity Services (GIS) state
+  const [gisLoaded, setGisLoaded] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -76,10 +79,29 @@ export default function Login() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
+  // Clear stale cached auth tokens and sessions on initial login page mount
+  useEffect(() => {
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem("manus-runtime-user-info");
+      localStorage.removeItem("prava-active-business-id");
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      document.cookie = "app_session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "manus-cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    } catch {}
+    void queryClient.clear();
+    api.auth.logout().catch(() => {});
+  }, []);
+
   // Auth Completion Handler
   const handleAuthComplete = (data) => {
     setErrorMessage("");
     setSuccessMessage("");
+    if (data.token) {
+      try {
+        sessionStorage.setItem("manus-cookie", `${COOKIE_NAME}=${data.token}; path=/;`);
+      } catch {}
+    }
     void queryClient.invalidateQueries({ queryKey: ["auth"] });
     void queryClient.invalidateQueries({ queryKey: ["businesses"] });
 
@@ -111,15 +133,8 @@ export default function Login() {
       setOtpMethod(data.method || "email");
       setLoginStep("otp");
       setResendCooldown(60);
-      if (data.devOtpCode) {
-        setDevOtpCode(data.devOtpCode);
-        setOtpCode(data.devOtpCode);
-        toast.success(`Verification Code: ${data.devOtpCode}`, { duration: 15000, description: "Auto-filled (Development Mode)" });
-      } else {
-        setDevOtpCode(null);
-        setOtpCode("");
-        toast.info(data.message || `Verification code sent to ${data.maskedTarget}.`);
-      }
+      setOtpCode("");
+      toast.info(data.message || `Verification code sent to ${data.maskedTarget}. Please check your inbox.`);
     },
     onError: (error) => {
       const msg =
@@ -146,14 +161,8 @@ export default function Login() {
     onSuccess: (data) => {
       setErrorMessage("");
       setResendCooldown(60);
-      if (data.devOtpCode) {
-        setDevOtpCode(data.devOtpCode);
-        setOtpCode(data.devOtpCode);
-        toast.success(`New Verification Code: ${data.devOtpCode}`, { duration: 15000 });
-      } else {
-        setOtpCode("");
-        toast.success(data.message || "A new OTP has been sent to your email.");
-      }
+      setOtpCode("");
+      toast.success(data.message || "A new verification code has been dispatched to your email.");
     },
     onError: (error) => {
       const msg = error.message || "Failed to resend verification code.";
@@ -172,15 +181,8 @@ export default function Login() {
       setOtpMethod(data.method || "email");
       setLoginStep("otp");
       setResendCooldown(60);
-      if (data.devOtpCode) {
-        setDevOtpCode(data.devOtpCode);
-        setOtpCode(data.devOtpCode);
-        toast.success(`Verification Code: ${data.devOtpCode}`, { duration: 15000 });
-      } else {
-        setDevOtpCode(null);
-        setOtpCode("");
-        toast.success(data.message || `Account created! Verification code sent to ${data.maskedTarget}.`);
-      }
+      setOtpCode("");
+      toast.success(data.message || `Account created! Verification code sent to ${data.maskedTarget}.`);
     },
     onError: (error) => {
       const msg = error.message || "Registration failed. Please verify your details.";
@@ -242,6 +244,93 @@ export default function Login() {
       toast.error(msg);
     },
   });
+
+  // 8. Google OAuth Sign-in Mutation
+  const googleLoginMutation = useMutation({
+    mutationFn: (body) => api.auth.googleLogin(body),
+    onSuccess: (data) => {
+      handleAuthComplete(data);
+    },
+    onError: (error) => {
+      const msg = error.message || "Google identity verification failed.";
+      setErrorMessage(msg);
+      toast.error(msg);
+    },
+  });
+
+  // Initialize Google Identity Services (GIS) One-Tap and Button
+  useEffect(() => {
+    let isMounted = true;
+    api.auth.googleConfig().then((cfg) => {
+      if (!isMounted || !cfg?.configured || !cfg?.clientId) return;
+
+      const renderGis = () => {
+        if (window.google?.accounts?.id) {
+          try {
+            window.google.accounts.id.initialize({
+              client_id: cfg.clientId,
+              callback: (response) => {
+                if (response?.credential) {
+                  googleLoginMutation.mutate({ credential: response.credential });
+                }
+              },
+              auto_select: false,
+              cancel_on_tap_outside: true,
+            });
+
+            const btnContainer = document.getElementById("prava-gis-button-wrapper");
+            if (btnContainer) {
+              btnContainer.innerHTML = "";
+              window.google.accounts.id.renderButton(btnContainer, {
+                theme: "filled_black",
+                size: "large",
+                width: 340,
+                text: "continue_with",
+                shape: "rectangular",
+              });
+              setGisLoaded(true);
+            }
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      };
+
+      if (!renderGis()) {
+        const interval = setInterval(() => {
+          if (renderGis()) clearInterval(interval);
+        }, 300);
+        setTimeout(() => clearInterval(interval), 5000);
+      }
+    }).catch(() => {});
+
+    return () => { isMounted = false; };
+  }, [mode, loginStep]);
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage("");
+    try {
+      const config = await api.auth.googleConfig();
+      if (!config?.configured || !config?.clientId) {
+        toast.info("Google OAuth configuration is currently in development mode. Please configure GOOGLE_CLIENT_ID in your environment variables for live production OAuth.", {
+          duration: 6000,
+        });
+        return;
+      }
+
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt();
+        return;
+      }
+
+      // If configured, trigger standard Google OAuth flow or popup
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(config.redirectUri || window.location.origin + "/api/auth/google/callback")}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
+    } catch (err) {
+      toast.error("Unable to connect to Google OAuth service.");
+    }
+  };
 
   // Handlers
   const handleLoginSubmit = (e) => {
@@ -354,10 +443,7 @@ export default function Login() {
       <header className="relative z-10 border-b border-white/[0.08] bg-[#030405]/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setLocation("/")}>
-            <PravaMark size="md" />
-            <span className="text-xl font-bold tracking-tight text-white">
-              Prava
-            </span>
+            <PravaMark size="md" inverse={true} />
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -520,6 +606,38 @@ export default function Login() {
                 </div>
               )}
 
+              {/* Google Sign In Option (Credentials Stage) */}
+              {loginStep === "credentials" && forgotStep === "request" && (
+                <div className="mb-5 space-y-3">
+                  <div id="prava-gis-button-wrapper" className="flex justify-center w-full min-h-[40px] [&>div]:!w-full [&_iframe]:!mx-auto" />
+                  {!gisLoaded && (
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      disabled={googleLoginMutation.isPending}
+                      className="relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.12] bg-[#0E131F] py-2.5 px-4 text-xs font-semibold text-white transition hover:bg-white/[0.06] hover:border-white/[0.2] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    >
+                      <svg className="size-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      <span>{googleLoginMutation.isPending ? "Connecting to Google…" : "Continue with Google"}</span>
+                    </button>
+                  )}
+
+                  <div className="relative my-4 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/[0.08]" />
+                    </div>
+                    <div className="relative bg-[#07090E] px-3 text-[10px] uppercase font-mono tracking-wider text-slate-500">
+                      Or continue with {mode === "register" ? "registration details" : "credentials"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ----------------------------------------------------------- */}
               {/* FLOW A: LOGIN (STEP 1 - PASSWORD / STEP 2 - OTP)            */}
               {/* ----------------------------------------------------------- */}
@@ -629,11 +747,6 @@ export default function Login() {
                     </p>
                   </div>
 
-                  {devOtpCode && (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                      💡 <strong>Development Mode:</strong> Code <code className="font-mono font-bold bg-amber-500/20 px-1.5 py-0.5 rounded text-foreground">{devOtpCode}</code> was auto-filled for testing.
-                    </div>
-                  )}
 
                   <div className="space-y-1.5">
                     <Label htmlFor="login-otp" className="text-xs font-medium text-foreground">

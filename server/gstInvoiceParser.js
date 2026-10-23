@@ -159,6 +159,7 @@ export function parseDateString(str) {
 
 /**
  * Normalizes and cleans potential OCR optical noise in 15-char GSTINs
+ * Incorporates statutory GST Council structure rules (e.g. 14th character is 'Z')
  */
 export function cleanGstin(candidate) {
   if (!candidate || typeof candidate !== "string") return "";
@@ -180,6 +181,42 @@ export function cleanGstin(candidate) {
   // Look for 15-character statutory substring
   const match = clean.match(/[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]/);
   if (match) return match[0];
+
+  // Optical recovery for 15-char candidates:
+  // Statutory Indian GSTIN: [2 digits state][5 letters][4 digits][1 letter][1 entity][Z][1 check]
+  if (clean.length === 15 && /^[0-3][0-9]/.test(clean)) {
+    const chars = clean.split("");
+
+    // 14th char (index 13) in statutory GSTIN is almost universally 'Z', often misread as '2'
+    if (chars[13] === "2") {
+      chars[13] = "Z";
+    }
+
+    // Fix letter/digit confusion in PAN portion: chars 2 to 6 must be letters
+    for (let i = 2; i <= 6; i++) {
+      if (chars[i] === "0") chars[i] = "O";
+      if (chars[i] === "1") chars[i] = "I";
+      if (chars[i] === "5") chars[i] = "S";
+      if (chars[i] === "8") chars[i] = "B";
+    }
+
+    // Chars 7 to 10 must be digits
+    for (let i = 7; i <= 10; i++) {
+      if (chars[i] === "O" || chars[i] === "Q") chars[i] = "0";
+      if (chars[i] === "I" || chars[i] === "L") chars[i] = "1";
+      if (chars[i] === "S") chars[i] = "5";
+      if (chars[i] === "B") chars[i] = "8";
+    }
+
+    // Char 11 must be letter
+    if (chars[11] === "0") chars[11] = "O";
+    if (chars[11] === "1") chars[11] = "I";
+
+    const repaired = chars.join("");
+    if (STRICT_GSTIN_REGEX.test(repaired)) {
+      return repaired;
+    }
+  }
 
   return clean.length >= 15 ? clean.slice(0, 15) : clean;
 }
@@ -320,16 +357,36 @@ export function classifyDocument(text, originalName = "") {
 }
 
 /**
- * Extracts line items from OCR tabular text
+ * Extracts line items from OCR tabular text supporting multiple layout patterns
  */
 export function extractLineItems(text) {
+  if (!text || typeof text !== "string") return [];
   const items = [];
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-  const itemLineRegex = /^(\d{1,3})[.\s]+([A-Za-z0-9\s,./()-]+?)\s+(\d{4,8})\s+(\d+(?:\.\d+)?)\s*(?:[A-Za-z]{2,5})?\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)$/;
+  // Skip header rows
+  const isHeader = (l) => /^(?:s\.?no|sr\.?|#|item|description|particulars|hsn|sac|qty|quantity|rate|unit|price|amount|taxable|cgst|sgst|igst|total)\b/i.test(l) &&
+                          l.split(/\s+/).length <= 8 &&
+                          !/\d{3,}/.test(l);
 
+  // Pattern 1: Serial + Description + HSN/SAC + Qty + [Unit] + Rate + Amount
+  const pattern1 = /^(\d{1,3})[.\s]+([A-Za-z0-9\s,./()&'-]+?)\s+(\d{4,8})\s+(\d+(?:\.\d+)?)\s*(?:[A-Za-z]{2,5})?\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)$/;
+
+  // Pattern 2: Description + HSN/SAC + Qty + Rate + Amount (no leading serial number)
+  const pattern2 = /^([A-Za-z0-9\s,./()&'-]+?)\s+(\d{4,8})\s+(\d+(?:\.\d+)?)\s*(?:[A-Za-z]{2,5})?\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)$/;
+
+  // Pattern 3: Serial? + Description + Qty + Rate + Amount (without HSN/SAC)
+  const pattern3 = /^(?:(\d{1,3})[.\s]+)?([A-Za-z0-9\s,./()&'-]{3,60}?)\s+(\d+(?:\.\d+)?)\s*(?:[A-Za-z]{2,5})?\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)\s+([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)$/;
+
+  // Pattern 4: With Tax Rate (e.g. 18%, 12%, 5%)
+  const pattern4 = /^(?:(\d{1,3})[.\s]+)?([A-Za-z0-9\s,./()&'-]+?)\s+(?:(\d{4,8})\s+)?(\d+(?:\.\d+)?)\s*(?:[A-Za-z]{2,5})?\s+([0-9.,]+)\s+(\d+(?:\.\d+)?\s*%)\s+([0-9.,]+)$/;
+
+  let lineIdx = 0;
   for (const line of lines) {
-    const m = line.match(itemLineRegex);
+    if (isHeader(line)) continue;
+
+    // Check Pattern 1
+    let m = line.match(pattern1);
     if (m) {
       const idx = parseInt(m[1], 10);
       const desc = m[2].trim();
@@ -337,17 +394,91 @@ export function extractLineItems(text) {
       const qty = parseFloat(m[4]);
       const rate = parseRupee(m[5]);
       const amt = parseRupee(m[6]);
+      if (desc && amt !== null && rate !== null) {
+        lineIdx++;
+        items.push({
+          index: idx || lineIdx,
+          description: desc,
+          hsn_sac: hsn,
+          quantity: Number.isFinite(qty) ? qty : 1,
+          unit: "Nos",
+          rate,
+          tax_rate: null,
+          amount: amt,
+        });
+        continue;
+      }
+    }
 
+    // Check Pattern 4 (with tax rate)
+    m = line.match(pattern4);
+    if (m) {
+      const idx = m[1] ? parseInt(m[1], 10) : ++lineIdx;
+      const desc = m[2].trim();
+      const hsn = m[3]?.trim() || null;
+      const qty = parseFloat(m[4]);
+      const rate = parseRupee(m[5]);
+      const taxRate = parseFloat(m[6].replace("%", "").trim());
+      const amt = parseRupee(m[7]);
       if (desc && amt !== null) {
         items.push({
           index: idx,
           description: desc,
           hsn_sac: hsn,
           quantity: Number.isFinite(qty) ? qty : 1,
-          unit: null,
-          rate,
+          unit: "Nos",
+          rate: rate || amt,
+          tax_rate: Number.isFinite(taxRate) ? taxRate : null,
           amount: amt,
         });
+        continue;
+      }
+    }
+
+    // Check Pattern 2
+    m = line.match(pattern2);
+    if (m) {
+      const desc = m[1].trim();
+      const hsn = m[2].trim();
+      const qty = parseFloat(m[3]);
+      const rate = parseRupee(m[4]);
+      const amt = parseRupee(m[5]);
+      if (desc && amt !== null && !/total|subtotal|balance/i.test(desc)) {
+        lineIdx++;
+        items.push({
+          index: lineIdx,
+          description: desc,
+          hsn_sac: hsn,
+          quantity: Number.isFinite(qty) ? qty : 1,
+          unit: "Nos",
+          rate: rate || amt,
+          tax_rate: null,
+          amount: amt,
+        });
+        continue;
+      }
+    }
+
+    // Check Pattern 3 (no HSN)
+    m = line.match(pattern3);
+    if (m) {
+      const idx = m[1] ? parseInt(m[1], 10) : ++lineIdx;
+      const desc = m[2].trim();
+      const qty = parseFloat(m[3]);
+      const rate = parseRupee(m[4]);
+      const amt = parseRupee(m[5]);
+      if (desc && amt !== null && rate !== null && !/total|subtotal|taxable|amount|balance|cgst|sgst|igst/i.test(desc)) {
+        items.push({
+          index: idx,
+          description: desc,
+          hsn_sac: null,
+          quantity: Number.isFinite(qty) ? qty : 1,
+          unit: "Nos",
+          rate,
+          tax_rate: null,
+          amount: amt,
+        });
+        continue;
       }
     }
   }
@@ -358,21 +489,37 @@ export function extractLineItems(text) {
 export function isReadableText(str) {
   if (!str || typeof str !== "string") return false;
   const clean = str.trim();
-  if (clean.length < 30) return false;
+  if (clean.length < 25) return false;
   const alphanumCount = (clean.match(/[a-zA-Z0-9]/g) || []).length;
   const ratio = alphanumCount / clean.length;
-  if (ratio < 0.5) return false;
-  return /\b(tax|invoice|bill|gst|total|date|pvt|ltd|limited|amount|details|note|bank|order)\b/i.test(clean) || /\b\d{4}\b/.test(clean);
+  if (ratio < 0.4) return false;
+  return /\b(tax|invoice|bill|gst|total|date|pvt|ltd|limited|amount|details|note|bank|order|customer|supplier|buyer|seller)\b/i.test(clean) || /\b\d{4}\b/.test(clean);
 }
 
 /**
- * Universally extracts text from any PDF or Image buffer using Tesseract OCR fallback
+ * Universally extracts text from any PDF or Image buffer with fault tolerance,
+ * password protection detection, and Tesseract OCR fallback
  */
 export async function extractDocumentText(buffer, mimeType, originalName = "") {
+  if (!buffer || buffer.length === 0) {
+    throw new Error("Cannot process document: The uploaded file is empty (0 bytes).");
+  }
+
   let text = "";
 
   // 1. Digital PDF path: Try extracting vector font text
   if (mimeType === "application/pdf" || originalName.toLowerCase().endsWith(".pdf")) {
+    const rawHead = buffer.slice(0, 1024).toString("latin1");
+    if (!rawHead.includes("%PDF-")) {
+      throw new Error(`Invalid PDF format: "${originalName}" does not have a valid PDF header.`);
+    }
+
+    // Password / Encryption check
+    const rawStr = buffer.toString("latin1");
+    if (rawStr.includes("/Encrypt") && (rawStr.includes("/Standard") || rawStr.includes("/Filter"))) {
+      throw new Error(`The document "${originalName}" is password-protected or encrypted. Please remove password protection before uploading.`);
+    }
+
     if (PDFParseClass) {
       try {
         const parser = new PDFParseClass({ data: buffer });
@@ -381,7 +528,9 @@ export async function extractDocumentText(buffer, mimeType, originalName = "") {
           text = res.text;
         }
       } catch (err) {
-        // Handled gracefully
+        if (/password|encrypt/i.test(err.message)) {
+          throw new Error(`The document "${originalName}" is password-protected. Please upload an unlocked PDF.`);
+        }
       }
     }
     if (!text || !isReadableText(text)) {
@@ -416,9 +565,9 @@ export async function extractDocumentText(buffer, mimeType, originalName = "") {
     }
 
     if (!text || !isReadableText(text)) {
-      const rawStr = buffer.toString("utf-8");
-      if (isReadableText(rawStr)) {
-        text = rawStr;
+      const rawText = buffer.toString("utf-8");
+      if (isReadableText(rawText)) {
+        text = rawText;
       }
     }
   } else if (["image/jpeg", "image/png", "image/webp"].includes(mimeType) || /\.(png|jpe?g|webp)$/i.test(originalName)) {
@@ -884,12 +1033,88 @@ export async function parseGstInvoiceData(buffer, mimeType, originalName = "", b
   const woMatch = text.match(/(?:WO\s*No\.?|PO\s*No\.?)[:.\s*#]*([A-Z0-9/_-]+)/i);
   const projMatch = text.match(/(?:Project\s*ID|Project)[:.\s*#]*([A-Z0-9/_-]+)/i);
 
-  // Review reasons
+  // Review reasons & cross-field mathematical invariants
   const reviewReasons = [];
-  if (!sellerGstin && !classification.isReceipt) reviewReasons.push("Supplier GSTIN not detected.");
-  if (!invoiceNumber) reviewReasons.push("Document number requires confirmation.");
+  if (!sellerGstin && !classification.isReceipt && !classification.isBillOfSupply) {
+    reviewReasons.push("Supplier GSTIN not detected.");
+  }
+  const isSyntheticDocNumber = /^(?:INV|CN|DN)-\d{6}$/.test(invoiceNumber);
+  if (!invoiceNumber || isSyntheticDocNumber) {
+    reviewReasons.push("Document number requires confirmation.");
+  }
   if (isBlocked17_5) reviewReasons.push("Blocked ITC detected u/s 17(5).");
   if (!total || total === 0) reviewReasons.push("Document total could not be determined.");
+
+  // Line items cross-check against taxable amount
+  let computedItemsTaxableTotal = 0;
+  if (items.length > 0) {
+    computedItemsTaxableTotal = Math.round(items.reduce((s, it) => s + (it.amount || 0), 0) * 100) / 100;
+    if (taxableValue !== null && Math.abs(computedItemsTaxableTotal - taxableValue) > 1.5) {
+      reviewReasons.push(`Line-items taxable total (₹${computedItemsTaxableTotal.toFixed(2)}) differs from document taxable subtotal (₹${taxableValue.toFixed(2)}).`);
+    }
+  }
+
+  // Cross-component equation check: taxable + cgst + sgst + igst - discount ≈ total
+  if (taxableValue !== null && total !== null) {
+    const expectedTotal = Math.round((taxableValue + cgst + sgst + igst - discount) * 100) / 100;
+    if (Math.abs(expectedTotal - total) > 1.5) {
+      reviewReasons.push(`Total amount mismatch: taxable (₹${taxableValue.toFixed(2)}) + tax (₹${(cgst + sgst + igst).toFixed(2)}) - discount (₹${discount.toFixed(2)}) = ₹${expectedTotal.toFixed(2)}, but invoice states ₹${total.toFixed(2)}.`);
+    }
+  }
+
+  // Field-level confidence and verification status
+  const fieldConfidence = {
+    vendorName: {
+      value: vendorName,
+      confidence: vendorName && vendorName !== "Commercial Supplier" ? "high" : "low",
+      verified: Boolean(vendorName && vendorName !== "Commercial Supplier"),
+    },
+    buyerName: {
+      value: buyerName,
+      confidence: buyerName && buyerName !== "Enterprise Client" ? "high" : "medium",
+      verified: Boolean(buyerName && buyerName !== "Enterprise Client"),
+    },
+    gstin: {
+      value: sellerGstin,
+      confidence: sellerGstin ? (STRICT_GSTIN_REGEX.test(sellerGstin) ? "high" : "low") : "missing",
+      verified: Boolean(sellerGstin && STRICT_GSTIN_REGEX.test(sellerGstin)),
+    },
+    invoiceNumber: {
+      value: invoiceNumber,
+      confidence: invoiceNumber && !invoiceNumber.match(/^(?:INV|CN|DN)-\d+$/) ? "high" : "medium",
+      verified: Boolean(invoiceNumber),
+    },
+    invoiceDate: {
+      value: invoiceDate,
+      confidence: invoiceDate ? "high" : "missing",
+      verified: Boolean(invoiceDate),
+    },
+    taxableValue: {
+      value: taxableValue !== null ? taxableValue.toFixed(2) : "0.00",
+      confidence: taxableValue !== null ? "high" : "missing",
+      verified: taxableValue !== null,
+    },
+    total: {
+      value: total !== null ? total.toFixed(2) : "0.00",
+      confidence: total !== null && total > 0 ? "high" : "missing",
+      verified: total !== null && total > 0,
+    },
+    taxComponents: {
+      cgst: cgst.toFixed(2),
+      sgst: sgst.toFixed(2),
+      igst: igst.toFixed(2),
+      confidence: (cgst > 0 || sgst > 0 || igst > 0 || classification.isBillOfSupply) ? "high" : "medium",
+      verified: classification.isBillOfSupply || (taxableValue !== null && total !== null && Math.abs((taxableValue + cgst + sgst + igst) - total) <= 1.5),
+    },
+    lineItems: {
+      count: items.length,
+      confidence: items.length > 0 ? "high" : "medium",
+      verified: items.length > 0 && (taxableValue === null || Math.abs(computedItemsTaxableTotal - taxableValue) <= 1.5),
+    },
+  };
+
+  const isFullyVerified = reviewReasons.length === 0;
+  const confidenceBps = isFullyVerified ? 9600 : (reviewReasons.length === 1 ? 8200 : 5400);
 
   return {
     documentType: classification.documentType,
@@ -901,7 +1126,7 @@ export async function parseGstInvoiceData(buffer, mimeType, originalName = "", b
     originalInvoiceDate,
     creditNoteReason,
     vendorName,
-    gstin: sellerGstin || "27AABCP8821F1Z2",
+    gstin: sellerGstin || "",
     pan: sellerPan || (sellerGstin.length >= 12 ? sellerGstin.slice(2, 12) : ""),
     buyerName,
     buyerGstin,
@@ -920,6 +1145,9 @@ export async function parseGstInvoiceData(buffer, mimeType, originalName = "", b
     blockedReason,
     reviewReasons,
     items,
+    fieldConfidence,
+    confidenceBps,
+    status: isFullyVerified ? "extracted" : "needs_review",
     bankDetails: {
       bankName: bankMatch ? bankMatch[1].trim() : "",
       accountNo: accMatch ? accMatch[1].trim() : "",

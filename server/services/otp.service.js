@@ -140,11 +140,9 @@ export async function issueOtpChallenge({ identifier, userId, method, purpose = 
   activeChallenges.set(challengeId, entry);
   identifierToChallenge.set(normalizedIdentifier, challengeId);
 
-  let devOtpCode = null;
   // Dispatch OTP via clean Email service (or SMS if explicitly phone-only)
   if (entry.method === "email" || normalizedIdentifier.includes("@")) {
-    const res = await sendEmailOtp({ to: normalizedIdentifier, code, purpose });
-    devOtpCode = res?.devOtpCode || null;
+    await sendEmailOtp({ to: normalizedIdentifier, code, purpose });
   } else {
     await sendSmsOtp({ to: normalizedIdentifier, code, purpose });
   }
@@ -158,10 +156,7 @@ export async function issueOtpChallenge({ identifier, userId, method, purpose = 
     method: entry.method,
     maskedTarget: maskIdentifier(normalizedIdentifier),
     expiryMinutes,
-    devOtpCode,
-    message: devOtpCode
-      ? `Verification code for testing: ${devOtpCode} (Resend sandbox mode)`
-      : `A verification code has been dispatched to ${maskIdentifier(normalizedIdentifier)}.`,
+    message: `A verification code has been dispatched to ${maskIdentifier(normalizedIdentifier)}.`,
   };
 }
 
@@ -203,21 +198,16 @@ export async function resendOtpChallenge(rawChallengeId) {
   entry.expiresAt = now + getExpiryMinutes() * 60 * 1000; // Reset 5-minute expiry
   entry.lastSentAt = now;
 
-  let devOtpCode = null;
   // Dispatch fresh OTP code
   if (entry.method === "email" || entry.identifier.includes("@")) {
-    const res = await sendEmailOtp({ to: entry.identifier, code, purpose: entry.purpose });
-    devOtpCode = res?.devOtpCode || null;
+    await sendEmailOtp({ to: entry.identifier, code, purpose: entry.purpose });
   } else {
     await sendSmsOtp({ to: entry.identifier, code, purpose: entry.purpose });
   }
 
   return {
     success: true,
-    devOtpCode,
-    message: devOtpCode
-      ? `A new verification code for testing: ${devOtpCode} (Resend sandbox mode)`
-      : "A new OTP has been sent to your email.",
+    message: "A new OTP has been sent to your email.",
     maskedTarget: maskIdentifier(entry.identifier),
   };
 }
@@ -231,15 +221,15 @@ export async function resendOtpChallenge(rawChallengeId) {
  * - Constant-time comparison to prevent timing leaks.
  * - Once verified, the challenge is immediately destroyed (single use).
  */
-export async function verifyOtpChallenge({ challengeId, challengeToken, otp, code, expectedPurpose = null }) {
-  const token = challengeId || challengeToken;
-  const rawCode = otp || code;
+export async function verifyOtpChallenge({ challengeId, challengeToken, token, otp, code, otpCode, verificationCode, expectedPurpose = null } = {}) {
+  const resolvedToken = challengeId || challengeToken || token;
+  const rawCode = otp ?? code ?? otpCode ?? verificationCode;
 
-  if (!token || !rawCode) {
+  if (!resolvedToken || !rawCode) {
     throw new HttpError(400, "Invalid or expired OTP.");
   }
 
-  const entry = activeChallenges.get(token);
+  const entry = activeChallenges.get(resolvedToken);
   if (!entry) {
     throw new HttpError(400, "Invalid or expired OTP.");
   }

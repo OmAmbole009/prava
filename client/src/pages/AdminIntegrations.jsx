@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/DashboardLayout";
+import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,21 +51,21 @@ export default function AdminIntegrations() {
     }, [settings.data]);
     const setField = (type, field, value) => setForms((previous) => ({ ...previous, [type]: { ...previous[type], [field]: value } }));
     if (settings.isLoading)
-        return (<DashboardLayout>
+        return (<AdminLayout title="Integration Gateway">
         <div className="flex min-h-[60vh] items-center justify-center text-xs text-slate-500 dark:text-slate-400">
           <Loader2 className="mr-2 size-4 animate-spin text-slate-700 dark:text-white"/>
           Loading integration readiness…
         </div>
-      </DashboardLayout>);
+      </AdminLayout>);
     if (settings.error || !settings.data)
-        return (<DashboardLayout>
+        return (<AdminLayout title="Integration Gateway">
         <div className="mx-auto mt-16 max-w-xl rounded-2xl border border-red-500/20 bg-red-500/10 p-7">
           <AlertCircle className="size-5 text-red-500 dark:text-red-400"/>
           <h1 className="font-['Playfair_Display',Georgia,serif] mt-3 text-lg font-bold text-slate-900 dark:text-white">Integration readiness is unavailable.</h1>
           <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">{settings.error?.message ?? "Administrative access is required."}</p>
         </div>
-      </DashboardLayout>);
-    return (<DashboardLayout>
+      </AdminLayout>);
+    return (<AdminLayout title="Integration Gateway" subtitle="Operational credentials, webhook dispatch readiness, and sandbox verification.">
       <div className="mx-auto max-w-6xl py-2 space-y-7">
         {/* Banner */}
         <section className="prava-panel rounded-3xl p-7 text-slate-900 dark:text-white sm:p-9 border border-slate-200/80 dark:border-white/10">
@@ -165,5 +165,5 @@ export default function AdminIntegrations() {
           {"Current delivery rule: approval and rejection notices remain available in-app; email rows are suppressed until delivery is configured. GST preparation is not filing, and payment status requires a server-verifiable provider response. No Razorpay checkout, UPI QR, or GST-provider dispatch is activated by this page."}
         </section>
       </div>
-    </DashboardLayout>);
+    </AdminLayout>);
 }

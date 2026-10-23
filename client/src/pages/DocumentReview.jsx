@@ -23,6 +23,7 @@ import {
   FileText,
   Loader2,
   Maximize2,
+  Plus,
   RefreshCw,
   Save,
   Scale,
@@ -79,6 +80,13 @@ export default function DocumentReview() {
   useEffect(() => {
     if (!detail.data?.extraction) return;
     const extraction = detail.data.extraction;
+    let parsed = null;
+    try {
+      parsed = JSON.parse(extraction.extractedData);
+    } catch {
+      parsed = null;
+    }
+
     setDraft({
       vendorName: extraction.vendorName ?? "",
       gstin: extraction.gstin ?? "",
@@ -96,6 +104,7 @@ export default function DocumentReview() {
         extraction.invoiceType === "sales" || extraction.invoiceType === "purchase"
           ? extraction.invoiceType
           : "purchase",
+      items: Array.isArray(parsed?.items) ? parsed.items : [],
     });
   }, [detail.data?.document?.id]);
 
@@ -222,32 +231,96 @@ export default function DocumentReview() {
     }
   };
 
-  const submit = (decision) => review.mutate({ documentId, decision, ...draft });
+  const submit = (decision) =>
+    review.mutate({
+      documentId,
+      decision,
+      ...draft,
+      items: draft.items || [],
+    });
   const returnPath = document.taskId ? `/tasks/${document.taskId}` : "/documents";
+
+  const getFieldConfidence = (key) => {
+    if (!parsedExtractedData?.fieldConfidence) return null;
+    const mapKey = key === "gstin" ? "vendorGstin" : key === "total" ? "totalAmount" : key;
+    return parsedExtractedData.fieldConfidence[mapKey] || null;
+  };
 
   const getFieldIssue = (key) => {
     if (key === "invoiceNumber" && !draft.invoiceNumber) return "Missing";
     if (key === "invoiceDate" && !draft.invoiceDate) return "Missing";
     if (key === "vendorName" && !draft.vendorName) return "Missing";
     if (key === "total" && (!draft.total || parseFloat(draft.total) === 0)) return "Missing";
-    if (key === "gstin" && draft.gstin && !/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(draft.gstin.trim().toUpperCase())) return "Invalid Format";
+    if (
+      key === "gstin" &&
+      draft.gstin &&
+      !/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(draft.gstin.trim().toUpperCase())
+    )
+      return "Invalid Format";
     if (key === "total" && !isMathematicallyBalanced) return "Sum Mismatch";
     return null;
   };
 
+  const updateLineItem = (index, fieldName, value) => {
+    const updated = [...(draft.items || [])];
+    const row = { ...updated[index], [fieldName]: value };
+    if (fieldName === "quantity" || fieldName === "rate") {
+      const q = parseFloat(fieldName === "quantity" ? value : row.quantity) || 0;
+      const r = parseFloat(fieldName === "rate" ? value : row.rate) || 0;
+      row.amount = Math.round(q * r * 100) / 100;
+    }
+    updated[index] = row;
+    setDraft({ ...draft, items: updated });
+  };
+
+  const addLineItem = () => {
+    const updated = [
+      ...(draft.items || []),
+      { description: "New Item", hsn_sac: "", quantity: 1, rate: 0, tax_rate: 18, amount: 0 },
+    ];
+    setDraft({ ...draft, items: updated });
+  };
+
+  const removeLineItem = (index) => {
+    const updated = (draft.items || []).filter((_, i) => i !== index);
+    setDraft({ ...draft, items: updated });
+  };
+
+  const lineItemsSum = (draft.items || []).reduce((acc, it) => acc + (parseFloat(it.amount) || 0), 0);
+  const itemsSumRounded = Math.round(lineItemsSum * 100) / 100;
+  const lineItemVariance = Math.round(Math.abs(numTaxable - itemsSumRounded) * 100) / 100;
+
   const field = (key, label, type = "text") => {
     const issue = getFieldIssue(key);
+    const confidence = getFieldConfidence(key);
     return (
       <div className="grid gap-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor={key} className="text-xs text-foreground font-semibold">
             {label}
           </Label>
-          {issue && (
-            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.2 text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400">
-              {issue}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {confidence && (
+              <span
+                className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-medium border ${
+                  confidence.confidence === "high" && confidence.verified
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : confidence.confidence === "medium"
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    : "bg-red-500/10 text-red-400 border-red-500/30"
+                }`}
+              >
+                {confidence.confidence === "high" && confidence.verified
+                  ? "Verified"
+                  : `${confidence.confidence.toUpperCase()}`}
+              </span>
+            )}
+            {issue && (
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.2 text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                {issue}
+              </span>
+            )}
+          </div>
         </div>
         <Input
           id={key}
@@ -549,47 +622,150 @@ export default function DocumentReview() {
                 </Select>
               </div>
 
-              {parsedExtractedData?.items?.length > 0 && (
-                <div className="mt-5 pt-5 border-t border-border">
-                  <div className="flex items-center justify-between mb-2.5">
+              {/* Interactive Line Items Editor */}
+              <div className="mt-5 pt-5 border-t border-border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                  <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                       <FileText className="size-3.5 text-blue-400" />
-                      Extracted Line Items ({parsedExtractedData.items.length})
+                      Line Items ({draft.items?.length || 0})
                     </h3>
-                    <span className="text-[10px] font-mono font-semibold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
-                      {extraction.model || "qwen2.5vl:7b"} Vision Extraction
-                    </span>
+                    {draft.items?.length > 0 && (
+                      <span className="text-[10px] font-mono font-semibold text-slate-400 bg-secondary px-2 py-0.5 rounded-full border border-border">
+                        Sum: ₹{itemsSumRounded.toFixed(2)}
+                      </span>
+                    )}
                   </div>
+                  <div className="flex items-center gap-2">
+                    {lineItemVariance > 0.05 && (draft.items?.length || 0) > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDraft({
+                            ...draft,
+                            taxableValue: itemsSumRounded.toFixed(2),
+                          });
+                          toast.success(`Taxable value updated to match line items sum (₹${itemsSumRounded.toFixed(2)})`);
+                        }}
+                        className="h-7 text-[10px] border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                      >
+                        <Sparkles className="size-3 mr-1" />
+                        Sync Subtotal to Items (₹{itemsSumRounded.toFixed(2)})
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={addLineItem}
+                      className="h-7 text-xs bg-secondary text-foreground hover:bg-secondary/80 border border-border"
+                    >
+                      <Plus className="size-3 mr-1" />
+                      Add Item
+                    </Button>
+                  </div>
+                </div>
+
+                {draft.items && draft.items.length > 0 ? (
                   <div className="overflow-x-auto rounded-xl border border-border bg-background/50 shadow-sm">
                     <table className="w-full text-left text-[11px]">
                       <thead className="bg-muted/40 border-b border-border text-[10px] uppercase font-semibold text-muted-foreground">
                         <tr>
-                          <th className="py-2 px-3">#</th>
-                          <th className="py-2 px-3">Description</th>
-                          <th className="py-2 px-3">HSN/SAC</th>
-                          <th className="py-2 px-3 text-right">Qty</th>
-                          <th className="py-2 px-3 text-right">Rate</th>
-                          <th className="py-2 px-3 text-right">Tax (%)</th>
-                          <th className="py-2 px-3 text-right">Amount</th>
+                          <th className="py-2 px-2.5 w-8">#</th>
+                          <th className="py-2 px-2.5 min-w-[140px]">Description</th>
+                          <th className="py-2 px-2.5 w-24">HSN/SAC</th>
+                          <th className="py-2 px-2.5 w-16 text-right">Qty</th>
+                          <th className="py-2 px-2.5 w-20 text-right">Rate</th>
+                          <th className="py-2 px-2.5 w-16 text-right">Tax %</th>
+                          <th className="py-2 px-2.5 w-24 text-right">Amount</th>
+                          <th className="py-2 px-2 w-8"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {parsedExtractedData.items.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-accent/30 transition">
-                            <td className="py-2 px-3 text-muted-foreground font-mono">{idx + 1}</td>
-                            <td className="py-2 px-3 font-medium text-foreground">{item.description || "—"}</td>
-                            <td className="py-2 px-3 font-mono text-muted-foreground">{item.hsn_sac || "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono">{item.quantity ?? "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono">{item.rate != null ? `₹${Number(item.rate).toFixed(2)}` : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono">{item.tax_rate != null ? `${item.tax_rate}%` : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono font-bold text-foreground">{item.amount != null ? `₹${Number(item.amount).toFixed(2)}` : "—"}</td>
+                        {draft.items.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-accent/20 transition">
+                            <td className="py-1.5 px-2.5 text-muted-foreground font-mono text-[10px]">{idx + 1}</td>
+                            <td className="py-1.5 px-2">
+                              <Input
+                                value={item.description || ""}
+                                onChange={(e) => updateLineItem(idx, "description", e.target.value)}
+                                className="h-7 text-[11px] bg-background border-border"
+                                placeholder="Item description..."
+                              />
+                            </td>
+                            <td className="py-1.5 px-2">
+                              <Input
+                                value={item.hsn_sac || ""}
+                                onChange={(e) => updateLineItem(idx, "hsn_sac", e.target.value)}
+                                className="h-7 text-[11px] font-mono bg-background border-border"
+                                placeholder="HSN/SAC"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              <Input
+                                type="number"
+                                step="any"
+                                value={item.quantity ?? 1}
+                                onChange={(e) => updateLineItem(idx, "quantity", e.target.value)}
+                                className="h-7 text-[11px] font-mono text-right bg-background border-border"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              <Input
+                                type="number"
+                                step="any"
+                                value={item.rate ?? 0}
+                                onChange={(e) => updateLineItem(idx, "rate", e.target.value)}
+                                className="h-7 text-[11px] font-mono text-right bg-background border-border"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              <Input
+                                type="number"
+                                step="any"
+                                value={item.tax_rate ?? 18}
+                                onChange={(e) => updateLineItem(idx, "tax_rate", e.target.value)}
+                                className="h-7 text-[11px] font-mono text-right bg-background border-border"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              <Input
+                                type="number"
+                                step="any"
+                                value={item.amount ?? 0}
+                                onChange={(e) => updateLineItem(idx, "amount", e.target.value)}
+                                className="h-7 text-[11px] font-mono font-bold text-right bg-background border-border text-foreground"
+                              />
+                            </td>
+                            <td className="py-1.5 px-1 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeLineItem(idx)}
+                                className="size-6 inline-flex items-center justify-center rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"
+                                title="Remove line item"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    <p>No line items recorded for this invoice.</p>
+                    <button
+                      type="button"
+                      onClick={addLineItem}
+                      className="mt-1 text-blue-400 hover:underline text-[11px] inline-flex items-center gap-1 font-semibold"
+                    >
+                      <Plus className="size-3" /> Add itemized row
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <div className="mt-6 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
                 <Button

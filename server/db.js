@@ -24,8 +24,26 @@ export const inMemoryUsers = new Map([
       openId: "admin-omambole-openid",
       name: "Om Ambole",
       email: "omambole2007@gmail.com",
+      phone: "+91 97665 49050",
       loginMethod: "local_auth",
       role: "admin",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-demo@prava.io",
+    {
+      id: 2,
+      openId: "user-demo@prava.io",
+      name: "Demo Founder",
+      email: "demo@prava.io",
+      phone: "+91 98200 12345",
+      passwordHash: "01059d5aefffedbb2c91f82e012243818a75aba6f531114531aa7543460d946d8784f060e0add0a0dd9f28de206781dceb8c29f8d0d9098750971e8fc4da780e",
+      passwordSalt: "88c310dd29d8646125fe3fd4ef195bd7",
+      loginMethod: "local_auth",
+      role: "owner",
       createdAt: new Date("2026-01-01"),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
@@ -41,7 +59,7 @@ export const inMemoryBusinesses = [
     legalName: "Prava Technologies Private Limited",
     businessType: "Private Limited Company",
     industry: "Financial Technology & Cloud Software",
-    email: "billing@prava.in",
+    email: "demo@prava.io",
     phone: "+91 98200 12345",
     addressLine1: "101, Tech Park, Andheri East",
     city: "Mumbai",
@@ -56,7 +74,7 @@ export const inMemoryBusinesses = [
     locale: "en-IN",
     timezone: "Asia/Kolkata",
     onboardingStep: 3,
-    onboardingCompletedAt: new Date(),
+    onboardingCompletedAt: new Date("2026-01-01"),
     membershipRole: "owner",
     updatedAt: new Date(),
   },
@@ -84,11 +102,12 @@ function loadDbStateFromDisk() {
       const raw = fs.readFileSync(DB_STATE_FILE, "utf-8");
       const data = JSON.parse(raw);
       if (Array.isArray(data.users)) {
+        inMemoryUsers.clear();
         for (const [k, v] of data.users) {
           inMemoryUsers.set(k, v);
         }
       }
-      if (Array.isArray(data.businesses) && data.businesses.length > 0) {
+      if (Array.isArray(data.businesses)) {
         inMemoryBusinesses.length = 0;
         inMemoryBusinesses.push(...data.businesses);
       }
@@ -96,6 +115,66 @@ function loadDbStateFromDisk() {
   } catch (err) {
     console.warn("[DB] Could not load persisted state:", err.message);
   }
+}
+
+export function resetInMemoryStateToCleanDefaults() {
+  inMemoryUsers.clear();
+  inMemoryUsers.set("admin-omambole-openid", {
+    id: 1,
+    openId: "admin-omambole-openid",
+    name: "Om Ambole",
+    email: "omambole2007@gmail.com",
+    phone: "+91 97665 49050",
+    loginMethod: "local_auth",
+    role: "admin",
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  });
+  inMemoryUsers.set("user-demo@prava.io", {
+    id: 2,
+    openId: "user-demo@prava.io",
+    name: "Demo Founder",
+    email: "demo@prava.io",
+    phone: "+91 98200 12345",
+    passwordHash: "01059d5aefffedbb2c91f82e012243818a75aba6f531114531aa7543460d946d8784f060e0add0a0dd9f28de206781dceb8c29f8d0d9098750971e8fc4da780e",
+    passwordSalt: "88c310dd29d8646125fe3fd4ef195bd7",
+    loginMethod: "local_auth",
+    role: "owner",
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  });
+
+  inMemoryBusinesses.length = 0;
+  inMemoryBusinesses.push({
+    id: 1,
+    ownerUserId: 2,
+    name: "Prava Technologies Private Limited",
+    legalName: "Prava Technologies Private Limited",
+    businessType: "Private Limited Company",
+    industry: "Financial Technology & Cloud Software",
+    email: "demo@prava.io",
+    phone: "+91 98200 12345",
+    addressLine1: "101, Tech Park, Andheri East",
+    city: "Mumbai",
+    state: "Maharashtra",
+    postalCode: "400069",
+    gstStatus: "registered",
+    gstin: "27AABCP8821F1Z2",
+    country: "IN",
+    taxSystem: "GST & Indian Direct Tax",
+    financialYear: "2024-25",
+    currency: "INR",
+    locale: "en-IN",
+    timezone: "Asia/Kolkata",
+    onboardingStep: 3,
+    onboardingCompletedAt: new Date("2026-01-01"),
+    membershipRole: "owner",
+    updatedAt: new Date(),
+  });
+
+  saveDbStateToDisk();
 }
 
 loadDbStateFromDisk();
@@ -357,17 +436,23 @@ export async function getBusinessesForUser(userId) {
         return [match];
       }
     }
-    if (userId === 1) return inMemoryBusinesses;
-    return [];
+    if (userId === 1 || userId === 2) return inMemoryBusinesses;
+    return inMemoryBusinesses.filter(b => b.ownerUserId === userId);
   }
   return db
     .select({
       id: businesses.id,
       name: businesses.name,
+      legalName: businesses.legalName,
       businessType: businesses.businessType,
       industry: businesses.industry,
+      email: businesses.email,
+      phone: businesses.phone,
+      addressLine1: businesses.addressLine1,
+      city: businesses.city,
+      state: businesses.state,
+      postalCode: businesses.postalCode,
       gstin: businesses.gstin,
-      registrationNumber: businesses.registrationNumber,
       gstStatus: businesses.gstStatus,
       country: businesses.country,
       taxSystem: businesses.taxSystem,
@@ -387,20 +472,29 @@ export async function getBusinessesForUser(userId) {
 }
 
 export async function getBusinessForUser(businessId, userId) {
+  const targetId = Number(businessId);
   const db = await getDb();
   if (!db) {
-    return (
-      inMemoryBusinesses.find(b => b.id === businessId && (b.ownerUserId === userId || userId === 1)) ??
-      inMemoryBusinesses.find(b => b.ownerUserId === userId) ??
-      null
-    );
+    const biz = inMemoryBusinesses.find(b => b.id === targetId);
+    if (!biz) return null;
+    if (userId === undefined || userId === null || biz.ownerUserId === userId || (biz.id === 1 && (userId === 1 || userId === 2))) {
+      return biz;
+    }
+    return null;
   }
   const result = await db
     .select({
       id: businesses.id,
       name: businesses.name,
+      legalName: businesses.legalName,
       businessType: businesses.businessType,
       industry: businesses.industry,
+      email: businesses.email,
+      phone: businesses.phone,
+      addressLine1: businesses.addressLine1,
+      city: businesses.city,
+      state: businesses.state,
+      postalCode: businesses.postalCode,
       gstStatus: businesses.gstStatus,
       gstin: businesses.gstin,
       country: businesses.country,
@@ -412,10 +506,11 @@ export async function getBusinessForUser(businessId, userId) {
       onboardingStep: businesses.onboardingStep,
       onboardingCompletedAt: businesses.onboardingCompletedAt,
       membershipRole: businessMembers.role,
+      updatedAt: businesses.updatedAt,
     })
     .from(businessMembers)
     .innerJoin(businesses, eq(businessMembers.businessId, businesses.id))
-    .where(and(eq(businessMembers.userId, userId), eq(businesses.id, businessId)))
+    .where(and(eq(businessMembers.userId, userId), eq(businesses.id, targetId)))
     .limit(1);
   return result[0];
 }
@@ -438,9 +533,12 @@ export async function createBusinessWithOwner(userId, input) {
       currency: input.currency ?? "INR",
       locale: input.locale ?? "en-IN",
       timezone: input.timezone ?? "Asia/Kolkata",
+      email: input.email || "",
       phone: input.phone || "",
+      addressLine1: input.addressLine1 || "",
       city: input.city || "",
       state: input.state || "",
+      postalCode: input.postalCode || "",
       onboardingStep: 3,
       onboardingCompletedAt: new Date(),
       membershipRole: "owner",
@@ -467,16 +565,17 @@ export async function updateBusinessOnboarding(
   userId,
   input
 ) {
+  const targetId = Number(input.businessId);
   const db = await getDb();
   if (!db) {
-    const target = inMemoryBusinesses.find(b => b.id === input.businessId && (b.ownerUserId === userId || userId === 1)) ?? inMemoryBusinesses[0];
+    const target = inMemoryBusinesses.find(b => b.id === targetId && (b.ownerUserId === userId || userId === 1)) ?? inMemoryBusinesses.find(b => b.id === targetId) ?? inMemoryBusinesses[0];
     if (target) {
-      Object.assign(target, { ...input, onboardingStep: input.complete ? 3 : 2, onboardingCompletedAt: input.complete ? new Date() : null });
+      Object.assign(target, { ...input, onboardingStep: input.complete ? 3 : 2, onboardingCompletedAt: input.complete ? new Date() : null, updatedAt: new Date() });
       saveDbStateToDisk();
     }
     return target;
   }
-  const permitted = await getBusinessForUser(input.businessId, userId);
+  const permitted = await getBusinessForUser(targetId, userId);
   if (!permitted || !["owner", "admin"].includes(permitted.membershipRole)) {
     throw new Error("You do not have permission to update this workspace.");
   }
@@ -487,9 +586,10 @@ export async function updateBusinessOnboarding(
       ...values,
       onboardingStep: complete ? 3 : 2,
       onboardingCompletedAt: complete ? new Date() : null,
+      updatedAt: new Date(),
     })
-    .where(eq(businesses.id, businessId));
-  return getBusinessForUser(businessId, userId);
+    .where(eq(businesses.id, targetId));
+  return getBusinessForUser(targetId, userId);
 }
 
 export async function updateBusinessProfile(
@@ -497,24 +597,26 @@ export async function updateBusinessProfile(
   input
 ) {
   const { businessId, ...values } = input;
+  const targetId = Number(businessId);
   const updateData = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined));
+  updateData.updatedAt = new Date();
   const db = await getDb();
   if (!db) {
-    const target = inMemoryBusinesses.find(b => b.id === businessId) ?? inMemoryBusinesses[0];
+    const target = inMemoryBusinesses.find(b => b.id === targetId && (b.ownerUserId === userId || userId === 1)) ?? inMemoryBusinesses.find(b => b.id === targetId) ?? inMemoryBusinesses[0];
     if (target) {
       Object.assign(target, updateData);
       saveDbStateToDisk();
     }
     return target;
   }
-  const permitted = await getBusinessForUser(businessId, userId);
+  const permitted = await getBusinessForUser(targetId, userId);
   if (!permitted || !["owner", "admin"].includes(permitted.membershipRole)) {
     throw new Error("You do not have permission to update this workspace.");
   }
   if (Object.keys(updateData).length > 0) {
-    await db.update(businesses).set(updateData).where(eq(businesses.id, businessId));
+    await db.update(businesses).set(updateData).where(eq(businesses.id, targetId));
   }
-  return getBusinessForUser(businessId, userId);
+  return getBusinessForUser(targetId, userId);
 }
 
 export async function getLatestFinancialSummaryForUser(userId, businessId) {

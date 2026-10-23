@@ -43,6 +43,8 @@ export const api = {
     forgotPasswordRequest: (body) => apiFetch("/auth/forgot-password/request", { method: "POST", body: JSON.stringify(body) }),
     forgotPasswordVerify: (body) => apiFetch("/auth/forgot-password/verify", { method: "POST", body: JSON.stringify(body) }),
     forgotPasswordReset: (body) => apiFetch("/auth/forgot-password/reset", { method: "POST", body: JSON.stringify(body) }),
+    googleConfig: () => apiFetch("/auth/google/config"),
+    googleLogin: (body) => apiFetch("/auth/google", { method: "POST", body: JSON.stringify(body) }),
     adminLogin: (body) => apiFetch("/auth/admin-login", { method: "POST", body: JSON.stringify(body) }),
     caLogin: (body) => apiFetch("/auth/ca-login", { method: "POST", body: JSON.stringify(body) }),
     logout: () => apiFetch("/auth/logout", { method: "POST" }),
@@ -50,6 +52,23 @@ export const api = {
   user: {
     profile: () => apiFetch("/user/profile"),
     changePassword: (body) => apiFetch("/user/change-password", { method: "POST", body: JSON.stringify(body) }),
+  },
+  reminders: {
+    list: (params) => {
+      const q = new URLSearchParams();
+      if (params?.businessId) q.set("businessId", params.businessId);
+      if (params?.unread) q.set("unread", "true");
+      const qs = q.toString() ? `?${q.toString()}` : "";
+      return apiFetch(`/reminders${qs}`);
+    },
+    markRead: (id) => apiFetch(`/reminders/${id}/read`, { method: "POST" }),
+    dismiss: (id) => apiFetch(`/reminders/${id}/dismiss`, { method: "POST" }),
+    getPreferences: (params) => {
+      const q = params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : "";
+      return apiFetch(`/reminders/preferences${q}`);
+    },
+    updatePreferences: (body) => apiFetch("/reminders/preferences", { method: "PUT", body: JSON.stringify(body) }),
+    triggerCheck: () => apiFetch("/reminders/trigger-check", { method: "POST" }),
   },
   invoices: {
     list: (params) => {
@@ -175,6 +194,13 @@ export const api = {
     schedule3Financials: (params) => apiFetch("/ca-engine/schedule3-financials", { method: "POST", body: JSON.stringify(params || {}) }),
     form3CdTaxAudit: () => apiFetch("/ca-engine/form3cd-tax-audit"),
     askCopilot: (body) => apiFetch("/ca-engine/ask-copilot", { method: "POST", body: JSON.stringify(body) }),
+    gstNoticeDefense: (body) => apiFetch("/ca-engine/gst-notice-defense", { method: "POST", body: JSON.stringify(body || {}) }),
+    auditWorkspace: (params) => apiFetch(`/ca-engine/audit-workspace${params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : ""}`),
+    booksCleanup: (params) => apiFetch(`/ca-engine/books-cleanup${params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : ""}`),
+    tdsWorkflow: (params) => apiFetch(`/ca-engine/tds-workflow${params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : ""}`),
+    ledgerReconciliation: (body) => apiFetch("/ca-engine/ledger-reconciliation", { method: "POST", body: JSON.stringify(body || {}) }),
+    rocCompliance: (params) => apiFetch(`/ca-engine/roc-compliance${params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : ""}`),
+    unifiedCalendar: (params) => apiFetch(`/ca-engine/unified-calendar${params?.businessId ? `?businessId=${encodeURIComponent(params.businessId)}` : ""}`),
   },
   admin: {
     billingOverview: () => apiFetch("/admin/billing-overview"),
@@ -197,6 +223,26 @@ export const api = {
     resetCaPassword: (body) => apiFetch("/admin/cas/reset-password", { method: "POST", body: JSON.stringify(body) }),
     assignCaToBusiness: (body) => apiFetch("/admin/cas/assign", { method: "POST", body: JSON.stringify(body) }),
     unassignCaFromBusiness: (body) => apiFetch("/admin/cas/unassign", { method: "POST", body: JSON.stringify(body) }),
+    overview: () => apiFetch("/admin/overview"),
+    businesses: (params) => {
+      const sp = new URLSearchParams();
+      if (params?.search) sp.set("search", params.search);
+      if (params?.status) sp.set("status", params.status);
+      if (params?.country) sp.set("country", params.country);
+      const q = sp.toString() ? `?${sp.toString()}` : "";
+      return apiFetch(`/admin/businesses${q}`);
+    },
+    businessDetail: (id) => apiFetch(`/admin/businesses/${id}`),
+    updateBusinessStatus: (id, body) => apiFetch(`/admin/businesses/${id}/status`, { method: "POST", body: JSON.stringify(body) }),
+    ocrQueue: (params) => {
+      const sp = new URLSearchParams();
+      if (params?.status) sp.set("status", params.status);
+      if (params?.limit) sp.set("limit", params.limit);
+      const q = sp.toString() ? `?${sp.toString()}` : "";
+      return apiFetch(`/admin/ocr/queue${q}`);
+    },
+    retryOcr: (id) => apiFetch(`/admin/ocr/retry/${id}`, { method: "POST" }),
+    analytics: () => apiFetch("/admin/analytics"),
   },
   ca: {
     dashboard: () => apiFetch("/ca/dashboard"),

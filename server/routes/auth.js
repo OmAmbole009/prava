@@ -11,6 +11,10 @@ import {
 } from "../controllers/auth.controller.js";
 import { signInLocalAdministrator, adminLoginSchema } from "../adminLogin.js";
 import { signInCa, caLoginSchema } from "../caAuth.js";
+import {
+  authenticateWithGoogle,
+  getGoogleOAuthConfiguration,
+} from "../services/googleAuth.service.js";
 import { sendData, sendError } from "../_core/middleware.js";
 
 export const authRouter = Router();
@@ -107,6 +111,33 @@ authRouter.post("/ca-login", async (req, res) => {
     return sendData(res, result);
   } catch (error) {
     return sendError(res, error, error.statusCode || 401);
+  }
+});
+
+// Google OAuth Endpoints
+authRouter.get("/google/config", (req, res) => {
+  return sendData(res, getGoogleOAuthConfiguration());
+});
+
+authRouter.post("/google", async (req, res) => {
+  try {
+    const result = await authenticateWithGoogle({ req, res }, req.body);
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error, error.statusCode || 401);
+  }
+});
+
+authRouter.get("/google/callback", async (req, res) => {
+  try {
+    const code = req.query.code;
+    if (!code) {
+      return res.redirect("/login?error=" + encodeURIComponent("Missing Google authorization code."));
+    }
+    const result = await authenticateWithGoogle({ req, res }, { code: String(code) });
+    return res.redirect(result.redirectTo || "/dashboard");
+  } catch (error) {
+    return res.redirect("/login?error=" + encodeURIComponent(error.message || "Google sign in failed."));
   }
 });
 

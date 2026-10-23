@@ -1,0 +1,107 @@
+{
+  "executedAt": "2026-10-22T13:06:22.979Z",
+  "totalTestCases": 4,
+  "overallExactMatchAccuracy": "100.0%",
+  "mathConsistencyRate": "100.0%",
+  "autoCompletionRate": "100.0%",
+  "avgProcessingTimeMs": "755ms",
+  "totalItemsExtracted": 7,
+  "testCaseResults": [
+    {
+      "id": "TC-01-IGST",
+      "name": "Inter-State IGST Tax Invoice (3 Line Items)",
+      "file": "test-igst-invoice.png",
+      "success": true,
+      "elapsedMs": 814,
+      "extracted": {
+        "documentType": "invoice",
+        "vendorName": "Bangalore Cloud Systems LLP",
+        "gstin": "29AAGCB5555M1Z8",
+        "invoiceNumber": "BCS/2026/109",
+        "taxableValue": "100000.00",
+        "cgst": "0.00",
+        "sgst": "0.00",
+        "igst": "18000.00",
+        "total": "118000.00",
+        "itemsCount": 3,
+        "confidenceBps": 9600,
+        "status": "extracted"
+      },
+      "exactMatchRatio": "6/6",
+      "isMathConsistent": true,
+      "reviewReasons": []
+    },
+    {
+      "id": "TC-02-CREDIT-NOTE",
+      "name": "Section 34 Credit Note with Linked Invoice Reference",
+      "file": "test-credit-note.png",
+      "success": true,
+      "elapsedMs": 580,
+      "extracted": {
+        "documentType": "credit_note",
+        "vendorName": "Apex Solutions Pvt Ltd",
+        "gstin": "27AABCU9603R1ZM",
+        "invoiceNumber": "CN-2026-001",
+        "taxableValue": "20000.00",
+        "cgst": "1800.00",
+        "sgst": "1800.00",
+        "igst": "0.00",
+        "total": "23600.00",
+        "itemsCount": 1,
+        "confidenceBps": 9600,
+        "status": "extracted"
+      },
+      "exactMatchRatio": "6/6",
+      "isMathConsistent": true,
+      "reviewReasons": []
+    },
+    {
+      "id": "TC-03-BILL-OF-SUPPLY",
+      "name": "Exempt Bill of Supply (0% Tax / Composition)",
+      "file": "test-bill-of-supply.png",
+      "success": true,
+      "elapsedMs": 424,
+      "extracted": {
+        "documentType": "invoice",
+        "vendorName": "Ganesh General Traders",
+        "gstin": "27AAECG1111Q1Z3",
+        "invoiceNumber": "BOS-2026-104",
+        "taxableValue": "4500.00",
+        "cgst": "0.00",
+        "sgst": "0.00",
+        "igst": "0.00",
+        "total": "4500.00",
+        "itemsCount": 0,
+        "confidenceBps": 9600,
+        "status": "extracted"
+      },
+      "exactMatchRatio": "6/6",
+      "isMathConsistent": true,
+      "reviewReasons": []
+    },
+    {
+      "id": "TC-04-PDF-STANDARD",
+      "name": "Rendered Standard Multi-Page/Vector PDF Invoice",
+      "file": "test-invoice.pdf",
+      "success": true,
+      "elapsedMs": 1201,
+      "extracted": {
+        "documentType": "invoice",
+        "vendorName": "Bangalore Cloud Systems LLP",
+        "gstin": "29AGCBS5555M1Z8",
+        "invoiceNumber": "BCS/2026/109",
+        "taxableValue": "100000.00",
+        "cgst": "0.00",
+        "sgst": "0.00",
+        "igst": "18000.00",
+        "total": "118000.00",
+        "itemsCount": 3,
+        "confidenceBps": 9600,
+        "status": "extracted"
+      },
+      "exactMatchRatio": "6/6",
+      "isMathConsistent": true,
+      "reviewReasons": []
+    }
+  ]
+}

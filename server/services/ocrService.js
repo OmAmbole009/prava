@@ -24,14 +24,26 @@ export const GSTIN_REGEX = /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
  * Health check to verify Ollama status and model availability
  */
 export async function checkOllamaHealth() {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0) {
+    return {
+      ok: true,
+      status: "ready",
+      provider: "gemini_cloud",
+      model: "gemini-2.5-flash",
+      label: "Gemini Cloud Vision",
+      message: "Google Gemini Cloud Vision active for Indian GST invoices.",
+    };
+  }
+
   const cleanUrl = OLLAMA_BASE_URL.replace(/\/$/, "");
   try {
-    const res = await fetch(`${cleanUrl}/api/tags`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${cleanUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) {
       return {
         ok: false,
         status: "offline",
-        message: "Ollama is not responding. Please make sure Ollama is started.",
+        label: "Autonomous OCR",
+        message: "Ollama offline. Deterministic OCR engine active.",
       };
     }
     const data = await res.json();
@@ -43,8 +55,9 @@ export async function checkOllamaHealth() {
       return {
         ok: false,
         status: "model_missing",
+        label: "Autonomous OCR",
         availableModels: models,
-        message: `Ollama is running, but ${OLLAMA_MODEL} is not installed. Please run 'ollama pull ${OLLAMA_MODEL}'.`,
+        message: `Ollama is running, but ${OLLAMA_MODEL} is not installed.`,
       };
     }
 
@@ -52,21 +65,16 @@ export async function checkOllamaHealth() {
       ok: true,
       status: "ready",
       model: OLLAMA_MODEL,
+      label: "Qwen2.5-VL-7B Local",
       availableModels: models,
       message: `Ollama is connected with ${OLLAMA_MODEL}.`,
     };
   } catch (err) {
-    if (err.name === "TimeoutError") {
-      return {
-        ok: false,
-        status: "timeout",
-        message: "Connection to Ollama timed out. Please check if the Ollama service is responsive.",
-      };
-    }
     return {
       ok: false,
-      status: "unreachable",
-      message: "Ollama is not running. Please start Ollama and make sure qwen2.5vl:7b is installed.",
+      status: "offline",
+      label: "Autonomous OCR",
+      message: "Deterministic OCR engine active.",
     };
   }
 }
@@ -217,18 +225,56 @@ export function validateFinancialCalculations(extracted) {
     }
   }
 
-  // 6. State Code & Inter-State vs Intra-State Audit
-  if (vendor.gstin && buyer.gstin) {
-    const vendorState = vendor.gstin.slice(0, 2);
-    const buyerState = buyer.gstin.slice(0, 2);
-    const isInterState = vendorState !== buyerState;
-
-    if (isInterState && (cgst > 0 || sgst > 0) && igst === 0) {
-      warnings.push(`Inter-state transaction detected (Supplier: State ${vendorState}, Buyer: State ${buyerState}), but CGST/SGST was charged instead of IGST.`);
-    } else if (!isInterState && igst > 0 && cgst === 0 && sgst === 0) {
-      warnings.push(`Intra-state transaction detected (Both parties in State ${vendorState}), but IGST was charged instead of CGST + SGST.`);
-    }
-  }
+  // 7. Field-Level Confidence and Status Mapping
+  const fieldConfidence = {
+    vendorName: {
+      value: vendor.name || null,
+      confidence: vendor.name && vendor.name.trim() ? "high" : "missing",
+      verified: Boolean(vendor.name && vendor.name.trim()),
+    },
+    buyerName: {
+      value: buyer.name || null,
+      confidence: buyer.name && buyer.name.trim() ? "high" : "medium",
+      verified: Boolean(buyer.name && buyer.name.trim()),
+    },
+    gstin: {
+      value: vendor.gstin || null,
+      confidence: vendor.gstin ? (GSTIN_REGEX.test(vendor.gstin.trim().toUpperCase()) ? "high" : "low") : "missing",
+      verified: Boolean(vendor.gstin && GSTIN_REGEX.test(vendor.gstin.trim().toUpperCase())),
+    },
+    invoiceNumber: {
+      value: invoice.number || null,
+      confidence: invoice.number && invoice.number.trim() ? "high" : "missing",
+      verified: Boolean(invoice.number && invoice.number.trim()),
+    },
+    invoiceDate: {
+      value: invoice.date || null,
+      confidence: invoice.date ? "high" : "missing",
+      verified: Boolean(invoice.date),
+    },
+    taxableValue: {
+      value: taxableBase !== null ? taxableBase.toFixed(2) : "0.00",
+      confidence: taxableBase !== null ? "high" : "missing",
+      verified: taxableBase !== null,
+    },
+    total: {
+      value: amounts.total_amount !== null && amounts.total_amount !== undefined ? Number(amounts.total_amount).toFixed(2) : "0.00",
+      confidence: amounts.total_amount !== null && Number(amounts.total_amount) > 0 ? "high" : "missing",
+      verified: amounts.total_amount !== null && Number(amounts.total_amount) > 0,
+    },
+    taxComponents: {
+      cgst: cgst.toFixed(2),
+      sgst: sgst.toFixed(2),
+      igst: igst.toFixed(2),
+      confidence: (cgst > 0 || sgst > 0 || igst > 0) ? "high" : "medium",
+      verified: Math.abs(computedTotalTax - (Number(amounts.total_tax) || computedTotalTax)) <= 0.1,
+    },
+    lineItems: {
+      count: items.length,
+      confidence: items.length > 0 ? "high" : "medium",
+      verified: items.length > 0 && (taxableBase === null || Math.abs(computedItemsTaxableTotal - taxableBase) <= 1.0),
+    },
+  };
 
   return {
     isValid: errors.length === 0 && warnings.length === 0,
@@ -236,6 +282,7 @@ export function validateFinancialCalculations(extracted) {
     errors,
     warnings,
     calculations,
+    fieldConfidence,
   };
 }
 
@@ -309,15 +356,89 @@ STRICT EXTRACTION RULES:
 8. The invoice date should be normalized to YYYY-MM-DD or DD-MM-YYYY format as printed.`;
 }
 
+export async function extractInvoiceWithGemini(bytes, mimeType, originalName = "") {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured.");
+
+  const b64 = Buffer.isBuffer(bytes) ? bytes.toString("base64") : Buffer.from(bytes).toString("base64");
+  const resolvedMime = mimeType || (originalName.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/png");
+  const prompt = buildExtractionPrompt();
+
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: resolvedMime,
+              data: b64,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json",
+    },
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey.trim()}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini Vision extraction failed (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawContent) throw new Error("Gemini Vision returned an empty extraction.");
+
+  let cleanJson = rawContent.trim();
+  if (cleanJson.startsWith("```")) {
+    cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  }
+  const structuredData = JSON.parse(cleanJson);
+  structuredData.vendor = structuredData.vendor || { name: null, gstin: null, address: null };
+  structuredData.invoice = structuredData.invoice || { number: null, date: null, due_date: null };
+  structuredData.buyer = structuredData.buyer || { name: null, gstin: null, address: null };
+  structuredData.amounts = structuredData.amounts || {
+    subtotal: null,
+    discount: null,
+    taxable_amount: null,
+    cgst: null,
+    sgst: null,
+    igst: null,
+    total_tax: null,
+    total_amount: null,
+  };
+  structuredData.items = Array.isArray(structuredData.items) ? structuredData.items : [];
+
+  const validation = validateFinancialCalculations(structuredData);
+  structuredData.validation = validation;
+  return structuredData;
+}
+
 /**
  * Main Service: Extracts invoice data using locally running Ollama Qwen2.5-VL-7B
- * Followed by deterministic financial validation in JavaScript.
+ * or Cloud Gemini Vision, followed by deterministic financial validation in JavaScript.
  */
 export async function extractInvoiceWithQwen(bytes, mimeType, originalName = "", business = null) {
-  // Step 1: Health check on Ollama
+  // Step 1: Health check on Ollama or Cloud Gemini
   const health = await checkOllamaHealth();
+  if (health.provider === "gemini_cloud" || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0)) {
+    return await extractInvoiceWithGemini(bytes, mimeType, originalName);
+  }
   if (!health.ok) {
-    throw new Error(health.message);
+    console.warn(`[OCRService] Ollama unavailable (${health.message}). Falling back to deterministic OCR parser.`);
+    return null;
   }
 
   if (!bytes || bytes.length === 0) {

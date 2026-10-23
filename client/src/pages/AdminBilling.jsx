@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/DashboardLayout";
+import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,14 +72,14 @@ export default function AdminBilling() {
         overview.data?.plans,
     ]);
     if (overview.isLoading)
-        return (<DashboardLayout>
+        return (<AdminLayout title="Billing & Plans">
         <div className="flex min-h-[60vh] items-center justify-center text-xs text-muted-foreground">
           <Loader2 className="mr-2 size-4 animate-spin text-primary"/>
           Loading administration console…
         </div>
-      </DashboardLayout>);
+      </AdminLayout>);
     if (overview.error || !overview.data)
-        return (<DashboardLayout>
+        return (<AdminLayout title="Billing & Plans">
         <div className="mx-auto mt-16 max-w-xl rounded-2xl border border-destructive/20 bg-destructive/10 p-7">
           <AlertCircle className="size-5 text-destructive"/>
           <h1 className="font-serif mt-3 text-lg font-bold text-foreground">Administrative access is required.</h1>
@@ -87,8 +87,8 @@ export default function AdminBilling() {
             {overview.error?.message ?? "This console is available only to authorized administrators."}
           </p>
         </div>
-      </DashboardLayout>);
-    return (<DashboardLayout>
+      </AdminLayout>);
+    return (<AdminLayout title="Billing & Plans" subtitle="Subscription tier configurations, enterprise quota gates, and active platform memberships.">
       <div className="mx-auto max-w-6xl py-2 space-y-7">
         {/* Banner */}
         <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card/90 via-card/50 to-card/90 p-7 shadow-xl backdrop-blur-xl sm:p-9">
@@ -342,5 +342,5 @@ export default function AdminBilling() {
           </section>
         </div>
       </div>
-    </DashboardLayout>);
+    </AdminLayout>);
 }

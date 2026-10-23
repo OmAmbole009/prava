@@ -103,6 +103,7 @@ jspm_packages/
 tmp/
 temp/
 .storage_cache/
+scratch/
 scratch_*
 
 # Database

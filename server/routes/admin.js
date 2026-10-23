@@ -266,4 +266,87 @@ router.post("/cas/unassign", async (req, res) => {
   }
 });
 
+// Platform Administration & Telemetry
+router.get("/overview", async (_req, res) => {
+  try {
+    const { getPlatformOverview } = await import("../services/adminPlatformService.js");
+    const overview = await getPlatformOverview();
+    return sendData(res, overview);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get("/businesses", async (req, res) => {
+  try {
+    const { getAdminBusinessesList } = await import("../services/adminPlatformService.js");
+    const list = await getAdminBusinessesList({
+      search: req.query.search || "",
+      status: req.query.status || "all",
+      country: req.query.country || "all",
+    });
+    return sendData(res, list);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get("/businesses/:id", async (req, res) => {
+  try {
+    const { getAdminBusinessDetail } = await import("../services/adminPlatformService.js");
+    const detail = await getAdminBusinessDetail(Number(req.params.id));
+    return sendData(res, detail);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post("/businesses/:id/status", async (req, res) => {
+  try {
+    const { setBusinessAccountStatus } = await import("../services/adminPlatformService.js");
+    const result = await setBusinessAccountStatus(
+      req.user.id,
+      Number(req.params.id),
+      req.body.status,
+      req.body.reason || ""
+    );
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get("/ocr/queue", async (req, res) => {
+  try {
+    const { getAdminOcrQueue } = await import("../services/adminPlatformService.js");
+    const queue = await getAdminOcrQueue({
+      status: req.query.status || "all",
+      limit: Number(req.query.limit) || 50,
+    });
+    return sendData(res, queue);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post("/ocr/retry/:id", async (req, res) => {
+  try {
+    const { retryOcrExtraction } = await import("../services/adminPlatformService.js");
+    const result = await retryOcrExtraction(req.user.id, Number(req.params.id));
+    return sendData(res, result);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get("/analytics", async (_req, res) => {
+  try {
+    const { getAdminAnalytics } = await import("../services/adminPlatformService.js");
+    const analytics = await getAdminAnalytics();
+    return sendData(res, analytics);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 export default router;

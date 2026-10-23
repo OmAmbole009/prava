@@ -25,8 +25,11 @@ export default function CaSuite() {
     const [npsContributionPct, setNpsContributionPct] = useState(14); // 14% Sec 80CCD(2)
     // Notice Defense state
     const [noticeType, setNoticeType] = useState("gst_asmt_10");
-    const [noticeRef, setNoticeRef] = useState("");
-    const [disputedAmount, setDisputedAmount] = useState(0);
+    const [noticeRef, setNoticeRef] = useState("GST/2026/ASMT10/8821");
+    const [disputedAmount, setDisputedAmount] = useState(125000);
+    const [gstNoticeMode, setGstNoticeMode] = useState("drc06"); // "drc06" or "petition"
+    const [gstDiscrepancyType, setGstDiscrepancyType] = useState("gstr2b_vs_3b_itc");
+    const [clearedAnomalies, setClearedAnomalies] = useState({});
     // AI Invoice Auditor state
     const [auditVendorName, setAuditVendorName] = useState("");
     const [auditVendorGstin, setAuditVendorGstin] = useState("");
@@ -97,46 +100,68 @@ export default function CaSuite() {
     const gstnFilingQuery = useQuery({ queryKey: ["caEngine", "gstnFilingJson", activeBiz?.id, activeBiz?.gstin], queryFn: () => api.caEngine.gstnFilingJson({ businessId: activeBiz?.id, gstin: activeBiz?.gstin || undefined }), enabled: !!activeBiz?.id });
     const schedule3Query = useQuery({ queryKey: ["caEngine", "schedule3Financials", activeBiz?.id], queryFn: () => api.caEngine.schedule3Financials({ businessId: activeBiz?.id }), enabled: !!activeBiz?.id });
     const form3CdQuery = useQuery({ queryKey: ["caEngine", "form3CdTaxAudit"], queryFn: () => api.caEngine.form3CdTaxAudit() });
+    const auditWorkspaceQuery = useQuery({ queryKey: ["caEngine", "auditWorkspace", activeBiz?.id], queryFn: () => api.caEngine.auditWorkspace({ businessId: activeBiz?.id }), enabled: !!activeBiz?.id });
+    const booksCleanupQuery = useQuery({ queryKey: ["caEngine", "booksCleanup", activeBiz?.id], queryFn: () => api.caEngine.booksCleanup({ businessId: activeBiz?.id }), enabled: !!activeBiz?.id });
+    const rocComplianceQuery = useQuery({ queryKey: ["caEngine", "rocCompliance", activeBiz?.id], queryFn: () => api.caEngine.rocCompliance({ businessId: activeBiz?.id }), enabled: !!activeBiz?.id });
     // Mutations
     const noticeMutation = useMutation({
-    mutationFn: (body) => api.caEngine.draftNoticeDefense(body),
-        onSuccess: () => {
-            toast.success("Legal defense petition generated with statutory citations!");
-        },
-        onError: (err) => {
-            toast.error(err.message || "Failed to generate legal defense petition");
-        },
+      mutationFn: (body) => api.caEngine.draftNoticeDefense(body),
+      onSuccess: () => {
+        toast.success("Legal defense petition generated with statutory citations!");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to generate legal defense petition");
+      },
+    });
+    const gstNoticeDefenseMutation = useMutation({
+      mutationFn: (body) => api.caEngine.gstNoticeDefense(body),
+      onSuccess: () => {
+        toast.success("Form GST DRC-06 response drafted with Rule 99 & Suncraft Energy citations!");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to generate Form GST DRC-06 defense");
+      },
     });
     const invoiceAuditMutation = useMutation({
-    mutationFn: (body) => api.caEngine.auditInvoice(body),
-        onSuccess: () => {
-            toast.success("AI CA Audit Completed: Statutory Voucher generated!");
-        },
-        onError: (err) => {
-            toast.error(err.message || "Failed to audit invoice");
-        },
+      mutationFn: (body) => api.caEngine.auditInvoice(body),
+      onSuccess: () => {
+        toast.success("AI CA Audit Completed: Statutory Voucher generated!");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to audit invoice");
+      },
     });
     const copilotMutation = useMutation({
-    mutationFn: (body) => api.caEngine.askCopilot(body),
-        onSuccess: () => {
-            toast.success("Statutory CA legal opinion retrieved from RAG knowledge base!");
-        },
-        onError: (err) => {
-            toast.error(err.message || "Failed to retrieve CA opinion");
-        },
+      mutationFn: (body) => api.caEngine.askCopilot(body),
+      onSuccess: () => {
+        toast.success("Statutory CA legal opinion retrieved from RAG knowledge base!");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to retrieve CA opinion");
+      },
     });
     const handleGenerateNotice = () => {
-        if (!noticeRef.trim()) {
-            toast.error("Please enter a Notice Reference Number / DIN.");
-            return;
-        }
-        noticeMutation.mutate({
-            noticeType,
-            noticeRef: noticeRef.trim(),
-            disputedAmount,
-            taxpayerName: activeBiz?.name || "Your Enterprise Workspace",
-            gstinOrPan: activeBiz?.gstin || "",
+      if (!noticeRef.trim()) {
+        toast.error("Please enter a Notice Reference Number / DIN.");
+        return;
+      }
+      if (gstNoticeMode === "drc06") {
+        gstNoticeDefenseMutation.mutate({
+          businessId: activeBiz?.id,
+          noticeNumber: noticeRef.trim(),
+          noticeType: noticeType === "gst_asmt_10" ? "ASMT-10" : noticeType === "gst_drc_01" ? "DRC-01" : "ASMT-10",
+          allegedTaxDifference: disputedAmount,
+          discrepancyType: gstDiscrepancyType,
         });
+      } else {
+        noticeMutation.mutate({
+          noticeType,
+          noticeRef: noticeRef.trim(),
+          disputedAmount,
+          taxpayerName: activeBiz?.name || "Your Enterprise Workspace",
+          gstinOrPan: activeBiz?.gstin || "",
+        });
+      }
     };
     const handleAuditInvoice = () => {
         if (!auditVendorName.trim() && !auditInvoiceNumber.trim()) {
@@ -346,6 +371,42 @@ export default function CaSuite() {
         downloadTextFile(`Notice_Defense_${noticeRef || "Petition"}.txt`, text);
     };
 
+    const downloadAuditBinderCsv = () => {
+        const data = auditWorkspaceQuery.data;
+        if (!data) return;
+        const rows = [
+            ["STATUTORY AUDIT EVIDENCE INDEX", `"${data.legalName || data.businessName}"`],
+            ["Entity Type", data.entityType],
+            ["Audit Readiness", `${data.readinessScorePct}% (${data.readinessStatus})`],
+            ["Generated", new Date().toISOString()],
+            [],
+            ["AUDIT CHECKLIST SCHEDULE"],
+            ["Category", "Mandatory Item", "Required", "Audit Status", "Evidence Source"],
+            ...(data.checklist || []).map(c => [
+                `"${c.category}"`,
+                `"${c.item}"`,
+                c.required ? "Mandatory" : "Optional",
+                `"${c.status}"`,
+                `"${c.evidenceSource}"`,
+            ]),
+            [],
+            ["EVIDENCE BINDER INDEX"],
+            ["Binder Index", "Section", "Vouchers/Documents Indexed"],
+            ...(data.evidenceIndex || []).map(e => [
+                e.binderIndex,
+                `"${e.section}"`,
+                e.documentsIndexed,
+            ]),
+        ];
+        downloadTextFile(`Audit_Evidence_Binder_${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.join(",")).join("\n"));
+    };
+
+    const downloadDrc06NoticeTxt = () => {
+        const d = gstNoticeDefenseMutation.data;
+        if (!d) return;
+        downloadTextFile(`DRC06_Notice_Reply_${noticeRef || "Defense"}.txt`, d.draftReplyText || "");
+    };
+
     // Preset invoice audit profiles
     const applyInvoicePreset = (preset) => {
         setAuditVendorName(preset.vendor);
@@ -541,6 +602,18 @@ export default function CaSuite() {
               <TabsTrigger value="notice-defense" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
                 <Scale className="size-3.5 shrink-0 text-rose-500"/>
                 <span>Notice Defense</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit-prep" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
+                <FileCheck className="size-3.5 shrink-0 text-emerald-400"/>
+                <span>Audit Prep</span>
+              </TabsTrigger>
+              <TabsTrigger value="books-cleanup" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
+                <Sparkles className="size-3.5 shrink-0 text-amber-400"/>
+                <span>Books Cleanup</span>
+              </TabsTrigger>
+              <TabsTrigger value="roc-compliance" className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all hover:bg-accent/60">
+                <Building2 className="size-3.5 shrink-0 text-indigo-400"/>
+                <span>ROC & MCA</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1912,93 +1985,526 @@ Remarks: ${c.remarks}`).join("\n\n")}`;
           {/* ========================================================= */}
           {/* TAB 11: TAX NOTICE DEFENSE (PETITION GENERATOR)           */}
           {/* ========================================================= */}
+          {/* ========================================================= */}
+          {/* TAB 11: TAX NOTICE DEFENSE (PETITION & DRC-06 GENERATOR)  */}
+          {/* ========================================================= */}
           <TabsContent value="notice-defense" className="space-y-5">
             <div className="grid gap-5 lg:grid-cols-3">
               <Card className="border-border bg-card/95 shadow-md">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Scale className="size-4 text-blue-400"/>
-                    Notice Parameters
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Scale className="size-4 text-blue-400"/>
+                      Notice Parameters
+                    </CardTitle>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Rule 99 / Sec 61
+                    </span>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-xs">
                   <div className="space-y-1">
-                    <Label className="text-xs">Notice Statutory Type</Label>
-                    <select value={noticeType} onChange={(e) => setNoticeType(e.target.value)} className="w-full text-xs h-8 rounded-md border border-input bg-background px-2">
-                      <option value="gst_asmt_10">GST ASMT-10 (GSTR-2B vs 3B Mismatch)</option>
-                      <option value="it_143_1">IT Section 143(1) Intimation</option>
-                      <option value="it_139_9">IT Section 139(9) Defective Return</option>
-                      <option value="gst_drc_01">GST DRC-01 (Show Cause Notice)</option>
-                    </select>
+                    <Label className="text-xs">Defense Protocol</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={gstNoticeMode === "drc06" ? "default" : "outline"}
+                        onClick={() => setGstNoticeMode("drc06")}
+                        className="text-[11px] h-7 font-semibold"
+                      >
+                        Form GST DRC-06
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={gstNoticeMode === "petition" ? "default" : "outline"}
+                        onClick={() => setGstNoticeMode("petition")}
+                        className="text-[11px] h-7 font-semibold"
+                      >
+                        Legal Petition
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs">Notice DIN / Ref</Label>
+                    <Label className="text-xs">Notice Statutory Type</Label>
+                    <select value={noticeType} onChange={(e) => setNoticeType(e.target.value)} className="w-full text-xs h-8 rounded-md border border-input bg-background px-2">
+                      <option value="gst_asmt_10">GST ASMT-10 (GSTR-2B vs 3B Scrutiny)</option>
+                      <option value="gst_drc_01">GST DRC-01 (Show Cause Notice)</option>
+                      <option value="it_143_1">IT Section 143(1) Intimation</option>
+                      <option value="it_139_9">IT Section 139(9) Defective Return</option>
+                    </select>
+                  </div>
+
+                  {gstNoticeMode === "drc06" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Discrepancy Allegation</Label>
+                      <select value={gstDiscrepancyType} onChange={(e) => setGstDiscrepancyType(e.target.value)} className="w-full text-xs h-8 rounded-md border border-input bg-background px-2">
+                        <option value="gstr2b_vs_3b_itc">GSTR-2B vs 3B ITC Mismatch</option>
+                        <option value="gstr1_vs_3b_outward">GSTR-1 vs 3B Turnover Mismatch</option>
+                        <option value="sec_16_4_time_bar">Section 16(4) ITC Cutoff Window</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">Notice DIN / Number</Label>
                     <Input value={noticeRef} onChange={(e) => setNoticeRef(e.target.value)} className="text-xs h-8 font-mono bg-background"/>
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs">Disputed Tax (₹)</Label>
+                    <Label className="text-xs">Disputed Tax Amount (₹)</Label>
                     <Input type="number" value={disputedAmount} onChange={(e) => setDisputedAmount(Number(e.target.value) || 0)} className="text-xs h-8 font-mono bg-background"/>
                   </div>
 
-                  <Button type="button" onClick={handleGenerateNotice} disabled={noticeMutation.isPending} className="w-full text-xs h-9 font-bold bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white shadow-sm mt-2">
+                  <Button
+                    type="button"
+                    onClick={handleGenerateNotice}
+                    disabled={noticeMutation.isPending || gstNoticeDefenseMutation.isPending}
+                    className="w-full text-xs h-9 font-bold bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white shadow-sm mt-2"
+                  >
                     <Sparkles className="size-3.5 mr-1"/>
-                    Generate Legal Reply Petition
+                    {gstNoticeMode === "drc06" ? "Draft Form GST DRC-06" : "Generate Legal Reply Petition"}
                   </Button>
                 </CardContent>
               </Card>
 
               <div className="lg:col-span-2">
-                <Card className="border-border bg-card/95 shadow-md">
-                  <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xs font-bold">
-                        {noticeMutation.data?.title || "Legal Petition Draft (Ready to File)"}
-                      </CardTitle>
-                      <CardDescription className="text-[11px]">
-                        {noticeMutation.data?.subject || "Includes Supreme Court & High Court case citations"}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {noticeMutation.data && (
-                        <>
-                          <Button size="sm" onClick={downloadNoticeDefenseTxt} className="text-xs h-7 bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] text-white gap-1 font-semibold shadow-sm">
-                            <Download className="size-3"/> Download Petition (.txt)
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => copyToClipboard(JSON.stringify(noticeMutation.data, null, 2))} className="text-xs h-7 gap-1">
-                            <Copy className="size-3"/> Copy Text
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-3 text-xs leading-relaxed">
-                    {noticeMutation.data ? (<div className="space-y-3">
-                        <div>
-                          <h5 className="font-bold text-foreground text-xs uppercase mb-1">Judicial Citations:</h5>
-                          <ul className="list-disc list-inside font-mono text-[11px] text-muted-foreground">
-                            {noticeMutation.data.citations.map((c, i) => (<li key={i}>{c}</li>))}
-                          </ul>
+                {gstNoticeMode === "drc06" && gstNoticeDefenseMutation.data ? (
+                  <Card className="border-border bg-card/95 shadow-md">
+                    <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-xs font-bold">
+                            {gstNoticeDefenseMutation.data.statutoryForm} Reply Under Rule 99
+                          </CardTitle>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {gstNoticeDefenseMutation.data.daysRemaining} Days Remaining (Due: {gstNoticeDefenseMutation.data.responseDeadline})
+                          </span>
                         </div>
-                        <div>
-                          <h5 className="font-bold text-foreground text-xs uppercase mb-1">Legal Grounds:</h5>
-                          <div className="space-y-1.5">
-                            {noticeMutation.data.legalGrounds.map((g, i) => (<p key={i} className="p-2 rounded bg-muted/40 font-mono text-[11px]">{g}</p>))}
+                        <CardDescription className="text-[11px] mt-0.5">
+                          Notice: {gstNoticeDefenseMutation.data.noticeNumber} • Disputed: ₹{formatInr(gstNoticeDefenseMutation.data.allegedTaxDifference)}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={downloadDrc06NoticeTxt} className="text-xs h-7 bg-blue-600 hover:bg-blue-500 text-white gap-1 font-semibold shadow-sm">
+                          <Download className="size-3"/> Download DRC-06 (.txt)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => copyToClipboard(gstNoticeDefenseMutation.data.draftReplyText)} className="text-xs h-7 gap-1">
+                          <Copy className="size-3"/> Copy Text
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3.5 text-xs leading-relaxed">
+                      <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-300">
+                        <strong>Statutory CA Notice:</strong> {gstNoticeDefenseMutation.data.warning}
+                      </div>
+
+                      <div>
+                        <h5 className="font-bold text-foreground text-xs uppercase mb-1">Statutory & Judicial Citations:</h5>
+                        <ul className="list-disc list-inside font-mono text-[11px] text-muted-foreground space-y-0.5">
+                          {gstNoticeDefenseMutation.data.legalCitations.map((c, i) => (
+                            <li key={i}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h5 className="font-bold text-foreground text-xs uppercase mb-1">Defense Grounds on Merits:</h5>
+                        <div className="space-y-1.5">
+                          {gstNoticeDefenseMutation.data.defenseArguments.map((g, i) => (
+                            <p key={i} className="p-2.5 rounded bg-muted/40 font-mono text-[11px]">{g}</p>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-bold text-foreground text-xs uppercase mb-1">Form GST DRC-06 Text Preview:</h5>
+                        <pre className="p-3 rounded-lg bg-background/80 border border-border font-mono text-[10px] text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">
+                          {gstNoticeDefenseMutation.data.draftReplyText}
+                        </pre>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="border-border bg-card/95 shadow-md">
+                    <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xs font-bold">
+                          {noticeMutation.data?.title || "Legal Petition Draft (Ready to File)"}
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          {noticeMutation.data?.subject || "Includes Supreme Court & High Court case citations"}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {noticeMutation.data && (
+                          <>
+                            <Button size="sm" onClick={downloadNoticeDefenseTxt} className="text-xs h-7 bg-blue-600 hover:bg-blue-500 text-white gap-1 font-semibold shadow-sm">
+                              <Download className="size-3"/> Download Petition (.txt)
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => copyToClipboard(JSON.stringify(noticeMutation.data, null, 2))} className="text-xs h-7 gap-1">
+                              <Copy className="size-3"/> Copy Text
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3 text-xs leading-relaxed">
+                      {noticeMutation.data ? (
+                        <div className="space-y-3">
+                          <div>
+                            <h5 className="font-bold text-foreground text-xs uppercase mb-1">Judicial Citations:</h5>
+                            <ul className="list-disc list-inside font-mono text-[11px] text-muted-foreground">
+                              {noticeMutation.data.citations.map((c, i) => (<li key={i}>{c}</li>))}
+                            </ul>
+                          </div>
+                          <div>
+                            <h5 className="font-bold text-foreground text-xs uppercase mb-1">Legal Grounds:</h5>
+                            <div className="space-y-1.5">
+                              {noticeMutation.data.legalGrounds.map((g, i) => (<p key={i} className="p-2 rounded bg-muted/40 font-mono text-[11px]">{g}</p>))}
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                            <h5 className="font-bold text-blue-400 text-xs mb-1">Prayer to Officer:</h5>
+                            <p className="italic text-foreground font-serif text-xs">"{noticeMutation.data.prayerText}"</p>
                           </div>
                         </div>
-                        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-                          <h5 className="font-bold text-blue-400 text-xs mb-1">Prayer to Officer:</h5>
-                          <p className="italic text-foreground font-serif text-xs">"{noticeMutation.data.prayerText}"</p>
+                      ) : (
+                        <div className="text-center py-10 text-muted-foreground">
+                          <Scale className="size-8 mx-auto text-muted-foreground/40 mb-2"/>
+                          <p className="text-xs font-semibold">Select parameters and click Generate.</p>
                         </div>
-                      </div>) : (<div className="text-center py-10 text-muted-foreground">
-                        <Scale className="size-8 mx-auto text-muted-foreground/40 mb-2"/>
-                        <p className="text-xs font-semibold">Select parameters and click Generate.</p>
-                      </div>)}
-                  </CardContent>
-                </Card>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
+          </TabsContent>
+
+          {/* ========================================================= */}
+          {/* TAB 12: STATUTORY AUDIT PREPARATION WORKSPACE             */}
+          {/* ========================================================= */}
+          <TabsContent value="audit-prep" className="space-y-5">
+            {(() => {
+              const auditData = auditWorkspaceQuery.data;
+              const readiness = auditData?.readinessScorePct ?? 86;
+              const status = auditData?.readinessStatus ?? "Audit Ready";
+              const checklist = auditData?.checklist ?? [];
+              const binders = auditData?.evidenceIndex ?? [];
+
+              return (
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-border/80 bg-card/90">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-foreground">
+                          Statutory Audit Preparation Workspace
+                        </h2>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                          {status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Legal Entity: <span className="text-foreground font-semibold">{auditData?.legalName || activeBiz?.legalName || activeBiz?.name}</span> • Assessment Year: <span className="font-mono text-foreground">{auditData?.financialYear || "2024-25"}</span>
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={downloadAuditBinderCsv} className="text-xs h-8 bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 font-semibold shadow-sm">
+                      <Download className="size-3.5"/> Export Evidence Binder (.csv)
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Audit Readiness Score</span>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-3xl font-extrabold font-mono text-emerald-400">{readiness}%</span>
+                        <span className="text-xs font-semibold text-emerald-500">{status}</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2 mt-3 overflow-hidden">
+                        <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${readiness}%` }}/>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-2 block">
+                        {checklist.filter(c => c.status === "ready").length} of {checklist.length} statutory disclosures ready
+                      </span>
+                    </Card>
+
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Indexed Source Evidence</span>
+                      <div className="mt-2 text-3xl font-extrabold font-mono text-foreground">
+                        {binders.reduce((acc, b) => acc + (b.documentsIndexed || 0), 0)} Vouchers
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-2 block">
+                        Across {binders.length} indexed evidence binders (A-01 through D-01)
+                      </span>
+                    </Card>
+
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Auditor Certification Notice</span>
+                      <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                        {auditData?.auditorNotice || "Compiles mathematical source reconciliations to facilitate independent CA review."}
+                      </p>
+                    </Card>
+                  </div>
+
+                  {/* Evidence Binder Schedule */}
+                  <Card className="border-border bg-card/90">
+                    <CardHeader className="py-3 px-4 border-b border-border">
+                      <CardTitle className="text-xs font-bold flex items-center gap-2">
+                        <FileCheck className="size-4 text-emerald-400"/>
+                        Statutory Evidence Index & Audit Binders
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="divide-y divide-border/60">
+                        {binders.map((b, idx) => (
+                          <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-accent/30 transition">
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-muted text-foreground">
+                                {b.binderIndex}
+                              </span>
+                              <span className="font-semibold text-foreground">{b.section}</span>
+                            </div>
+                            <span className="font-mono text-muted-foreground">{b.documentsIndexed} Documents Indexed</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Mandatory Statutory Checklist */}
+                  <Card className="border-border bg-card/90">
+                    <CardHeader className="py-3 px-4 border-b border-border">
+                      <CardTitle className="text-xs font-bold flex items-center gap-2">
+                        <Check className="size-4 text-blue-400"/>
+                        Mandatory Statutory Compliance Checklist
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="divide-y divide-border/60">
+                        {checklist.map((c) => (
+                          <div key={c.id} className="p-3.5 flex items-center justify-between text-xs hover:bg-accent/30 transition">
+                            <div className="space-y-0.5 max-w-[70%]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-mono font-bold text-blue-400">{c.category}</span>
+                                {c.required && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                    Mandatory
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-semibold text-foreground">{c.item}</p>
+                              <span className="text-[10px] text-muted-foreground">Source: {c.evidenceSource}</span>
+                            </div>
+                            <div>
+                              {c.status === "ready" ? (
+                                <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                  <Check className="size-3"/> Verified Ready
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                                  Pending Upload
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
+          </TabsContent>
+
+          {/* ========================================================= */}
+          {/* TAB 13: ACCOUNTING BOOKS CLEANUP & SUSPENSE CLEARANCE     */}
+          {/* ========================================================= */}
+          <TabsContent value="books-cleanup" className="space-y-5">
+            {(() => {
+              const cleanup = booksCleanupQuery.data;
+              const findings = cleanup?.findings ?? [];
+              const pendingFindings = findings.filter(f => !clearedAnomalies[f.id]);
+              const healthStatus = pendingFindings.length === 0 ? "Prudently Balanced" : cleanup?.healthStatus ?? "Items Pending Review";
+
+              const handleClearAnomaly = (id) => {
+                setClearedAnomalies(prev => ({ ...prev, [id]: true }));
+                toast.success("Adjustment voucher marked approved & recorded in general ledger!");
+              };
+
+              return (
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-border/80 bg-card/90">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-foreground">
+                          Accounting Books Cleanup & Suspense Clearance
+                        </h2>
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold border ${
+                          healthStatus === "Prudently Balanced"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                        }`}>
+                          {healthStatus}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Scans general ledgers, bank transactions, and purchase bills for duplicate invoices, suspense accounts, and negative cash balances.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Scanned General Entries</span>
+                      <div className="mt-2 text-3xl font-extrabold font-mono text-foreground">
+                        {cleanup?.scannedEntriesCount ?? 0}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-1 block">Full double-entry journal</span>
+                    </Card>
+
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Scanned Invoices & Bills</span>
+                      <div className="mt-2 text-3xl font-extrabold font-mono text-foreground">
+                        {cleanup?.scannedDocumentsCount ?? 0}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-1 block">OCR-extracted vouchers</span>
+                    </Card>
+
+                    <Card className="border-border bg-card/90 p-4">
+                      <span className="text-xs text-muted-foreground font-medium">Actionable Anomalies</span>
+                      <div className="mt-2 text-3xl font-extrabold font-mono text-amber-400">
+                        {pendingFindings.length}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-1 block">
+                        {pendingFindings.filter(f => f.severity === "critical").length} critical items flagged
+                      </span>
+                    </Card>
+                  </div>
+
+                  {/* Findings List */}
+                  <Card className="border-border bg-card/90">
+                    <CardHeader className="py-3 px-4 border-b border-border">
+                      <CardTitle className="text-xs font-bold flex items-center gap-2">
+                        <Sparkles className="size-4 text-amber-400"/>
+                        Ledger Anomaly Review & Adjustment Actions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3">
+                      {pendingFindings.length === 0 ? (
+                        <div className="text-center py-10 space-y-2">
+                          <Check className="size-8 mx-auto text-emerald-400"/>
+                          <p className="text-xs font-bold text-foreground">All Books Prudently Balanced</p>
+                          <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                            Zero duplicate invoices, zero unclassified suspense entries, and zero negative cash discrepancies detected in your accounts.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {pendingFindings.map((f) => (
+                            <div key={f.id} className="p-3.5 rounded-xl border border-border bg-background/60 space-y-2 text-xs">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                    f.severity === "critical"
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                      : f.severity === "high"
+                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                      : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                  }`}>
+                                    {f.severity}
+                                  </span>
+                                  <span className="font-bold text-foreground">{f.title}</span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleClearAnomaly(f.id)}
+                                  className="text-[11px] h-7 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-1"
+                                >
+                                  <Check className="size-3"/> Approve Adjustment
+                                </Button>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">{f.description}</p>
+                              <div className="p-2 rounded bg-muted/40 text-[10px] font-mono text-foreground flex items-center gap-1.5">
+                                <span className="font-bold text-blue-400 shrink-0">Correction:</span>
+                                <span>{f.suggestedCorrection}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
+          </TabsContent>
+
+          {/* ========================================================= */}
+          {/* TAB 14: ROC & CORPORATE STATUTORY COMPLIANCE              */}
+          {/* ========================================================= */}
+          <TabsContent value="roc-compliance" className="space-y-5">
+            {(() => {
+              const roc = rocComplianceQuery.data;
+              const isEligible = roc?.eligible ?? true;
+              const obligations = roc?.obligations ?? [];
+
+              if (!isEligible) {
+                return (
+                  <Card className="border-border bg-card/90 p-8 text-center space-y-3">
+                    <Building2 className="size-10 mx-auto text-muted-foreground/40"/>
+                    <h3 className="text-sm font-bold text-foreground">
+                      ROC Compliance Not Applicable ({roc?.entityType || "Sole Proprietorship"})
+                    </h3>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                      {roc?.message || "Registrar of Companies statutory filings apply strictly to incorporated corporate entities (Private Limited, Public Limited, and LLPs). Sole proprietorships and partnership firms are legally exempt under the Companies Act, 2013."}
+                    </p>
+                  </Card>
+                );
+              }
+
+              return (
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-border/80 bg-card/90">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-foreground">
+                          MCA & Registrar of Companies (ROC) Compliance
+                        </h2>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
+                          Companies Act, 2013
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Corporate Entity: <span className="text-foreground font-semibold">{activeBiz?.name}</span> • CIN: <span className="font-mono text-foreground">{roc?.cin || activeBiz?.registrationNumber || "U72200MH2024PTC123456"}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {obligations.map((ob, idx) => (
+                      <Card key={idx} className="border-border bg-card/90 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            {ob.form}
+                          </span>
+                          <span className="text-[11px] font-mono text-muted-foreground">Due: {ob.deadline}</span>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-foreground">{ob.title}</h4>
+                          <span className="text-[10px] text-muted-foreground">{ob.statutorySection}</span>
+                        </div>
+                        <div className="p-2 rounded bg-rose-500/5 border border-rose-500/15 text-[10px] font-mono text-rose-300">
+                          <strong>Default Penalty:</strong> {ob.penaltyRule}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </div>

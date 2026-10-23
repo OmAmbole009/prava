@@ -46,32 +46,32 @@ const OUT_OF_SCOPE_DOMAINS = [
 
 // 4. Legitimate Business, Financial, Tax & Prava Terms
 const IN_SCOPE_TERMS = [
-  // Financial metrics & money
-  /\b(revenue|sales|turnover|income|earning|earnings|profit|profits|loss|losses|margin|margins|expense|expenses|expenditure|spending|spend|cost|costs|cash|cashflow|cash\s*flow|bank|banking|balance|funds|runway|burn\s*rate|debt|loan|credit|debit|money|financials?)\b/i,
+  // Financial metrics, concepts & money
+  /\b(revenue|sales|turnover|income|earning|earnings|profit|profits|loss|losses|margin|margins|gross\s*margin|net\s*margin|expense|expenses|expenditure|spending|spend|cost|costs|cogs|cash|cashflow|cash\s*flow|bank|banking|balance|funds|runway|burn\s*rate|ebitda|arr|mrr|debt|loan|credit|debit|equity|valuation|working\s*capital|current\s*ratio|liquidity|money|financials?)\b/i,
 
-  // Receivables, payables, accounting entries
-  /\b(receivable|receivables|payable|payables|debtor|debtors|creditor|creditors|ledger|journal|balance\s*sheet|p&l|profit\s+and\s+loss|trial\s*balance|accounting|bookkeeping|reconcil|reconciliation|unreconciled|mismatch|difference)\b/i,
+  // Accounting, bookkeeping & financial statements
+  /\b(receivable|receivables|payable|payables|debtor|debtors|creditor|creditors|ledger|journal|balance\s*sheet|p&l|profit\s+and\s+loss|trial\s*balance|accounting|bookkeeping|double\s*entry|debit\s+(and|vs)\s+credit|depreciation|slm|wdv|straight\s*line|written\s*down|capex|opex|capital\s*expenditure|operating\s*expenditure|reconcil|reconciliation|unreconciled|mismatch|difference)\b/i,
 
-  // Invoices, bills, vendors, clients
-  /\b(invoice|invoices|bill|bills|billing|receipt|receipts|voucher|vouchers|vendor|vendors|supplier|suppliers|customer|customers|client|clients|purchase\s*order|po|quotation|proforma|payment|payments|payout|payouts|due|dues|overdue|unpaid)\b/i,
+  // Invoices, bills, vendors, clients & issuing sales bills
+  /\b(invoice|invoices|bill|bills|billing|receipt|receipts|voucher|vouchers|vendor|vendors|supplier|suppliers|customer|customers|client|clients|purchase\s*order|po|quotation|proforma|payment|payments|payout|payouts|due|dues|overdue|unpaid|issue\s*invoice|create\s*invoice|sales\s*invoice)\b/i,
 
   // Tax, GST, Statutory laws
-  /\b(tax|taxes|taxation|gst|cgst|sgst|igst|itc|input\s+tax\s+credit|gstr|gstr-?1|gstr-?2b|gstr-?3b|gstin|tds|tcs|advance\s*tax|income\s*tax|corporate\s*tax|e-?way|eway|hsn|sac|pan|challan|form\s*26q|26as|ais|tis|audit|auditor|audits)\b/i,
+  /\b(tax|taxes|taxation|gst|cgst|sgst|igst|itc|input\s+tax\s+credit|gstr|gstr-?1|gstr-?2b|gstr-?3b|gstin|tds|tcs|rcm|reverse\s*charge|advance\s*tax|income\s*tax|corporate\s*tax|e-?way|eway|hsn|sac|pan|challan|form\s*26q|26as|ais|tis|audit|auditor|audits|form\s*3cd)\b/i,
 
   // Indian statutory sections & compliance
-  /\b(43b|43b\(h\)|43bh|44ad|44ada|40a|40a\(3\)|40a3|194c|194j|194i|194q|80ccd|section\s+\d+|msme|udyam|presumptive|disallowance)\b/i,
+  /\b(43b|43b\(h\)|43bh|44ad|44ada|40a|40a\(3\)|40a3|40\(a\)\(ia\)|194c|194j|194i|194q|80ccd|16\(2\)|17\(5\)|blocked\s*credit|section\s+\d+|msme|udyam|presumptive|disallowance)\b/i,
 
   // CA & professional review
-  /\b(\bca\b|\bcas\b|chartered\s+accountant|advisor|advisory|tax\s+saving|save\s+tax|tax\s+deduction|deduction|exemption|slab|rates|penalty|interest\s+234[bc]?|refund|compliance|statutory)\b/i,
+  /\b(\bca\b|\bcas\b|chartered\s+accountant|advisor|advisory|tax\s+saving|save\s+tax|tax\s+deduction|deduction|exemption|slab|rates|penalty|interest\s+234[bc]?|refund|compliance|statutory|sign-?off)\b/i,
 
-  // Prava platform & operations
-  /\b(prava|workspace|dashboard|health\s*score|health\s*grade|action\s*item|action\s*items|task|tasks|document|documents|upload|ocr|extraction|checklist|review|authorization)\b/i,
+  // Prava website, features, navigation, and operations
+  /\b(prava|website|platform|feature|features|modules?|walkthrough|overview|navigation|dashboard|health\s*score|health\s*grade|action\s*item|action\s*items|task|tasks|document|documents|upload|uploading|dropzone|drag\s+and\s+drop|ocr|extraction|vault|export|download|setting|settings|invite|invitation|member|members|team|roles?|permissions?|security|privacy|encryption|storage|reconcil)\b/i,
 
-  // Business status & operational inquiries
-  /\b(how\s+are\s+we\s+doing|how\s+is\s+(our\s+|the\s+|my\s+)?business|business(\s+doing|\s+performance|\s+health)?|company|enterprise|what\s+should\s+i\s+do|what\s+needs\s+attention|attention|any\s+updates|overview|summary|status|today'?s?\s+(action|task)|pending|to\s*do|what\s+do\s+we\s+have|business\s+situation)\b/i,
+  // Business status, identity, legal entity inquiries
+  /\b(how\s+are\s+we\s+doing|how\s+is\s+(our\s+|the\s+|my\s+)?business|business(\s+doing|\s+performance|\s+health)?|company|enterprise|who\s+are\s+we|legal\s+name|company\s+name|our\s+business|my\s+business|our\s+company|my\s+company|what\s+should\s+i\s+do|what\s+needs\s+attention|attention|any\s+updates|summary|status|today'?s?\s+(action|task)|pending|to\s*do|what\s+do\s+we\s+have|business\s+situation)\b/i,
 
   // Payroll & company remuneration
-  /\b(salary|salaries|payroll|wages|director\s+remuneration|remuneration|dividend|dividends|reimbursement)\b/i,
+  /\b(salary|salaries|payroll|wages|director\s+remuneration|remuneration|dividend|dividends|reimbursement|founder\s+salary)\b/i,
 
   // Capital & asset management
   /\b(working\s+capital|share\s+capital|capital\s+goods|capital\s+gain|capital\s+expenditure|capex|asset|assets|liability|liabilities|depreciation)\b/i,

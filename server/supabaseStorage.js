@@ -33,7 +33,11 @@ export function getSupabaseClient() {
   return supabaseClient;
 }
 
-const LOCAL_STORAGE_DIR = path.resolve(process.cwd(), ".storage_cache");
+const isTestEnv = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+const LOCAL_STORAGE_DIR = isTestEnv
+  ? path.resolve(process.cwd(), "scratch", "test_storage_cache")
+  : path.resolve(process.cwd(), ".storage_cache");
+
 if (!fs.existsSync(LOCAL_STORAGE_DIR)) {
   try {
     fs.mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });

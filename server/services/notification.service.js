@@ -52,7 +52,7 @@ function getSmtpTransporter() {
 export async function sendEmailOtp({ to, code, purpose = "login" }) {
   const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES) || 5;
   const result = await sendOtpEmail({ to, otp: code, purpose, expiryMinutes });
-  return { success: true, provider: result.provider, devOtpCode: result.devOtpCode };
+  return { success: true, provider: result.provider };
 }
 
 /**

@@ -32,12 +32,22 @@ export const updateOnboardingSchema = businessInputSchema.extend({
 
 export const updateBusinessProfileSchema = z.object({
   businessId: z.number().int().positive(),
+  name: z.string().trim().min(2, "Enter a business name").max(160).optional(),
+  legalName: optionalText(200),
+  businessType: z.string().trim().min(2).max(96).optional(),
+  industry: z.string().trim().min(2).max(120).optional(),
+  email: optionalText(320).pipe(z.string().email("Enter a valid email").optional()),
+  phone: optionalText(32),
+  addressLine1: optionalText(200),
+  city: optionalText(96),
+  state: optionalText(96),
+  postalCode: optionalText(24),
   country: z.enum(countryCodes).optional(),
   currency: z.enum(currencyCodes).optional(),
   taxSystem: z.string().trim().min(1).max(64).optional(),
+  financialYear: z.string().trim().max(32).optional(),
   locale: z.string().trim().regex(/^[a-z]{2,3}(-[A-Z]{2})?$/).optional(),
   timezone: z.string().trim().min(1).max(64).optional(),
-  name: z.string().trim().min(2).max(160).optional(),
   gstStatus: z.enum(["registered", "not_registered", "pending"]).optional(),
   gstin: optionalText(32).transform(value => value?.toUpperCase()),
 });

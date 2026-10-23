@@ -18,6 +18,9 @@ const Tasks = lazy(() => import("@/pages/Tasks"));
 const TaskDetail = lazy(() => import("@/pages/TaskDetail"));
 const Billing = lazy(() => import("@/pages/Billing"));
 const AdminBilling = lazy(() => import("@/pages/AdminBilling"));
+const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+const AdminBusinesses = lazy(() => import("@/pages/AdminBusinesses"));
+const AdminOcrQueue = lazy(() => import("@/pages/AdminOcrQueue"));
 const DocumentReview = lazy(() => import("@/pages/DocumentReview"));
 const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 const AdminSecurity = lazy(() => import("@/pages/AdminSecurity"));
@@ -62,6 +65,11 @@ export default function WorkspaceApp() {
               <Route path="/ca/login">{() => <DeferredPage component={CaLogin}/>}</Route>
               <Route path="/ca/dashboard">{() => <DeferredPage component={CaDashboard}/>}</Route>
               <Route path="/admin/login">{() => <DeferredPage component={Login}/>}</Route>
+              <Route path="/admin">{() => <DeferredPage component={AdminDashboard}/>}</Route>
+              <Route path="/admin/dashboard">{() => <DeferredPage component={AdminDashboard}/>}</Route>
+              <Route path="/admin/analytics">{() => <DeferredPage component={AdminDashboard}/>}</Route>
+              <Route path="/admin/businesses">{() => <DeferredPage component={AdminBusinesses}/>}</Route>
+              <Route path="/admin/ocr">{() => <DeferredPage component={AdminOcrQueue}/>}</Route>
               <Route path="/admin/security">{() => <DeferredPage component={AdminSecurity}/>}</Route>
               <Route path="/admin/cas">{() => <DeferredPage component={AdminCaManagement}/>}</Route>
               <Route path="/admin/gst">{() => <DeferredPage component={AdminGstSubmissions}/>}</Route>

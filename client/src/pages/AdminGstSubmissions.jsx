@@ -1,4 +1,4 @@
-import DashboardLayout from "@/components/DashboardLayout";
+import AdminLayout from "@/components/AdminLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export default function AdminGstSubmissions() {
         windowRef.document.write(`<!doctype html><title>Prava GST submission register</title><style>body{font:12px system-ui;margin:28px;color:#173d35}h1{font-size:20px}p{color:#526b60}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #cdd8cf;padding:8px;text-align:left;vertical-align:top}th{background:#e8f0e2}@media print{button{display:none}}</style><h1>Prava GST submission register</h1><p>Generated ${new Date().toLocaleString()}</p><table><thead><tr><th>ID</th><th>Workspace</th><th>Task</th><th>Status</th><th>Requester</th><th>Provider</th><th>Official reference</th></tr></thead><tbody>${body}</tbody></table><script>window.print()</script>`);
         windowRef.document.close();
     };
-    return (<DashboardLayout>
+    return (<AdminLayout title="GST Statutory Submissions" subtitle="Central clearinghouse for statutory GST filing packages, verification states, and export manifests.">
       <div className="mx-auto max-w-6xl py-2 space-y-7">
         {/* Banner */}
         <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card/90 via-card/50 to-card/90 p-7 shadow-xl backdrop-blur-xl sm:p-9">
@@ -188,5 +188,5 @@ export default function AdminGstSubmissions() {
             </div>)}
         </section>
       </div>
-    </DashboardLayout>);
+    </AdminLayout>);
 }

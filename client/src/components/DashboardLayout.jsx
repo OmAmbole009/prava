@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { PravaMark } from "@/components/PravaMark";
+import { PravaLogoIcon, PravaMark } from "@/components/PravaMark";
 import { ElectricHorizonBackground } from "@/components/ElectricHorizonBackground";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -62,34 +62,34 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 import { Streamdown } from "streamdown";
 
-// ─── High-Tech Nav Groups ───────────────────────────────────────────────────
+// ─── Professional Enterprise Nav Groups ──────────────────────────────────────
 const navGroups = [
     {
-        category: "// 01 · INTELLIGENCE & AI",
+        category: "OVERVIEW & INTELLIGENCE",
         items: [
-            { icon: LayoutDashboard, label: "Command Center", path: "/dashboard", badge: "LIVE" },
-            { icon: Sparkles, label: "Ask Prava AI", path: "/assistant", highlight: true },
+            { icon: LayoutDashboard, label: "Command Center", path: "/dashboard" },
+            { icon: Sparkles, label: "Ask Prava AI", path: "/assistant" },
         ],
     },
     {
-        category: "// 02 · LEDGER & INVOICES",
+        category: "FINANCE & DOCUMENTS",
         items: [
             { icon: WalletCards, label: "Money In & Out", path: "/money" },
-            { icon: FilePenLine, label: "Invoice & Bill Studio", path: "/invoice-studio", badge: "PDF" },
-            { icon: FileText, label: "Invoices & Receipts", path: "/documents", badge: "OCR" },
-            { icon: ClipboardCheck, label: "Things to Fix", path: "/tasks" },
+            { icon: FilePenLine, label: "Invoice Studio", path: "/invoice-studio" },
+            { icon: FileText, label: "Documents & Vault", path: "/documents" },
+            { icon: ClipboardCheck, label: "Action Items", path: "/tasks" },
         ],
     },
     {
-        category: "// 03 · TAXES & COMPLIANCE",
+        category: "TAXES & CA ADVISORY",
         items: [
             { icon: Receipt, label: "Taxes & Compliance", path: "/tax" },
-            { icon: Scale, label: "Autonomous CA Suite", path: "/ca-suite", badge: "AI-CA" },
-            { icon: UserCheck, label: "CA Review Desk", path: "/ca-review", badge: "ICAI" },
+            { icon: Scale, label: "Autonomous CA Suite", path: "/ca-suite" },
+            { icon: UserCheck, label: "CA Review Desk", path: "/ca-review" },
         ],
     },
     {
-        category: "// 04 · WORKSPACE & CONFIG",
+        category: "WORKSPACE & SETTINGS",
         items: [
             { icon: Building2, label: "Business Profile", path: "/onboarding" },
             { icon: ShieldCheck, label: "Account & Security", path: "/profile" },
@@ -710,26 +710,28 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="flex items-center justify-between min-w-0 flex-1"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <PravaMark size="sm" />
+                                    <div className="flex items-center gap-2.5">
+                                        <PravaLogoIcon size="sm" />
                                         <div className="flex flex-col">
-                                            <span className="text-[11px] font-bold tracking-wider text-white font-mono">
-                                                PRAVA OS
-                                            </span>
-                                            <span className="text-[8px] font-mono text-cyan-400 tracking-tight">
-                                                v2.6 // AUTONOMOUS
+                                            <div className="flex items-baseline gap-1 leading-none">
+                                                <span className="font-serif text-sm font-bold tracking-tight text-white">
+                                                    Prava
+                                                </span>
+                                                <span className="text-[8px] font-mono font-bold tracking-widest text-emerald-400 uppercase">
+                                                    OS
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 leading-tight mt-0.5">
+                                                Financial Compliance
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Eyebrow System Pill */}
-                                    <div className="flex items-center gap-1.5 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-0.5">
-                                        <span className="relative flex size-1.5">
-                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                                            <span className="relative inline-flex size-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-                                        </span>
-                                        <span className="text-[8px] font-mono uppercase tracking-widest text-cyan-400 font-semibold">
-                                            ONLINE
+                                    {/* Clean Status Pill */}
+                                    <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5">
+                                        <span className="size-1.5 rounded-full bg-emerald-400" />
+                                        <span className="text-[9px] font-medium text-emerald-400">
+                                            Live
                                         </span>
                                     </div>
                                 </motion.div>
@@ -843,41 +845,42 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                             ))
                         )}
 
-                        {/* Admin Management Section */}
+                        {/* Admin Platform Switcher */}
                         {user?.role === "admin" && (
-                            <div className="space-y-1 pt-2 border-t border-white/[0.06]">
-                                {!isCollapsed && (
-                                    <p className="px-3 py-1 text-[9px] font-mono uppercase tracking-widest text-slate-400">
-                                        // 05 · SECURITY & ACCESS
-                                    </p>
+                            <div className="pt-3 border-t border-white/[0.08]">
+                                {!isCollapsed ? (
+                                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">
+                                                Platform Administration
+                                            </span>
+                                            <span className="text-[9px] bg-blue-500/20 text-blue-300 font-mono px-1.5 py-0.5 rounded border border-blue-500/30">
+                                                Superadmin
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-300 leading-snug">
+                                            Dedicated multi-tenant governance, OCR diagnostics, and CA management.
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setLocation("/admin")}
+                                            className="w-full h-7 bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white gap-1.5"
+                                        >
+                                            <ShieldCheck className="size-3.5" />
+                                            Open Admin Console
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton
+                                            onClick={() => setLocation("/admin")}
+                                            tooltip="Open Admin Console"
+                                            className="h-9 rounded-xl px-3 bg-blue-500/10 text-blue-400 border border-blue-500/30"
+                                        >
+                                            <ShieldCheck className="size-4" />
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
                                 )}
-                                <SidebarMenu>
-                                    {[
-                                        { icon: UserCheck, label: "CA Management", path: "/admin/cas" },
-                                        { icon: ReceiptText, label: "GST Submissions", path: "/admin/gst" },
-                                        { icon: ShieldCheck, label: "Access & Security", path: "/admin/security" },
-                                    ].map((item) => {
-                                        const isActive = location === item.path;
-                                        const Icon = item.icon;
-                                        return (
-                                            <SidebarMenuItem key={item.path}>
-                                                <SidebarMenuButton
-                                                    isActive={isActive}
-                                                    onClick={() => setLocation(item.path)}
-                                                    tooltip={item.label}
-                                                    className={`h-9 rounded-xl px-3 transition-all ${
-                                                        isActive
-                                                            ? "bg-[#0B0F19] text-white border border-cyan-500/30 text-xs font-medium"
-                                                            : "text-slate-400 hover:bg-white/[0.04] hover:text-white text-xs"
-                                                    }`}
-                                                >
-                                                    <Icon className={`size-3.5 shrink-0 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
-                                                    <span className="flex-1 truncate text-xs">{item.label}</span>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        );
-                                    })}
-                                </SidebarMenu>
                             </div>
                         )}
                     </SidebarContent>
@@ -972,66 +975,65 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                     <div className="flex items-center gap-3">
                         <SidebarTrigger
                             aria-label="Toggle navigation"
-                            className="size-8 rounded-xl border border-white/[0.08] bg-[#0B0F19] text-slate-400 hover:border-cyan-500/40 hover:text-white shadow-xs focus-visible:ring-2 focus-visible:ring-cyan-500"
+                            className="size-8 rounded-xl border border-white/[0.08] bg-[#0B0F19] text-slate-400 hover:border-slate-700 hover:text-white shadow-xs focus-visible:ring-2 focus-visible:ring-blue-500"
                         />
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-cyan-400/80 font-bold hidden sm:inline">
-                                PRAVA //
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+                                Workspace
                             </span>
-                            {activeMenuItem && (
-                                <motion.div
-                                    key={location}
-                                    initial={{ opacity: 0, x: -6 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="flex items-center gap-1.5"
-                                >
-                                    <span className="text-xs font-semibold text-white tracking-tight">
-                                        {activeMenuItem.label}
-                                    </span>
-                                </motion.div>
+                            <span className="text-xs text-slate-600 hidden sm:inline">/</span>
+                            {activeMenuItem ? (
+                                <span className="text-xs font-semibold text-white tracking-tight">
+                                    {activeMenuItem.label}
+                                </span>
+                            ) : (
+                                <span className="text-xs font-semibold text-white tracking-tight">
+                                    Console
+                                </span>
                             )}
-                            <span className="hidden md:inline-flex items-center rounded-md border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[8px] font-mono text-slate-400">
-                                SYS.NODE · 01
-                            </span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                        {/* Real-time Ledger Telemetry Capsule */}
-                        <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#0B0F19] px-3 py-1 shadow-xs">
-                            <span className="relative flex size-2">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                                <span className="relative inline-flex size-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
-                            </span>
-                            <span className="text-[9px] font-mono font-semibold tracking-wider text-slate-300 uppercase">
-                                LEDGER: SYNCHRONIZED
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                        {/* Real-time Ledger Telemetry */}
+                        <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#0B0F19] px-2.5 py-1">
+                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            <span className="text-[10px] font-medium text-slate-300">
+                                Ledger Synced
                             </span>
                         </div>
 
+                        {/* Admin Link if authorized */}
+                        {user?.role === "admin" && (
+                            <button
+                                onClick={() => setLocation("/admin")}
+                                className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 hover:text-white transition"
+                            >
+                                <ShieldCheck className="size-3.5 text-blue-400" />
+                                <span>Platform Admin</span>
+                            </button>
+                        )}
+
                         {/* Fast Action: Upload Doc */}
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <button
                             onClick={() => setLocation("/documents")}
                             className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#0B0F19] px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/[0.18] hover:text-white transition shadow-sm"
                         >
                             <UploadCloud className="size-3.5 text-slate-400" />
-                            <span>Upload Invoices</span>
-                        </motion.button>
+                            <span>Upload Invoice</span>
+                        </button>
 
-                        {/* Futuristic Global AI Copilot Trigger */}
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        {/* Global AI Copilot Trigger */}
+                        <button
                             onClick={() => setQuickCopilotOpen(true)}
-                            className="flex items-center gap-2 rounded-full border border-cyan-500/40 bg-gradient-to-r from-sky-950/60 to-[#0B0F19] px-3.5 py-1.5 text-xs font-semibold text-cyan-200 shadow-[0_0_15px_rgba(34,211,238,0.15)] transition hover:border-cyan-400 hover:text-white"
+                            className="flex items-center gap-2 rounded-xl border border-white/[0.1] bg-[#0B0F19] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-blue-500/40 hover:text-white"
                         >
-                            <Sparkles className="size-3.5 text-cyan-400 animate-pulse" />
-                            <span className="tracking-tight">Ask Copilot…</span>
-                            <kbd className="hidden sm:inline rounded border border-cyan-500/30 bg-cyan-900/30 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300">
+                            <Sparkles className="size-3.5 text-blue-400" />
+                            <span className="tracking-tight">Ask Prava…</span>
+                            <kbd className="hidden sm:inline rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
                                 ⌘K
                             </kbd>
-                        </motion.button>
+                        </button>
                     </div>
                 </div>
 

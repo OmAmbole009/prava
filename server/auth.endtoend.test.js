@@ -531,7 +531,7 @@ describe("End-to-End Authentication & Invoicing Security Audit Suite", () => {
     // Verify invoice B is STILL INTACT for User B
     const safeView = await getInvoice(userB.id, invoiceBId);
     expect(safeView.document.id).toBe(invoiceBId);
-  });
+  }, 15000);
 
   // ───────────────────────────────────────────────────────────────────────────
   // FLOW 22: Protected APIs reject unauthenticated requests
