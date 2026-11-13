@@ -2,8 +2,7 @@ import express from "express";
 import fs from "fs";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config.js";
+import { pathToFileURL } from "node:url";
 
 export function shouldServeSpaDocument(method, acceptsHtml, originalUrl) {
   const pathname = new URL(originalUrl, "http://localhost").pathname;
@@ -11,6 +10,10 @@ export function shouldServeSpaDocument(method, acceptsHtml, originalUrl) {
 }
 
 export async function setupVite(app, server) {
+  const [{ createServer: createViteServer }, { default: viteConfig }] = await Promise.all([
+    import("vite"),
+    import(pathToFileURL(path.resolve(process.cwd(), "vite.config.js")).href),
+  ]);
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

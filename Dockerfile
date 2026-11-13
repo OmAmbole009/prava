@@ -24,8 +24,6 @@ RUN npm run build
 # Run this target as a one-off job before deploying the application image.
 FROM builder AS migrator
 
-ENV NODE_ENV=production
-
 CMD ["npm", "run", "db:migrate"]
 
 # Stage 2: Production Runner

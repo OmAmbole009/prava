@@ -1,8 +1,10 @@
 # Deployment
 
 The application is a single Node.js service with a static SPA build. Any host that can
-run `npm start` behind HTTPS works. Verified in this repository: `npm run build`
-produces `dist/public` and `dist/index.js`.
+run `npm start` behind HTTPS works. `npm run build` uses Vite and other development
+dependencies to create `dist/public` and `dist/index.js`. The production server serves
+the built static files without importing Vite; Vite and `vite.config.js` are loaded
+dynamically only by the development-only `setupVite()` path.
 
 ## Preconditions
 
@@ -38,8 +40,9 @@ npm run build
 npm start
 ```
 
-The explicit `--include=dev` is required because the build and migration commands use
-development dependencies, even when `NODE_ENV=production`.
+The explicit `--include=dev` is required during build because Vite, its plugins, and
+Drizzle Kit are development dependencies. The final Docker runtime installs production
+dependencies only; it does not need Vite or its plugins.
 
 ### Docker
 
