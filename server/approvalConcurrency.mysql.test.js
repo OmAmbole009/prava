@@ -15,10 +15,9 @@ import {
 } from "../drizzle/schema.js";
 import { getDb } from "./db.js";
 import { submitCaDecision } from "./caManagement.js";
+import { isMysqlIntegrationTestEnabled } from "./test/mysqlIntegrationTarget.js";
 
-// Only runs against a real MySQL instance (DATABASE_URL). In-memory runs skip it,
-// because the guarantee under test is the database transaction and row lock.
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+const hasDatabase = isMysqlIntegrationTestEnabled();
 
 const created = { ownerId: 0, caId: 0, businessId: 0, taskId: 0, documentId: 0, profileId: 0 };
 

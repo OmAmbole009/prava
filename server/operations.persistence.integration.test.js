@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { actionItems, auditEvents, businessMembers, businesses, documentExtractions, documents, gstPreparations, gstSubmissionNotifications, gstSubmissionRequests, operationalTasks, reconciliationItems, reviewRequests, taskRequirements, users } from "../drizzle/schema.js";
 import { getDb } from "./db.js";
 import { rejectAuthorizedGstSubmission } from "./gstAdmin.js";
+import { isMysqlIntegrationTestEnabled } from "./test/mysqlIntegrationTarget.js";
 
 const mocks = vi.hoisted(() => ({
   storageGetSignedUrl: vi.fn(async () => "https://storage.example/integration-source.pdf"),
@@ -43,10 +44,9 @@ afterEach(async () => {
   Object.assign(created, { userId: 0, approvalUserId: 0, businessId: 0, taskId: 0, documentId: 0 });
 });
 
-describe("real-persistence non-production document-to-GST integration", () => {
+describe.skipIf(!isMysqlIntegrationTestEnabled())("real MySQL document-to-GST integration", () => {
   it("reviews a document, resolves its action, prepares GST, and persists reconciliation output within an isolated workspace", async () => {
     const db = await getDb();
-    if (!db) return;
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const userResult = await db.insert(users).values({ openId: `integration-${suffix}`, name: "Integration Harness", loginMethod: "test", role: "user" }).$returningId();
     created.userId = userResult[0].id;
@@ -74,7 +74,6 @@ describe("real-persistence non-production document-to-GST integration", () => {
 
   it("requires independent approval and provider evidence before a GST return is confirmed submitted", async () => {
     const db = await getDb();
-    if (!db) return;
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
     const requester = await db.insert(users).values({ openId: `submission-requester-${suffix}`, name: "Submission Requester", loginMethod: "test", role: "user" }).$returningId();
     created.userId = requester[0].id;

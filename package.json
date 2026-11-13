@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:mysql": "vitest run server/approvalConcurrency.mysql.test.js server/operations.persistence.integration.test.js",
+    "test:mysql": "vitest run server/authPersistence.mysql.test.js server/approvalConcurrency.mysql.test.js server/operations.persistence.integration.test.js",
     "test:e2e": "playwright test",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "drizzle-kit migrate",

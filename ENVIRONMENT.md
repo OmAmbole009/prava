@@ -7,7 +7,7 @@
 | Variable | Purpose | Notes |
 | --- | --- | --- |
 | `NODE_ENV` | Runtime mode | Must be `production`. |
-| `DATABASE_URL` | MySQL connection | **Mandatory.** The server refuses to start without it. Include TLS options in the URL where your provider requires them. |
+| `DATABASE_URL` | MySQL connection | **Mandatory.** Must be a `mysql://.../database` URI; PostgreSQL URLs and Supabase project HTTPS URLs are not database connections for this application. Include TLS options where your provider requires them. |
 | `JWT_SECRET` | Session signing | At least 32 characters of random data. Rotating it signs everyone out. |
 | `APP_ORIGIN` (or `APP_URL`) | Public origin | Used for OAuth redirects, emailed links and cross-origin mutation checks. |
 | `PORT` | Listen port | Defaults to 3000; Render sets 10000. |

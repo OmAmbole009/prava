@@ -43,8 +43,10 @@ the controls that exist in the code, and the gaps that remain.
 `server/_core/security.js`, applied in `server/_core/index.js`:
 
 - Content-Security-Policy (`default-src 'self'`, `object-src 'none'`,
-  `frame-ancestors 'none'`, `base-uri 'self'`, Google OAuth/fonts allow-listed;
-  `unsafe-eval` only in development for Vite HMR)
+  `frame-ancestors 'none'`, `base-uri 'self'`); Google Identity Services and
+  Google Fonts are explicitly allow-listed, and production `connect-src` uses
+  specific GIS, exchange-rate, and map-proxy sources. Vite's broader HTTPS and
+  WebSocket connections and `unsafe-eval` are limited to development.
 - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy`,
   restrictive `Permissions-Policy`

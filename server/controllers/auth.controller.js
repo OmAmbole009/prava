@@ -3,12 +3,14 @@ import { HttpError } from "../../shared/_core/errors.js";
 import {
   getUserByEmail,
   getUserByIdentifier,
+  getUserById,
   getUserByOpenId,
   registerUser,
   verifyPassword,
   hashPassword,
   getBusinessesForUser,
-  saveDbStateToDisk,
+  createBusinessWithOwner,
+  recordUserSignIn,
 } from "../db.js";
 import { verifyAdministratorPassword } from "../adminSecurity.js";
 import { issueOtpChallenge, resendOtpChallenge, verifyOtpChallenge } from "../services/otp.service.js";
@@ -181,7 +183,7 @@ export async function loginStep1(ctx, rawInput) {
   const challenge = await issueOtpChallenge({
     identifier: targetEmail,
     userId: user.id,
-    method: "email",
+    method: user.email ? "email" : "mobile",
     purpose: "login",
   });
 
@@ -219,20 +221,15 @@ export async function loginStep2(ctx, rawInput) {
   });
 
   // Lookup user in DB
-  let user = null;
-  if (verified.userId) {
-    const dbUsers = Array.from((await import("../db.js")).inMemoryUsers.values());
-    user = dbUsers.find(u => u.id === verified.userId) || await getUserByIdentifier(verified.identifier);
-  } else {
-    user = await getUserByIdentifier(verified.identifier);
-  }
+  let user = verified.userId
+    ? await getUserById(verified.userId)
+    : await getUserByIdentifier(verified.identifier);
 
   if (!user) {
     throw new HttpError(404, "User account not found.");
   }
 
-  user.lastSignedIn = new Date();
-  saveDbStateToDisk();
+  user = await recordUserSignIn(user.id) || user;
 
   // Create real JWT session token and attach HTTP-only cookie
   const token = await createAuthenticatedSession(ctx, user);
@@ -286,22 +283,25 @@ export async function registerAccount(ctx, rawInput) {
       password: input.password,
       role: "owner",
     });
-
-    if (input.companyName) {
-      try {
-        const { createBusinessWithOwner } = await import("../db.js");
-        await createBusinessWithOwner(newUser.id, {
-          name: input.companyName,
-          country: "IN",
-          currency: "INR",
-          locale: "en-IN",
-        });
-      } catch (bizErr) {
-        console.warn("[Auth] Workspace auto-creation notice:", bizErr.message);
-      }
-    }
   } catch (err) {
-    throw new HttpError(409, err.message || "An account with this email address already exists.");
+    if (err.message === "An account with this email or mobile number already exists.") {
+      throw new HttpError(409, err.message);
+    }
+    throw err;
+  }
+
+  if (input.companyName) {
+    await createBusinessWithOwner(newUser.id, {
+      name: input.companyName,
+      businessType: "Other",
+      industry: "General",
+      country: "IN",
+      currency: "INR",
+      locale: "en-IN",
+      timezone: "Asia/Kolkata",
+      taxSystem: "GST & Indian Direct Tax",
+      financialYear: "April–March",
+    });
   }
 
   // Issue OTP challenge to verify newly registered account
@@ -309,7 +309,7 @@ export async function registerAccount(ctx, rawInput) {
   const challenge = await issueOtpChallenge({
     identifier: target,
     userId: newUser.id,
-    method: "email",
+    method: newUser.email ? "email" : "mobile",
     purpose: "login",
   });
 

@@ -37,6 +37,17 @@ describe("Production environment validation", () => {
     expect(result.errors.join(" ")).toMatch(/APP_ORIGIN/);
   });
 
+  it("rejects non-MySQL production database URLs", () => {
+    const result = validateProductionEnvironment({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://placeholder:placeholder@database.invalid/prava",
+      JWT_SECRET: "a".repeat(48),
+      APP_ORIGIN: "https://prava.example",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/MySQL connection URI/);
+  });
+
   it("rejects a short session secret and ephemeral storage in production", () => {
     const result = validateProductionEnvironment({
       NODE_ENV: "production",
@@ -80,7 +91,38 @@ describe("Security headers", () => {
 
   it("allows Vite HMR evaluation in development but not in production", () => {
     expect(buildContentSecurityPolicy({ isProduction: false })).toContain("'unsafe-eval'");
+    expect(buildContentSecurityPolicy({ isProduction: false })).toContain("connect-src 'self' https: wss:");
     expect(buildContentSecurityPolicy({ isProduction: true })).not.toContain("'unsafe-eval'");
+  });
+
+  it("allows the required Google Identity Services resources in production", () => {
+    const res = mockRes();
+    securityHeadersMiddleware({ isProduction: true })(mockReq(), res, () => {});
+    const directives = Object.fromEntries(
+      res.headers["content-security-policy"]
+        .split("; ")
+        .map((directive) => {
+          const [name, ...sources] = directive.split(" ");
+          return [name, sources.join(" ")];
+        }),
+    );
+
+    expect(directives["style-src"]).toContain("https://accounts.google.com/gsi/style");
+    expect(directives["style-src-elem"]).toContain("https://accounts.google.com/gsi/style");
+    expect(directives["style-src"]).toContain("https://fonts.googleapis.com");
+    expect(directives["font-src"]).toContain("https://fonts.gstatic.com");
+    expect(directives["script-src"]).toContain("https://accounts.google.com");
+    expect(directives["frame-src"]).toBe("https://accounts.google.com/gsi/");
+    expect(directives["connect-src"]).toContain("https://accounts.google.com/gsi/");
+    expect(directives["connect-src"].split(" ")).not.toContain("https:");
+    expect(directives["connect-src"].split(" ")).not.toContain("wss:");
+    expect(directives["connect-src"].split(" ")).not.toContain("*");
+    expect(directives["object-src"]).toBe("'none'");
+    expect(directives["frame-ancestors"]).toBe("'none'");
+    expect(directives["connect-src"]).toContain("'self'");
+    expect(directives["connect-src"]).toContain("https://open.er-api.com");
+    expect(directives["connect-src"]).toContain("https://forge.butterfly-effect.dev");
+    expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin");
   });
 });
 

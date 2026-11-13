@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mysqlDatabaseUrlError } from "./databaseConfig.js";
 
 /**
  * Application security controls for the Prava API.
@@ -8,21 +9,31 @@ import { randomUUID } from "node:crypto";
  */
 
 const GOOGLE_ACCOUNTS = "https://accounts.google.com";
+const GOOGLE_GSI = `${GOOGLE_ACCOUNTS}/gsi/`;
+const GOOGLE_GSI_STYLE = `${GOOGLE_GSI}style`;
 const GOOGLE_FONTS_CSS = "https://fonts.googleapis.com";
 const GOOGLE_FONTS_FILES = "https://fonts.gstatic.com";
+const PRODUCTION_CONNECT_SOURCES = [
+  "'self'",
+  GOOGLE_GSI,
+  "https://open.er-api.com",
+  "https://forge.butterfly-effect.dev",
+].join(" ");
 
 export function buildContentSecurityPolicy({ isProduction = true } = {}) {
   const scriptSrc = isProduction
     ? `'self' ${GOOGLE_ACCOUNTS}`
     : `'self' 'unsafe-inline' 'unsafe-eval' ${GOOGLE_ACCOUNTS}`;
+  const connectSrc = isProduction ? PRODUCTION_CONNECT_SOURCES : "'self' https: wss:";
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
-    "style-src 'self' 'unsafe-inline' " + GOOGLE_FONTS_CSS,
+    `style-src 'self' 'unsafe-inline' ${GOOGLE_FONTS_CSS} ${GOOGLE_GSI_STYLE}`,
+    `style-src-elem 'self' 'unsafe-inline' ${GOOGLE_FONTS_CSS} ${GOOGLE_GSI_STYLE}`,
     `font-src 'self' data: ${GOOGLE_FONTS_FILES}`,
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https: wss:",
-    `frame-src ${GOOGLE_ACCOUNTS}`,
+    `connect-src ${connectSrc}`,
+    `frame-src ${GOOGLE_GSI}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -139,6 +150,9 @@ export function validateProductionEnvironment(env = process.env) {
 
   if (!env.DATABASE_URL) {
     errors.push("DATABASE_URL is required: production must not use the ephemeral JSON fallback store.");
+  } else {
+    const databaseUrlError = mysqlDatabaseUrlError(env.DATABASE_URL);
+    if (databaseUrlError) errors.push(databaseUrlError);
   }
   if (!env.JWT_SECRET || env.JWT_SECRET.length < MIN_SECRET_LENGTH) {
     errors.push(`JWT_SECRET must be set to at least ${MIN_SECRET_LENGTH} characters.`);

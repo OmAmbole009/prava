@@ -8,8 +8,9 @@ dynamically only by the development-only `setupVite()` path.
 
 ## Preconditions
 
-Provide at minimum `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET` (32+ chars) and
-`APP_ORIGIN`/`APP_URL`. The server will not start otherwise — this is intentional.
+Provide at minimum `NODE_ENV=production`, a MySQL `DATABASE_URL`, `JWT_SECRET` (32+
+characters) and `APP_ORIGIN`/`APP_URL`. The server rejects non-MySQL database URLs
+before accepting traffic.
 
 ## 1. Database
 
@@ -26,6 +27,14 @@ Run them against a snapshot or staging database first. Do not generate schema ch
 from production data.
 
 Never edit an applied migration. Add a new one.
+
+The runtime driver, Drizzle schema, and all checked-in migrations use MySQL. Set
+`DATABASE_URL` to the managed MySQL provider's connection URI
+(`mysql://user:password@host:3306/database`), not to a Supabase project HTTPS URL or
+a PostgreSQL connection URI. Supabase Storage variables are separate and do not provide
+the relational database connection. If production data currently lives in PostgreSQL,
+back it up and perform a deliberate data migration into MySQL before switching the
+application; do not simply replace the URL or drop the existing database.
 
 ## 2. Environment
 
@@ -66,7 +75,8 @@ environment files and `.storage_cache`.
 `preDeployCommand`, and uses `/api/ready` as its health check. Supply `DATABASE_URL`,
 `APP_URL`/`APP_ORIGIN`, and credentials for the integrations you intend to enable in
 Render's environment settings. Render runs migrations before starting the new service;
-a failed migration prevents that deploy from proceeding.
+a failed migration prevents that deploy from proceeding. The pre-deploy migration and
+runtime both read the same `DATABASE_URL` setting.
 
 ### Railway / VPS
 
@@ -147,6 +157,20 @@ curl -fsS https://your-host/api/ready
 
 The drift check must print "No schema drift detected." Check the command exit code and
 migration count rather than relying on the last console line.
+
+### MySQL integration tests
+
+Use a dedicated disposable MySQL database with a name ending in `_test`. These tests
+are explicitly gated so they cannot accidentally run against the production database:
+
+```bash
+MYSQL_INTEGRATION_TESTS=1 DATABASE_URL=mysql://.../prava_test npm run test:mysql
+```
+
+The suite exercises MySQL-backed registration, password lookup/login, database-backed
+OTP verification, business membership persistence, CA approval concurrency and GST
+workflow persistence. Apply the checked-in migrations to the test database first with
+`npm run db:migrate`.
 
 ## 9. Graceful shutdown
 

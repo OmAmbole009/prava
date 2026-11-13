@@ -7,6 +7,7 @@ import {
   users,
 } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
+import { assertMysqlDatabaseUrl } from "./_core/databaseConfig.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -188,12 +189,7 @@ loadDbStateFromDisk();
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
+    _db = drizzle(assertMysqlDatabaseUrl(process.env.DATABASE_URL));
   }
   // Production must never silently fall back to the JSON-file store. Boot-time
   // validation normally prevents this; this is defence in depth for any code
@@ -202,6 +198,10 @@ export async function getDb() {
     throw new Error("[Database] No database connection available and ephemeral storage is disabled in production.");
   }
   return _db;
+}
+
+function storedUserRole(role) {
+  return role === "admin" || role === "ca" ? role : "user";
 }
 
 export async function upsertUser(user) {
@@ -238,7 +238,7 @@ export async function upsertUser(user) {
     }
   });
   if (user.openId === ENV.ownerOpenId || user.role) {
-    values.role = user.openId === ENV.ownerOpenId ? "admin" : user.role;
+    values.role = user.openId === ENV.ownerOpenId ? "admin" : storedUserRole(user.role);
     updateSet.role = values.role;
   }
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
@@ -318,7 +318,7 @@ export async function getUserByIdentifier(identifier) {
   if (byEmail[0]) return byEmail[0];
 
   if (digits.length >= 10) {
-    const byPhone = await db.select().from(users).where(eq(users.phone, raw)).limit(1);
+    const byPhone = await db.select().from(users).where(eq(users.phone, normalizePhone(raw))).limit(1);
     if (byPhone[0]) return byPhone[0];
   }
   return null;
@@ -368,7 +368,7 @@ export async function registerUser({ name, email, phone, password, role = "owner
     passwordHash: hash,
     passwordSalt: salt,
     loginMethod: "local_auth",
-    role,
+    role: storedUserRole(role),
     lastSignedIn: new Date(),
   });
   return await getUserByOpenId(openId);
@@ -392,6 +392,31 @@ export async function getUserByOpenId(openId) {
   }
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result[0] || null;
+}
+
+export async function getUserById(userId) {
+  if (!userId) return null;
+  const db = await getDb();
+  if (!db) {
+    return Array.from(inMemoryUsers.values()).find(user => user.id === userId) || null;
+  }
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result[0] || null;
+}
+
+export async function recordUserSignIn(userId) {
+  const db = await getDb();
+  const lastSignedIn = new Date();
+  if (!db) {
+    const user = Array.from(inMemoryUsers.values()).find(entry => entry.id === userId);
+    if (!user) return null;
+    user.lastSignedIn = lastSignedIn;
+    saveDbStateToDisk();
+    return user;
+  }
+
+  await db.update(users).set({ lastSignedIn }).where(eq(users.id, userId));
+  return getUserById(userId);
 }
 
 export async function getUserByEmail(email, { autoCreate = false } = {}) {

@@ -1,4 +1,6 @@
+import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
+import { assertMysqlDatabaseUrl } from "./server/_core/databaseConfig.js";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -10,6 +12,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "mysql",
   dbCredentials: {
-    url: connectionString,
+    url: assertMysqlDatabaseUrl(connectionString),
   },
 });
