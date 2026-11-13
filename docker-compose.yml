@@ -1,0 +1,39 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: prava-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: prava
+      MYSQL_USER: prava
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-prava_local_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_password}
+    command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - prava-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_local_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: prava-app
+    profiles: ["full"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: mysql://prava:${MYSQL_PASSWORD:-prava_local_password}@db:3306/prava
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-at-least-32-chars}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+
+volumes:
+  prava-db-data:

@@ -26,6 +26,7 @@ import {
   getUserByIdentifier,
   verifyPassword,
 } from "./db.js";
+import { selectFreePlan } from "./entitlements.js";
 import {
   __getLastDispatchedOtpFor,
   __clearDispatchedNotifications,
@@ -461,6 +462,7 @@ describe("End-to-End Authentication & Invoicing Security Audit Suite", () => {
   // ───────────────────────────────────────────────────────────────────────────
   it("Flow 17, 18, 19, 20: User creates invoice, views it, deletes it, and verifies it disappears", async () => {
     const user = await getUserByIdentifier(testEmail);
+    await selectFreePlan(businessId);
 
     // 17. Create Invoice / Document
     const uploadResult = await uploadAndProcessDocument(user.id, {
@@ -507,6 +509,7 @@ describe("End-to-End Authentication & Invoicing Security Audit Suite", () => {
     const userB = await getUserByIdentifier(userBEmail);
     const bBusinesses = await getBusinessesForUser(userB.id);
     const bBusinessId = bBusinesses[0].id;
+    await selectFreePlan(bBusinessId);
 
     // User B creates an invoice
     const docB = await uploadAndProcessDocument(userB.id, {

@@ -158,6 +158,7 @@ export const subscriptions = mysqlTable(
       .notNull(),
     currentPeriodStart: timestamp("currentPeriodStart"),
     currentPeriodEnd: timestamp("currentPeriodEnd"),
+    planSelected: int("planSelected").default(1).notNull(),
     cancelAtPeriodEnd: int("cancelAtPeriodEnd").default(0).notNull(),
     cancelledAt: timestamp("cancelledAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -166,6 +167,40 @@ export const subscriptions = mysqlTable(
   table => [
     uniqueIndex("subscriptions_business_unique").on(table.businessId),
     uniqueIndex("subscriptions_provider_ref_unique").on(table.provider, table.providerSubscriptionId),
+  ]
+);
+
+export const planChangeRequests = mysqlTable(
+  "planChangeRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    businessId: int("businessId").notNull().references(() => businesses.id),
+    requestedByUserId: int("requestedByUserId").notNull().references(() => users.id),
+    requestedPlanId: int("requestedPlanId").notNull().references(() => plans.id),
+    status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending").notNull(),
+    reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("plan_change_requests_business_status_idx").on(table.businessId, table.status),
+    index("plan_change_requests_status_created_idx").on(table.status, table.createdAt),
+  ]
+);
+
+export const giftCodeRedemptions = mysqlTable(
+  "giftCodeRedemptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    businessId: int("businessId").notNull().references(() => businesses.id),
+    planId: int("planId").notNull().references(() => plans.id),
+    redeemedByUserId: int("redeemedByUserId").notNull().references(() => users.id),
+    code: varchar("code", { length: 64 }).notNull(),
+    redeemedAt: timestamp("redeemedAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("gift_code_redemptions_business_unique").on(table.businessId),
   ]
 );
 
@@ -190,6 +225,7 @@ export const payments = mysqlTable(
     subscriptionId: int("subscriptionId").references(() => subscriptions.id),
     provider: mysqlEnum("provider", ["razorpay", "stripe", "internal"]).notNull(),
     providerPaymentId: varchar("providerPaymentId", { length: 128 }),
+    providerOrderId: varchar("providerOrderId", { length: 128 }),
     status: mysqlEnum("status", ["pending", "authorized", "captured", "failed", "refunded", "cancelled"])
       .default("pending")
       .notNull(),
@@ -201,6 +237,7 @@ export const payments = mysqlTable(
   },
   table => [
     uniqueIndex("payments_provider_ref_unique").on(table.provider, table.providerPaymentId),
+    uniqueIndex("payments_provider_order_unique").on(table.provider, table.providerOrderId),
     index("payments_business_idx").on(table.businessId),
   ]
 );
@@ -363,13 +400,19 @@ export const operationalTasks = mysqlTable(
     periodEnd: timestamp("periodEnd"),
     description: text("description"),
     requiresProfessionalReview: int("requiresProfessionalReview").default(0).notNull(),
+    // Optimistic concurrency token. Incremented on every professional decision
+    // so a stale reviewer cannot overwrite a newer one.
+    version: int("version").default(0).notNull(),
     preparedAt: timestamp("preparedAt"),
     submittedAt: timestamp("submittedAt"),
     acceptedAt: timestamp("acceptedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [index("operational_tasks_business_status_idx").on(table.businessId, table.status)]
+  table => [
+    index("operational_tasks_business_status_idx").on(table.businessId, table.status),
+    index("operational_tasks_business_updated_idx").on(table.businessId, table.updatedAt),
+  ]
 );
 
 export const taskRequirements = mysqlTable(
@@ -712,10 +755,15 @@ export const caAuditObservations = mysqlTable(
     observationTitle: varchar("observationTitle", { length: 200 }).notNull(),
     detailedNotes: text("detailedNotes").notNull(),
     certificateReference: varchar("certificateReference", { length: 128 }),
+    evidenceFingerprint: varchar("evidenceFingerprint", { length: 64 }),
+    evidenceSnapshot: text("evidenceSnapshot"),
+    invalidatedAt: timestamp("invalidatedAt"),
+    invalidationReason: varchar("invalidationReason", { length: 200 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     index("ca_audit_obs_task_idx").on(table.taskId),
     index("ca_audit_obs_business_idx").on(table.businessId),
+    index("ca_audit_obs_fingerprint_idx").on(table.taskId, table.evidenceFingerprint),
   ]
 );

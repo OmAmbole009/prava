@@ -51,6 +51,11 @@ export const inMemoryUsers = new Map([
   ],
 ]);
 
+// Mirror of businessMembers for the development store. Tests and local seeding
+// add entries here; requireMember consults it so local mode cannot read another
+// tenant's records.
+export const inMemoryBusinessMembers = [];
+
 export const inMemoryBusinesses = [
   {
     id: 1,
@@ -146,6 +151,7 @@ export function resetInMemoryStateToCleanDefaults() {
     lastSignedIn: new Date(),
   });
 
+  inMemoryBusinessMembers.length = 0;
   inMemoryBusinesses.length = 0;
   inMemoryBusinesses.push({
     id: 1,
@@ -188,6 +194,12 @@ export async function getDb() {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
+  }
+  // Production must never silently fall back to the JSON-file store. Boot-time
+  // validation normally prevents this; this is defence in depth for any code
+  // path that reaches the data layer before configuration is checked.
+  if (!_db && process.env.NODE_ENV === "production" && process.env.ALLOW_EPHEMERAL_STORAGE !== "true") {
+    throw new Error("[Database] No database connection available and ephemeral storage is disabled in production.");
   }
   return _db;
 }
@@ -541,6 +553,7 @@ export async function createBusinessWithOwner(userId, input) {
       postalCode: input.postalCode || "",
       onboardingStep: 3,
       onboardingCompletedAt: new Date(),
+      planSelected: false,
       membershipRole: "owner",
       updatedAt: new Date(),
     };
@@ -551,7 +564,7 @@ export async function createBusinessWithOwner(userId, input) {
   const businessId = await db.transaction(async tx => {
     const inserted = await tx
       .insert(businesses)
-      .values({ ...input, ownerUserId: userId })
+      .values({ ...input, ownerUserId: userId, onboardingStep: 3, onboardingCompletedAt: new Date() })
       .$returningId();
     const createdId = inserted[0]?.id;
     if (!createdId) throw new Error("Workspace could not be created.");

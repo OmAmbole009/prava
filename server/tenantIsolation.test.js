@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers.js";
 import { createBusinessWithOwner } from "./db.js";
+import { selectFreePlan } from "./entitlements.js";
 import {
   getDocumentForUser,
   reviewDocumentForUser,
@@ -64,6 +65,7 @@ describe("Tenant Isolation & Role-Based Access Control", () => {
     });
 
     expect(bizA.id).not.toBe(bizB.id);
+    await selectFreePlan(bizA.id);
 
     // User A uploads an invoice
     const sampleInvoiceText =
@@ -169,6 +171,7 @@ describe("Tenant Isolation & Role-Based Access Control", () => {
       country: "IN",
       currency: "INR",
     });
+    await selectFreePlan(biz.id);
 
     const cleanInvoiceText = `TAX INVOICE
 Vendor: Reliable Cloud Services

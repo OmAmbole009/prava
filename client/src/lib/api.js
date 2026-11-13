@@ -113,11 +113,16 @@ export const api = {
     prepareGst: (params) => apiFetch(`/tasks/${params.taskId}/prepare-gst`, { method: "POST" }),
     prepareCashReconciliation: (params) => apiFetch(`/tasks/${params.taskId}/prepare-cash-reconciliation`, { method: "POST" }),
     markSubmissionPending: (params) => apiFetch(`/tasks/${params.taskId}/mark-submission-pending`, { method: "POST" }),
-    requestAuthorizedSubmission: (body) => apiFetch("/tasks/request-authorized-submission", { method: "POST", body: JSON.stringify(body) }),
-    approveAuthorizedSubmission: (body) => apiFetch("/tasks/approve-authorized-submission", { method: "POST", body: JSON.stringify(body) }),
+    requestAuthorizedSubmission: (body) => apiFetch(`/tasks/${body.taskId}/request-authorized-submission`, { method: "POST", body: JSON.stringify(body) }),
+    approveAuthorizedSubmission: (body) => apiFetch(`/tasks/${body.taskId}/approve-authorized-submission`, { method: "POST", body: JSON.stringify(body) }),
     reconcileGst: (params) => apiFetch(`/tasks/${params.taskId}/reconcile-gst`, { method: "POST" }),
-    resolveRequirement: (body) => apiFetch("/tasks/resolve-requirement", { method: "POST", body: JSON.stringify(body) }),
-    requestProfessionalReview: (params) => apiFetch(`/tasks/${params.taskId}/request-review`, { method: "POST", body: JSON.stringify(params) }),
+    resolveRequirement: (body) => apiFetch("/tasks/requirements/resolve", { method: "POST", body: JSON.stringify(body) }),
+    requestProfessionalReview: (params) => apiFetch(`/tasks/${params.taskId}/request-professional-review`, {
+      method: "POST",
+      body: JSON.stringify({ note: params.note }),
+    }),
+    approval: (params) => apiFetch(`/tasks/${params.taskId}/approval`),
+    approvals: (params) => apiFetch(`/tasks/approvals?businessId=${encodeURIComponent(params.businessId)}`),
   },
   documents: {
     list: (params) => {
@@ -149,6 +154,11 @@ export const api = {
   },
   billing: {
     snapshot: (params) => apiFetch(`/billing/snapshot?businessId=${encodeURIComponent(params.businessId)}`),
+    gatewayConfig: () => apiFetch("/billing/gateway-config"),
+    selectFreePlan: (body) => apiFetch("/billing/select-free-plan", { method: "POST", body: JSON.stringify(body) }),
+    createOrder: (body) => apiFetch("/billing/create-order", { method: "POST", body: JSON.stringify(body) }),
+    verifyPayment: (body) => apiFetch("/billing/verify-payment", { method: "POST", body: JSON.stringify(body) }),
+    redeemGiftCode: (body) => apiFetch("/billing/redeem-gift-code", { method: "POST", body: JSON.stringify(body) }),
   },
   assistant: {
     ask: (body) => apiFetch("/assistant/ask", { method: "POST", body: JSON.stringify(body) }),
@@ -249,6 +259,8 @@ export const api = {
     profile: () => apiFetch("/ca/profile"),
     workspaces: () => apiFetch("/ca/workspaces"),
     reviewQueue: () => apiFetch("/ca/review-queue"),
+    approvalQueue: () => apiFetch("/ca/approval-queue"),
+    task: (params) => apiFetch(`/ca/tasks/${params.taskId}`),
     submitDecision: (body) => apiFetch("/ca/submit-decision", { method: "POST", body: JSON.stringify(body) }),
   },
   system: {

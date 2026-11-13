@@ -54,21 +54,24 @@ export default function CaReview() {
                   </span>
                   <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-slate-900 dark:text-white">
                     <BadgeCheck className="size-3.5 text-blue-400"/>
-                    {assignedCa?.membershipNumber || "ICAI #409212"}
+                    {assignedCa?.membershipNumber || "Membership not recorded"}
                   </span>
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  {assignedCa?.fullName || "CA Rajesh Verma, FCA"}
+                  {assignedCa?.fullName || "No Chartered Accountant assigned"}
                 </h2>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  {assignedCa?.firmName || "Verma & Associates Chartered Accountants"} ·{" "}
-                  <span className="text-blue-400 font-semibold">
-                    {assignedCa?.specialization || "GST Filings, Direct Tax & Corporate Audit"}
-                  </span>
+                  {assignedCa?.firmName || "No firm recorded"}
+                  {assignedCa?.specialization ? (
+                    <>
+                      {" · "}
+                      <span className="text-blue-400 font-semibold">{assignedCa.specialization}</span>
+                    </>
+                  ) : null}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400 max-w-2xl">
                   {assignedCa?.bio ||
-            "Designated In-House Chartered Accountant assigned by Prava Administration for statutory verification, input tax credit audits, and official filing certifications."}
+            "A Prava administrator has not assigned a verified professional to this workspace. Review and certification are unavailable until an assignment is recorded."}
                 </p>
               </div>
             </div>

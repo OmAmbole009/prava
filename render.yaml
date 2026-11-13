@@ -2,10 +2,11 @@ services:
   - type: web
     name: prava-financial-cloud
     runtime: node
-    plan: starter
-    buildCommand: npm install --legacy-peer-deps && npm run build
+    plan: 0.5c-512mb
+    buildCommand: npm ci --include=dev --legacy-peer-deps && npm run build
+    preDeployCommand: npm run db:migrate
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
     envVars:
       - key: NODE_ENV
         value: production
@@ -13,6 +14,13 @@ services:
         value: 10000
       - key: JWT_SECRET
         generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      # Required: the server will not start without a production database.
+      - key: DATABASE_URL
+        sync: false
       - key: OTP_EXPIRY_MINUTES
         value: 5
       - key: OTP_RESEND_COOLDOWN_SECONDS
@@ -46,6 +54,12 @@ services:
       - key: VITE_GOOGLE_CLIENT_ID
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
       - key: ADMIN_LOGIN_PASSWORD
         sync: false

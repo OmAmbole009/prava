@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers.js";
-import { grantCaAccessSchema } from "./caManagement.js";
+import { grantCaAccessSchema, submitCaDecision } from "./caManagement.js";
 import { SEED_CA_EMAIL, SEED_CA_DEFAULT_PASSWORD } from "./caAuth.js";
+import { inMemoryTasks } from "./operations.js";
 
 describe("Chartered Accountant (CA) Management & Access Security", () => {
   it("validates grant CA access input schema correctly", () => {
@@ -129,8 +130,25 @@ describe("Chartered Accountant (CA) Management & Access Security", () => {
     const queue = await caCaller.ca.reviewQueue();
     expect(queue.reviewRequests).toBeDefined();
 
+    // A professional decision can only bind a real, reviewable task.
+    const taskId = 901;
+    inMemoryTasks.push({
+      id: taskId,
+      businessId: 1,
+      createdByUserId: 2,
+      type: "gst_return_preparation",
+      title: "GST Return Preparation — 2026-01",
+      status: "ready_for_review",
+      periodStart: new Date("2026-01-01T00:00:00.000Z"),
+      periodEnd: new Date("2026-02-01T00:00:00.000Z"),
+      requiresProfessionalReview: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      requirements: [],
+    });
+
     const decision = await caCaller.ca.submitDecision({
-      taskId: 1,
+      taskId,
       businessId: 1,
       decision: "approved",
       observationTitle: "Statutory GSTR-3B Verification Passed",
@@ -139,6 +157,25 @@ describe("Chartered Accountant (CA) Management & Access Security", () => {
     });
     expect(decision.success).toBe(true);
     expect(decision.decision).toBe("approved");
+    expect(decision.evidenceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+
+    // An actor without a verified CA profile cannot record a professional decision.
+    await expect(submitCaDecision(424242, {
+      taskId,
+      businessId: 1,
+      decision: "approved",
+      observationTitle: "Unauthorized approval attempt",
+      detailedNotes: "This attempt must be rejected by the server-side profile check.",
+    })).rejects.toThrow(/verified Chartered Accountant profile/i);
+
+    // A task that does not exist can never be approved.
+    await expect(submitCaDecision(201, {
+      taskId: 987654,
+      businessId: 1,
+      decision: "approved",
+      observationTitle: "Missing task",
+      detailedNotes: "This attempt must be rejected because the task does not exist.",
+    })).rejects.toThrow(/not found/i);
   });
 
   it("authenticates seed CA with valid credentials and sets session cookie", async () => {

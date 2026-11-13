@@ -106,7 +106,7 @@ export async function rejectAuthorizedGstSubmission(actorUserId, input) {
     }
     return { rejected: true };
   }
-  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, input.taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, input.taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (!request[0] || request[0].status !== "awaiting_review") throw new Error("Only an awaiting GST submission request can be rejected.");
   if (request[0].requestedByUserId === actorUserId) throw new Error("The requester cannot reject their own GST submission request.");
   const now = new Date();

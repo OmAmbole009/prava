@@ -1,6 +1,7 @@
 import { UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import WorkspaceApp from "./WorkspaceApp";
+import DisclaimerGate from "./components/DisclaimerGate";
 import { startLogin } from "./const";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -34,7 +35,9 @@ export function mountWorkspace(root) {
   root.render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <WorkspaceApp />
+        <DisclaimerGate>
+          <WorkspaceApp />
+        </DisclaimerGate>
       </QueryClientProvider>
     </ErrorBoundary>
   );

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Test and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --include=dev --legacy-peer-deps
+
+      - name: Run test suite
+        run: npx vitest run --reporter=dot
+        env:
+          NODE_ENV: test
+
+      - name: Build client and server
+        run: npm run build
+        env:
+          NODE_ENV: production
+          # Build-time only placeholder: the server validates real configuration at
+          # startup, which CI does not perform.
+          JWT_SECRET: ci-placeholder-secret-not-used-at-runtime
+          APP_ORIGIN: http://localhost:3000
+
+      - name: Verify production bundle exists
+        run: |
+          test -f dist/index.js
+          test -f dist/public/index.html
+
+  migrations:
+    name: Validate migrations are ordered
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check journal and files agree
+        run: |
+          node -e "
+          const fs = require('fs');
+          const journal = JSON.parse(fs.readFileSync('drizzle/meta/_journal.json', 'utf8'));
+          const files = fs.readdirSync('drizzle').filter(f => f.endsWith('.sql'));
+          const tags = journal.entries.map(e => e.tag);
+          if (tags.length !== files.length) {
+            console.error('Journal entries:', tags.length, 'SQL files:', files.length);
+            process.exit(1);
+          }
+          for (const tag of tags) {
+            if (!fs.existsSync('drizzle/' + tag + '.sql')) {
+              console.error('Missing migration file for', tag);
+              process.exit(1);
+            }
+          }
+          console.log('Migration journal is consistent:', tags.length, 'migrations');
+          "

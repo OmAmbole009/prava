@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../_core/middleware.js";
+import { getBusinessesForUser } from "../db.js";
+import { getBusinessEntitlement } from "../entitlements.js";
 
 import authRouter from "./auth.js";
 import businessesRouter from "./businesses.js";
@@ -27,6 +29,42 @@ const apiRouter = Router();
 
 // Apply auth middleware to all /api routes to populate req.user if token is present
 apiRouter.use(authenticate);
+
+const planProtectedPrefixes = [
+  "/actions",
+  "/assistant",
+  "/ca-engine",
+  "/caEngine",
+  "/documents",
+  "/finance",
+  "/gst",
+  "/intelligence",
+  "/invoices",
+  "/reconciliation",
+  "/reminders",
+  "/tasks",
+];
+
+apiRouter.use(async (req, res, next) => {
+  if (!req.user || !planProtectedPrefixes.some(prefix => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
+    return next();
+  }
+  try {
+    const workspaces = await getBusinessesForUser(req.user.id);
+    const requestedBusinessId = Number(req.query.businessId ?? req.body?.businessId);
+    const workspace = requestedBusinessId
+      ? workspaces.find(item => item.id === requestedBusinessId)
+      : workspaces[0];
+    if (!workspace) return next();
+    const entitlement = await getBusinessEntitlement(workspace.id);
+    if (!entitlement.subscription.planSelected) {
+      return res.status(403).json({ error: { message: "Choose a plan to activate this workspace before using business modules." } });
+    }
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+});
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/user", userRouter);

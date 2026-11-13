@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Building2, CheckCircle2, FileCheck2, History, ShieldCheck, } from "lucide-react";
+import CaApprovalQueue from "@/components/approval/CaApprovalQueue";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -18,6 +19,8 @@ export default function CaDashboard() {
     const dashboardQuery = useQuery({ queryKey: ["ca", "dashboard"], queryFn: () => api.ca.dashboard(), retry: false });
     const workspacesQuery = useQuery({ queryKey: ["ca", "workspaces"], queryFn: () => api.ca.workspaces(), retry: false });
     const queueQuery = useQuery({ queryKey: ["ca", "reviewQueue"], queryFn: () => api.ca.reviewQueue(), retry: false });
+    const approvalQueueQuery = useQuery({ queryKey: ["ca", "approvalQueue"], queryFn: () => api.ca.approvalQueue(), retry: false });
+    const approvalCounts = approvalQueueQuery.data?.counts ?? {};
     // Audit Modal State
     const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -83,28 +86,32 @@ export default function CaDashboard() {
         <section className="prava-panel relative overflow-hidden p-7 sm:p-9 border border-blue-500/20 bg-gradient-to-r from-blue-500/[0.05] to-transparent">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <span className="rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold">Prava In-House Chartered Accountant</span>
+              <span className="rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold">Practising Chartered Accountant</span>
               <h1 className="font-['Playfair_Display',Georgia,serif] mt-3 text-3xl sm:text-4xl font-normal tracking-tight text-slate-900 dark:text-white">
-                {caProfile?.fullName || "Chartered Accountant"} <em className="italic font-normal">Review Desk</em>
+                {caProfile?.fullName || "Professional profile not verified"} <em className="italic font-normal">Review Desk</em>
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300">
                 <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {caProfile?.membershipNumber || "ICAI #409212"}
+                  {caProfile?.membershipNumber || "Membership not recorded"}
                 </span>
                 <span>·</span>
-                <span>{caProfile?.firmName || "Verma & Associates CA"}</span>
+                <span>{caProfile?.firmName || "No firm recorded"}</span>
                 <span>·</span>
-                <span className="text-blue-400 font-semibold">{caProfile?.specialization || "GST & Direct Tax Audit"}</span>
+                <span className="text-blue-400 font-semibold">{caProfile?.specialization || "—"}</span>
               </div>
               <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600 dark:text-slate-400">
                 {caProfile?.bio ||
-            "Senior Fellow Chartered Accountant authorized to perform statutory audit reviews, reconcile supplier tax invoices, and issue formal filing certificates."}
+            (caProfile
+              ? "No professional biography has been recorded for this account."
+              : "No professional profile is recorded for this account. A Prava administrator must verify and record membership details before professional decisions can be recorded.")}
               </p>
             </div>
 
             <div className="flex flex-col gap-2 shrink-0">
-              <span className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3.5 py-1.5 text-center font-mono text-xs font-bold text-blue-300">
-                Verified Partner Status: Active
+              <span className={`rounded-xl border px-3.5 py-1.5 text-center font-mono text-xs font-bold ${caProfile?.status === "active"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                    : "border-red-500/30 bg-red-500/10 text-red-400"}`}>
+                Profile status: {caProfile?.status || "not recorded"}
               </span>
             </div>
           </div>
@@ -114,7 +121,7 @@ export default function CaDashboard() {
             <div>
               <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">Assigned Workspaces</p>
               <p className="prava-mono mt-1 text-2xl font-bold text-slate-900 dark:text-white">
-                {dashboardQuery.data?.assignedBusinessesCount ?? 1}
+                {dashboardQuery.data?.assignedBusinessesCount ?? 0}
               </p>
             </div>
             <div>
@@ -130,18 +137,24 @@ export default function CaDashboard() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-sky-600 dark:text-sky-400">Statutory Clearance</p>
-              <p className="prava-mono mt-1 text-2xl font-bold text-slate-900 dark:text-white">100% Verified</p>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-red-600 dark:text-red-400">Invalidated approvals</p>
+              <p className="prava-mono mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                {approvalCounts.approval_invalidated ?? 0}
+              </p>
             </div>
           </div>
         </section>
 
         {/* Tabbed Navigation */}
         <Tabs defaultValue="review-queue" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 rounded-2xl border border-slate-200 bg-white/80 dark:border-white/10 dark:bg-[#0D131A] p-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 rounded-2xl border border-slate-200 bg-white/80 dark:border-white/10 dark:bg-[#0D131A] p-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 shadow-sm">
             <TabsTrigger value="review-queue" className="rounded-xl data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
               <FileCheck2 className="mr-2 size-4"/>
               Review Queue ({reviewQueue.length + gstSubmissions.length})
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="rounded-xl data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
+              <ShieldCheck className="mr-2 size-4"/>
+              Approvals ({(approvalCounts.awaiting_ca_review || 0) + (approvalCounts.under_ca_review || 0) + (approvalCounts.changes_requested || 0) + (approvalCounts.approval_invalidated || 0)})
             </TabsTrigger>
             <TabsTrigger value="assigned-clients" className="rounded-xl data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
               <Building2 className="mr-2 size-4"/>
@@ -236,7 +249,12 @@ export default function CaDashboard() {
             </div>
           </TabsContent>
 
-          {/* TAB 2: Assigned Clients */}
+          {/* TAB 2: Approval queue with evidence inspection */}
+          <TabsContent value="approvals" className="mt-6">
+            <CaApprovalQueue />
+          </TabsContent>
+
+          {/* TAB 3: Assigned Clients */}
           <TabsContent value="assigned-clients" className="mt-6">
             <div className="prava-panel p-6 border border-slate-200/80 dark:border-white/10 shadow-md">
               <div className="border-b border-slate-200/80 dark:border-white/[0.06] pb-4">

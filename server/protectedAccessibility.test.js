@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const onboarding = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Onboarding.jsx"), "utf8");
 const dashboardLayout = readFileSync(resolve(import.meta.dirname, "../client/src/components/DashboardLayout.jsx"), "utf8");
+const apiRoutes = readFileSync(resolve(import.meta.dirname, "./routes/index.js"), "utf8");
 const taskDetail = readFileSync(resolve(import.meta.dirname, "../client/src/pages/TaskDetail.jsx"), "utf8");
 const billing = readFileSync(resolve(import.meta.dirname, "../client/src/pages/Billing.jsx"), "utf8");
 const documentReview = readFileSync(resolve(import.meta.dirname, "../client/src/pages/DocumentReview.jsx"), "utf8");
@@ -25,6 +26,8 @@ describe("protected Prava route accessibility contracts", () => {
     expect(dashboardLayout).toContain("startLogin()");
     expect(dashboardLayout).toContain("focus-visible:ring-2");
     expect(dashboardLayout).toContain('aria-label="Toggle navigation"');
+    expect(dashboardLayout).toContain('setLocation("/billing")');
+    expect(apiRoutes).toContain("Choose a plan to activate this workspace before using business modules.");
   });
 
   it("keeps task upload labelled and makes bank-statement and filing boundaries explicit", () => {
@@ -37,9 +40,11 @@ describe("protected Prava route accessibility contracts", () => {
     expect(taskDetail).toContain("No return was filed.");
   });
 
-  it("keeps provider checkout visibly disabled until verified integration exists", () => {
-    expect(billing).toContain("Provider checkout not configured");
-    expect(billing).toContain("will not simulate payments");
+  it("requires a plan choice and only activates paid access after provider verification or a gift code", () => {
+    expect(billing).toContain("Choose a plan to activate your workspace");
+    expect(billing).toContain("Pay securely to upgrade");
+    expect(billing).toContain("GANPATIBAPPA");
+    expect(billing).toContain("activate only after Razorpay confirms a captured payment");
   });
 
   it("keeps document review source-linked, field-labelled, and explicit about its approval boundary", () => {

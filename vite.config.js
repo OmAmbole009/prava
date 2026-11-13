@@ -135,7 +135,17 @@ function vitePluginManusDebugCollector() {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// The host preview runtime injects inline scripts and is only needed for local
+// development. Excluding it from production builds keeps the shipped HTML
+// compatible with a strict Content-Security-Policy (no inline scripts).
+const isProductionBuild = process.env.NODE_ENV === "production";
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  ...(isProductionBuild ? [] : [vitePluginManusRuntime()]),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,

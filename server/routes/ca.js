@@ -3,8 +3,10 @@ import { requireCa, sendData, sendError } from "../_core/middleware.js";
 import {
   caDecisionSchema,
   getAssignedWorkspacesForCa,
+  getCaApprovalQueue,
   getCaDashboardStats,
   getCaProfileForUser,
+  getTaskForCa,
   listCaReviewQueue,
   submitCaDecision,
 } from "../caManagement.js";
@@ -46,6 +48,33 @@ router.get("/review-queue", async (req, res) => {
     return sendData(res, queue);
   } catch (error) {
     return sendError(res, error);
+  }
+});
+
+// Approval workload derived from the same persisted records the business sees.
+router.get("/approval-queue", async (req, res) => {
+  try {
+    const queue = await getCaApprovalQueue(req.user.id, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    return sendData(res, queue);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Full evidence view for an assigned professional only.
+router.get("/tasks/:taskId", async (req, res) => {
+  try {
+    const taskId = Number(req.params.taskId);
+    if (!Number.isInteger(taskId) || taskId <= 0) {
+      return res.status(400).json({ error: { message: "A valid task id is required." } });
+    }
+    const view = await getTaskForCa(req.user.id, taskId);
+    return sendData(res, view);
+  } catch (error) {
+    return sendError(res, error, 403);
   }
 });
 

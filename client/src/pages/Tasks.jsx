@@ -17,6 +17,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { AnimatedSection, AnimatedList, AnimatedRow, FadeInView } from "@/components/AnimatedPage";
+import ApprovalStatusBadge from "@/components/approval/ApprovalStatusBadge";
 
 const workflowOptions = {
     monthly_close: {
@@ -36,18 +37,6 @@ const workflowOptions = {
     },
 };
 
-const statusLabel = (status) => {
-    switch (status) {
-        case "completed":
-            return "Completed";
-        case "in_progress":
-            return "In Progress";
-        case "waiting_user":
-            return "Action Required";
-        default:
-            return "Active";
-    }
-};
 
 export default function Tasks() {
     const [, setLocation] = useLocation();
@@ -63,6 +52,16 @@ export default function Tasks() {
         queryFn: () => api.tasks.list({ businessId: business?.id ?? 0 }),
         enabled: Boolean(business),
     });
+
+    const approvals = useQuery({
+        queryKey: ["tasks", "approvals", business?.id],
+        queryFn: () => api.tasks.approvals({ businessId: business?.id ?? 0 }),
+        enabled: Boolean(business?.id),
+        retry: false,
+    });
+
+    const approvalByTask = new Map((approvals.data?.tasks ?? []).map((item) => [item.taskId, item]));
+    const approvalCounts = approvals.data?.counts ?? {};
 
     const create = useMutation({
         mutationFn: (body) => api.tasks.create(body),
@@ -192,6 +191,22 @@ export default function Tasks() {
                                 <ClipboardCheck className="size-4 text-cyan-400" />
                             </div>
 
+                            {approvals.data && (
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {[
+                                        { label: "Awaiting CA", value: (approvalCounts.awaiting_ca_review || 0) + (approvalCounts.under_ca_review || 0) },
+                                        { label: "Changes requested", value: approvalCounts.changes_requested || 0 },
+                                        { label: "Approval invalidated", value: approvalCounts.approval_invalidated || 0 },
+                                        { label: "Approved", value: (approvalCounts.approved || 0) + (approvalCounts.authorized_for_execution || 0) },
+                                    ].map((stat) => (
+                                        <div key={stat.label} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                                            <p className="text-[10px] uppercase tracking-wide text-slate-400">{stat.label}</p>
+                                            <p className="mt-0.5 text-lg font-semibold text-white">{stat.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <AnimatedList className="space-y-2">
                                 {tasks.isLoading ? (
                                     <div className="p-6 text-center text-xs text-slate-400">Loading active workflows…</div>
@@ -212,9 +227,24 @@ export default function Tasks() {
                                                     </span>
                                                     <div className="min-w-0">
                                                         <p className="font-medium text-white truncate">{task.title}</p>
-                                                        <p className="mt-0.5 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
-                                                            Status: {statusLabel(task.status)}
-                                                        </p>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                            {approvalByTask.get(task.id) ? (
+                                                                <ApprovalStatusBadge
+                                                                    status={approvalByTask.get(task.id).approvalStatus}
+                                                                    label={approvalByTask.get(task.id).approvalStatusLabel}
+                                                                    tone={approvalByTask.get(task.id).tone}
+                                                                />
+                                                            ) : (
+                                                                <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                                                                    Review status unavailable
+                                                                </span>
+                                                            )}
+                                                            {approvalByTask.get(task.id)?.nextAction && (
+                                                                <span className="text-[10px] text-slate-400">
+                                                                    {approvalByTask.get(task.id).nextAction.label}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <ChevronRight className="size-4 text-slate-400 group-hover:text-white transition" />

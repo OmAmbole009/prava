@@ -142,3 +142,9 @@ test-*.jpeg
 test_*.png
 test_*.pdf
 *.traineddata
+
+# Playwright artefacts and signed E2E session cookies (never commit)
+e2e/.auth/
+e2e/.state.json
+test-results/
+playwright-report/

@@ -1,7 +1,10 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { adminAuditEvents, businesses, plans, subscriptions, usageRecords } from "../drizzle/schema.js";
-import { getDb } from "./db.js";
+import { adminAuditEvents, businesses, giftCodeRedemptions, plans, subscriptions, usageRecords } from "../drizzle/schema.js";
+import { getDb, inMemoryBusinesses } from "./db.js";
+
+const inMemoryBusinessPlans = new Map();
+const inMemoryGiftRedemptions = new Set();
 
 export const planUpdateSchema = z.object({
   planId: z.number().int().positive(),
@@ -92,6 +95,8 @@ export async function ensureDefaultPlans() {
   const existingCodes = new Set(existing.map(plan => plan.code));
   const missing = defaultPlans.filter(plan => !existingCodes.has(plan.code));
   if (missing.length) {
+    // Two concurrent requests can both observe the same gap; the unique code
+    // constraint turns the loser into a no-op instead of a 500.
     await db.insert(plans).values(missing.map(plan => ({
       ...plan,
       featureConfig: JSON.stringify(plan.featureConfig),
@@ -99,7 +104,7 @@ export async function ensureDefaultPlans() {
       status: "active",
       billingPeriod: "monthly",
       currency: "INR",
-    })));
+    }))).onDuplicateKeyUpdate({ set: { code: plans.code } });
   }
   return db.select().from(plans).where(eq(plans.status, "active"));
 }
@@ -117,6 +122,7 @@ async function ensureBusinessSubscription(businessId) {
     planId: freePlan[0].id,
     provider: "internal",
     status: "active",
+    planSelected: 0,
     currentPeriodStart: new Date(),
   }).$returningId();
   const id = created[0]?.id;
@@ -129,13 +135,18 @@ async function ensureBusinessSubscription(businessId) {
 export async function getBusinessEntitlement(businessId) {
   const db = await getDb();
   if (!db) {
+    const snapshot = await getBillingSnapshot(businessId);
     return {
-      subscription: { id: 1, businessId, planId: 3, provider: "internal", status: "active", currentPeriodStart: new Date() },
-      plan: { id: 3, code: "business", name: "Business", documentLimit: 5000, aiRequestLimit: 5000, gstWorkflowLimit: 100, memberLimit: 10 },
-      features: { GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: true, PROFESSIONAL_REVIEW: true },
+      subscription: snapshot.subscription,
+      plan: snapshot.currentPlan,
+      features: parseFeatures(snapshot.currentPlan.featureConfig),
     };
   }
   const subscription = await ensureBusinessSubscription(businessId);
+  if (subscription.planSelected && subscription.currentPeriodEnd && subscription.currentPeriodEnd <= new Date() && subscription.status === "active") {
+    await db.update(subscriptions).set({ status: "expired" }).where(eq(subscriptions.id, subscription.id));
+    subscription.status = "expired";
+  }
   const plan = await db.select().from(plans).where(eq(plans.id, subscription.planId)).limit(1);
   if (!plan[0]) throw new Error("Subscription plan is unavailable.");
   return { subscription, plan: plan[0], features: parseFeatures(plan[0].featureConfig) };
@@ -158,6 +169,9 @@ export function evaluateEntitlementEnforcement(input) {
 
 export async function checkFeatureEntitlement(businessId, feature) {
   const entitlement = await getBusinessEntitlement(businessId);
+  if (!entitlement.subscription.planSelected) {
+    return { allowed: false, reason: "Choose a plan to activate this workspace.", entitlement };
+  }
   const initial = evaluateEntitlementEnforcement({ subscriptionStatus: entitlement.subscription.status, feature, featureEnabled: entitlement.features[feature] });
   if (!initial.allowed) return { ...initial, entitlement };
   const usageLimit = limitForFeature(entitlement.plan, feature);
@@ -195,12 +209,30 @@ export async function consumeUsage(businessId, metric, quantity = 1) {
 export async function getBillingSnapshot(businessId) {
   const db = await getDb();
   if (!db) {
-    const starterPlan = {
+    const freePlan = {
       id: 1,
+      code: "free",
+      name: "Free",
+      description: "Workspace foundation with limited document processing and GST preparation.",
+      featureConfig: JSON.stringify({ GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: false, PROFESSIONAL_REVIEW: false }),
+      priceMinor: null,
+      documentLimit: 10,
+      aiRequestLimit: 20,
+      gstWorkflowLimit: 1,
+      storageLimitBytes: 1073741824,
+      memberLimit: 1,
+      status: "active",
+      billingPeriod: "monthly",
+      currency: "INR",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const starterPlan = {
+      id: 2,
       code: "starter",
       name: "Starter",
       description: "Standard business workspace with automated financial preparation.",
-      featureConfig: JSON.stringify({ GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: true, PROFESSIONAL_REVIEW: true }),
+      featureConfig: JSON.stringify({ GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: true, PROFESSIONAL_REVIEW: false }),
       priceMinor: 2900,
       documentLimit: 500,
       aiRequestLimit: 500,
@@ -209,30 +241,54 @@ export async function getBillingSnapshot(businessId) {
       memberLimit: 3,
       status: "active",
       billingPeriod: "monthly",
-      currency: "USD",
+      currency: "INR",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    const businessPlan = {
+      ...starterPlan,
+      id: 3,
+      code: "business",
+      name: "Business",
+      description: "Configured plan for high-volume operations.",
+      featureConfig: JSON.stringify({ GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: true, PROFESSIONAL_REVIEW: true }),
+      priceMinor: 7900,
+      documentLimit: 5000,
+      memberLimit: 10,
+    };
+    const plansList = [freePlan, starterPlan, businessPlan];
+    const workspace = inMemoryBusinesses.find(item => item.id === businessId);
+    const planState = inMemoryBusinessPlans.get(businessId);
+    const planSelected = planState?.planSelected ?? workspace?.planSelected !== false;
+    const currentPlan = planSelected
+      ? plansList.find(plan => plan.id === planState?.planId) ?? businessPlan
+      : freePlan;
+    const currentPeriodStart = planState?.currentPeriodStart ?? new Date();
+    const currentPeriodEnd = planState?.currentPeriodEnd ??
+      (planSelected && currentPlan.code !== "free" ? new Date(Date.now() + 30 * 86400000) : null);
+    const subscriptionStatus = currentPeriodEnd && currentPeriodEnd <= new Date()
+      ? "expired"
+      : planState?.status ?? "active";
+    if (subscriptionStatus === "expired" && planState) planState.status = "expired";
     return {
-      plans: [
-        starterPlan,
-        { ...starterPlan, id: 2, code: "business", name: "Business", description: "Configured plan for high-volume operations.", priceMinor: 7900, documentLimit: 5000, memberLimit: 10 },
-      ],
+      plans: plansList,
       subscription: {
         id: 1,
         businessId,
-        planId: 1,
+        planId: currentPlan.id,
         provider: "internal",
-        status: "active",
+        status: subscriptionStatus,
+        planSelected: planSelected ? 1 : 0,
         cancelAtPeriodEnd: 0,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 86400000),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelledAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      currentPlan: starterPlan,
-      features: { GST_PREPARATION: true, AI_DOCUMENT_EXTRACTION: true, ADVANCED_RECONCILIATION: true, PROFESSIONAL_REVIEW: true },
+      currentPlan,
+      features: parseFeatures(currentPlan.featureConfig),
+      giftCodeRedeemed: inMemoryGiftRedemptions.has(businessId),
       usage: [
         { metric: "documents_processed", quantity: 12 },
         { metric: "ai_requests", quantity: 18 },
@@ -250,7 +306,111 @@ export async function getBillingSnapshot(businessId) {
     eq(usageRecords.periodStart, period.start),
     eq(usageRecords.periodEnd, period.end),
   ));
-  return { plans: availablePlans, subscription: entitlement.subscription, currentPlan: entitlement.plan, features: entitlement.features, usage, period };
+  const giftRedemption = await db.select({ id: giftCodeRedemptions.id }).from(giftCodeRedemptions)
+      .where(eq(giftCodeRedemptions.businessId, businessId)).limit(1);
+  return {
+    plans: availablePlans,
+    subscription: entitlement.subscription,
+    currentPlan: entitlement.plan,
+    features: entitlement.features,
+    usage,
+    period,
+    giftCodeRedeemed: Boolean(giftRedemption[0]),
+  };
+}
+
+export async function selectFreePlan(businessId) {
+  const db = await getDb();
+  if (!db) {
+    const snapshot = await getBillingSnapshot(businessId);
+    const freePlan = snapshot.plans.find(plan => plan.code === "free" && plan.status === "active");
+    if (!freePlan) throw new Error("The free plan is unavailable.");
+    if (snapshot.subscription.planSelected && snapshot.currentPlan.id !== freePlan.id) {
+      throw new Error("A selected plan cannot be replaced with the free plan here.");
+    }
+    inMemoryBusinessPlans.set(businessId, { planId: freePlan.id, planSelected: true });
+    const workspace = inMemoryBusinesses.find(item => item.id === businessId);
+    if (workspace) workspace.planSelected = true;
+    return { businessId, planId: freePlan.id, planSelected: true };
+  }
+  const entitlement = await getBusinessEntitlement(businessId);
+  const freePlan = await db.select().from(plans).where(and(eq(plans.code, "free"), eq(plans.status, "active"))).limit(1);
+  if (!freePlan[0]) throw new Error("The free plan is unavailable.");
+  if (entitlement.subscription.planSelected && entitlement.plan.id !== freePlan[0].id) {
+    throw new Error("A selected plan cannot be replaced with the free plan here.");
+  }
+  await db.update(subscriptions).set({
+    planId: freePlan[0].id,
+    provider: "internal",
+    providerSubscriptionId: null,
+    status: "active",
+    planSelected: 1,
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: 0,
+    cancelledAt: null,
+  }).where(eq(subscriptions.id, entitlement.subscription.id));
+  return { businessId, planId: freePlan[0].id, planSelected: true };
+}
+
+export async function redeemGiftCode(userId, input) {
+  if (typeof input.code !== "string" || input.code.trim().toUpperCase() !== "GANPATIBAPPA") {
+    throw new Error("That gift code is not valid.");
+  }
+  const db = await getDb();
+  if (!db) {
+    const snapshot = await getBillingSnapshot(input.businessId);
+    const targetPlan = snapshot.plans.find(plan => plan.id === input.planId && plan.status === "active");
+    if (!targetPlan || targetPlan.code === "free") throw new Error("Choose an available paid plan for this gift code.");
+    if (targetPlan.billingPeriod === "custom") throw new Error("Custom plans must be activated by Prava support.");
+    if (inMemoryGiftRedemptions.has(input.businessId)) throw new Error("A gift code has already been redeemed for this workspace.");
+    inMemoryGiftRedemptions.add(input.businessId);
+    const now = new Date();
+    const periodEnd = targetPlan.billingPeriod === "yearly"
+      ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    inMemoryBusinessPlans.set(input.businessId, {
+      planId: targetPlan.id,
+      planSelected: true,
+      status: "active",
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+    });
+    const workspace = inMemoryBusinesses.find(item => item.id === input.businessId);
+    if (workspace) workspace.planSelected = true;
+    return { businessId: input.businessId, planId: targetPlan.id, planName: targetPlan.name, planSelected: true };
+  }
+  const entitlement = await getBusinessEntitlement(input.businessId);
+  const targetPlan = await db.select().from(plans).where(and(eq(plans.id, input.planId), eq(plans.status, "active"))).limit(1);
+  if (!targetPlan[0] || targetPlan[0].code === "free") throw new Error("Choose an available paid plan for this gift code.");
+  if (targetPlan[0].billingPeriod === "custom") throw new Error("Custom plans must be activated by Prava support.");
+  const existing = await db.select({ id: giftCodeRedemptions.id }).from(giftCodeRedemptions)
+    .where(eq(giftCodeRedemptions.businessId, input.businessId)).limit(1);
+  if (existing[0]) throw new Error("A gift code has already been redeemed for this workspace.");
+  const now = new Date();
+  const periodEnd = targetPlan[0].billingPeriod === "yearly"
+    ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+    : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  await db.transaction(async tx => {
+    await tx.insert(giftCodeRedemptions).values({
+      businessId: input.businessId,
+      planId: targetPlan[0].id,
+      redeemedByUserId: userId,
+      code: "GANPATIBAPPA",
+    });
+    await tx.update(subscriptions).set({
+      planId: targetPlan[0].id,
+      provider: "internal",
+      providerSubscriptionId: null,
+      status: "active",
+      planSelected: 1,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: 0,
+      cancelledAt: null,
+    }).where(eq(subscriptions.id, entitlement.subscription.id));
+  });
+  return { businessId: input.businessId, planId: targetPlan[0].id, planName: targetPlan[0].name, planSelected: true };
 }
 
 async function recordAdminAudit(actorUserId, action, entityType, entityId, metadata) {
@@ -324,6 +484,8 @@ export async function getAdminBillingOverview() {
         updatedAt: new Date(),
       },
     ];
+    const defaultSubscriptionPlanId = inMemoryBusinessPlans.get(1)?.planId ?? 3;
+    const defaultSubscriptionPlan = defaultPlansList.find(plan => plan.id === defaultSubscriptionPlanId) ?? defaultPlansList[2];
     return {
       plans: defaultPlansList,
       subscriptions: [
@@ -331,7 +493,7 @@ export async function getAdminBillingOverview() {
           subscription: {
             id: 1,
             businessId: 1,
-            planId: 2,
+            planId: defaultSubscriptionPlan.id,
             provider: "internal",
             status: "active",
             cancelAtPeriodEnd: 0,
@@ -342,8 +504,8 @@ export async function getAdminBillingOverview() {
             updatedAt: new Date(),
           },
           businessName: "Acme Global Solutions",
-          planName: "Starter",
-          planCode: "starter",
+          planName: defaultSubscriptionPlan.name,
+          planCode: defaultSubscriptionPlan.code,
         },
       ],
       auditEvents: [
@@ -413,10 +575,12 @@ export async function updatePlanFromAdmin(actorUserId, input) {
 export async function updateSubscriptionFromAdmin(actorUserId, input) {
   const db = await getDb();
   if (!db) {
+    inMemoryBusinessPlans.set(input.businessId, { planId: input.planId, planSelected: true });
     return {
       id: 1,
       businessId: input.businessId,
       planId: input.planId,
+      planSelected: 1,
       provider: "internal",
       status: input.status,
       cancelAtPeriodEnd: input.cancelAtPeriodEnd ? 1 : 0,
@@ -434,6 +598,7 @@ export async function updateSubscriptionFromAdmin(actorUserId, input) {
   await db.update(subscriptions).set({
     planId: input.planId,
     status: input.status,
+    planSelected: 1,
     cancelAtPeriodEnd: input.cancelAtPeriodEnd ? 1 : 0,
     cancelledAt: input.status === "cancelled" ? now : null,
   }).where(eq(subscriptions.id, subscription.id));

@@ -1,8 +1,15 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import ApprovalStatusBadge from "@/components/approval/ApprovalStatusBadge";
+import ApprovalTimeline from "@/components/approval/ApprovalTimeline";
+import ApprovalHistory from "@/components/approval/ApprovalHistory";
+import CAReviewerCard from "@/components/approval/CAReviewerCard";
+import ClientAuthorizationPanel from "@/components/approval/ClientAuthorizationPanel";
+import EvidenceReviewPanel from "@/components/approval/EvidenceReviewPanel";
+import NextActionCard from "@/components/approval/NextActionCard";
 import { formatMinorAmount } from "@shared/locale";
 import { AlertCircle, ArrowLeft, CheckCircle2, FileUp, Landmark, Loader2, RefreshCw, Send, ShieldCheck, Sparkles, UserRoundCheck, } from "lucide-react";
 import { useState } from "react";
@@ -38,7 +45,19 @@ export default function TaskDetail() {
     const [, params] = useRoute("/tasks/:taskId");
     const [, setLocation] = useLocation();
     const taskId = Number(params?.taskId ?? 0);
+    const queryClient = useQueryClient();
     const task = useQuery({ queryKey: ["tasks", "get", taskId], queryFn: () => api.tasks.get({ taskId }), enabled: taskId > 0, retry: false });
+    const approval = useQuery({
+        queryKey: ["tasks", "approval", taskId],
+        queryFn: () => api.tasks.approval({ taskId }),
+        enabled: taskId > 0,
+        retry: false,
+    });
+    const refreshApproval = () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks", "approval", taskId] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", "get", taskId] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", "list"] });
+    };
     const businesses = useQuery({ queryKey: ["businesses", "list"], queryFn: () => api.businesses.list(), retry: false });
     const business = businesses.data?.[0];
     const currency = business?.currency ?? "USD";
@@ -59,6 +78,7 @@ export default function TaskDetail() {
                     : "Document saved for review.");
             documents.refetch();
             task.refetch();
+            refreshApproval();
         },
         onError: (error) => toast.error(error.message),
     });
@@ -93,6 +113,7 @@ export default function TaskDetail() {
         onSuccess: () => {
             toast.success("Professional review has been requested.");
             task.refetch();
+            refreshApproval();
         },
         onError: (error) => toast.error(error.message),
     });
@@ -104,6 +125,7 @@ export default function TaskDetail() {
         onSuccess: () => {
             toast.success("Authorized submission requested. Ready for independent approval.");
             task.refetch();
+            refreshApproval();
         },
         onError: (error) => toast.error(error.message),
     });
@@ -112,6 +134,7 @@ export default function TaskDetail() {
         onSuccess: () => {
             toast.success("Authorized submission approved by independent reviewer.");
             task.refetch();
+            refreshApproval();
         },
         onError: (error) => toast.error(error.message),
     });
@@ -201,6 +224,141 @@ export default function TaskDetail() {
           </div>
           <StatusPill status={task.data.status}/>
         </div>
+
+        {/* Approval & Review — derived entirely from persisted approval records */}
+        <section className="prava-panel space-y-4 border border-slate-200/80 p-6 dark:border-white/10" aria-labelledby="approval-heading">
+          <div className="flex flex-col gap-3 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between dark:border-white/[0.06]">
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Approval &amp; review
+              </span>
+              <h2 id="approval-heading" className="mt-1 text-xl font-bold text-slate-900 dark:text-white">
+                Professional sign-off status
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                This state comes from the stored review record. Approval covers one exact version of the evidence;
+                changing that evidence withdraws it.
+              </p>
+            </div>
+            {approval.data && (
+              <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                <ApprovalStatusBadge
+                  status={approval.data.approvalStatus}
+                  label={approval.data.approvalStatusLabel}
+                  tone={approval.data.tone}
+                />
+                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                  Evidence {approval.data.evidenceReference || "—"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {approval.isLoading ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">Loading approval state…</p>
+          ) : approval.error ? (
+            <p className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+              Approval details could not be loaded: {approval.error.message}
+            </p>
+          ) : approval.data ? (
+            <>
+              {approval.data.approvalStatus === "approval_invalidated" && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3" role="alert">
+                  <p className="text-xs font-bold text-red-700 dark:text-red-300">
+                    Previous CA approval is no longer valid because the reviewed evidence has changed.
+                  </p>
+                  <p className="mt-1 text-[11px] text-red-700/90 dark:text-red-300/90">
+                    {approval.data.validityReason || "This task must be reviewed again."}
+                  </p>
+                </div>
+              )}
+
+              <NextActionCard
+                approvalStatus={approval.data.approvalStatus}
+                label={approval.data.approvalStatusLabel}
+                tone={approval.data.tone}
+                nextAction={approval.data.nextAction}
+                assignedCa={approval.data.assignedCa}
+                validityReason={approval.data.validityReason}
+                actionLabel={approval.data.nextAction?.code === "request_review" ? "Request professional review" : undefined}
+                onAction={
+                  approval.data.nextAction?.code === "request_review" || approval.data.nextAction?.code === "resubmit_review"
+                    ? () => requestReview.mutate({ taskId })
+                    : undefined
+                }
+              />
+
+              <ApprovalTimeline status={approval.data.approvalStatus} />
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <CAReviewerCard assignedCa={approval.data.assignedCa} />
+                <div className="rounded-lg border border-slate-200 bg-white/70 p-4 dark:border-white/[0.08] dark:bg-[#0A0F16]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Current professional decision
+                  </p>
+                  {approval.data.currentApproval ? (
+                    <dl className="mt-2 space-y-1 text-[11px]">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Reviewer</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {approval.data.currentApproval.caName || `User #${approval.data.currentApproval.caUserId}`}
+                          {approval.data.currentApproval.membershipNumber ? ` · ${approval.data.currentApproval.membershipNumber}` : ""}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Decision</dt>
+                        <dd className="text-slate-900 dark:text-white">{String(approval.data.currentApproval.decision).replaceAll("_", " ")}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Recorded</dt>
+                        <dd className="text-slate-900 dark:text-white">
+                          {approval.data.currentApproval.createdAt ? new Date(approval.data.currentApproval.createdAt).toLocaleString() : "—"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-slate-500 dark:text-slate-400">Valid for current evidence</dt>
+                        <dd className={approval.data.approvalValid ? "font-semibold text-emerald-700 dark:text-emerald-400" : "font-semibold text-red-600 dark:text-red-400"}>
+                          {approval.data.approvalValid ? "Yes" : "No"}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-400">
+                      No professional decision has been recorded for this task version.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <EvidenceReviewPanel
+                documents={(documents.data ?? []).map((row) => ({ ...row.document, extraction: row.extraction }))}
+                preparation={task.data.preparation}
+                requirements={task.data.requirements ?? []}
+                currency={currency}
+                locale={locale}
+                onOpenDocument={(documentId) => setLocation(`/documents/${documentId}`)}
+              />
+
+              <ClientAuthorizationPanel
+                taskId={taskId}
+                approvalView={approval.data}
+                onChanged={() => {
+                  task.refetch();
+                  refreshApproval();
+                }}
+              />
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Approval history ({approval.data.history?.length ?? 0})
+                </p>
+                <div className="mt-2">
+                  <ApprovalHistory history={approval.data.history ?? []} />
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
 
         {/* Requirements & Documents Split Grid */}
         <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">

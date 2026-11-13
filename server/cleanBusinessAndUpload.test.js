@@ -11,6 +11,7 @@ import {
   listTasksForUser,
   uploadAndProcessDocument,
 } from "./operations.js";
+import { selectFreePlan } from "./entitlements.js";
 import { listCaReviewQueue } from "./caManagement.js";
 
 describe("Clean New Business Onboarding & Document Storage", () => {
@@ -63,6 +64,7 @@ describe("Clean New Business Onboarding & Document Storage", () => {
     const userId = 1;
     const businesses = await getBusinessesForUser(userId);
     const targetBiz = businesses.find((b) => b.name === "Acme Industrial Logistics Ltd") || businesses[0];
+    await selectFreePlan(targetBiz.id);
 
     // Upload a sample invoice base64
     const sampleInvoiceBytes = Buffer.from(
@@ -146,4 +148,3 @@ describe("Clean New Business Onboarding & Document Storage", () => {
     expect(financials.profitAndLoss.revenue.revenueFromOperations).toBe(0);
   }, 20000);
 });
-

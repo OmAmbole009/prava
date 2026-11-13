@@ -618,11 +618,42 @@ export default function DashboardLayout({ children }) {
 
 function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
     const [location, setLocation] = useLocation();
+    const businesses = useQuery({ queryKey: ["businesses", "list"], queryFn: () => api.businesses.list(), enabled: Boolean(user), retry: false });
+    const activeBusiness = businesses.data?.[0];
+    const billing = useQuery({
+        queryKey: ["billing", "snapshot", activeBusiness?.id],
+        queryFn: () => api.billing.snapshot({ businessId: activeBusiness.id }),
+        enabled: Boolean(activeBusiness && location !== "/onboarding"),
+        retry: false,
+    });
     const { state, toggleSidebar } = useSidebar();
     const isCollapsed = state === "collapsed";
     const [isResizing, setIsResizing] = useState(false);
     const [quickCopilotOpen, setQuickCopilotOpen] = useState(false);
     const sidebarRef = useRef(null);
+
+    const hasSelectedPlan = billing.data?.subscription?.planSelected !== 0 &&
+        billing.data?.subscription?.planSelected !== false;
+    const onboardingComplete = Boolean(activeBusiness?.onboardingCompletedAt || activeBusiness?.onboardingStep >= 3);
+    const requiresPlanSelection = Boolean(
+        onboardingComplete &&
+        (billing.error || (billing.data && !hasSelectedPlan))
+    );
+    const billingGateLoading = Boolean(
+        location !== "/billing" &&
+        location !== "/onboarding" &&
+        (businesses.isLoading || (onboardingComplete && billing.isLoading))
+    );
+
+    useEffect(() => {
+        if (
+            requiresPlanSelection &&
+            location !== "/billing" &&
+            location !== "/onboarding"
+        ) {
+            setLocation("/billing");
+        }
+    }, [location, requiresPlanSelection, setLocation]);
 
     const allItems = navGroups.flatMap((g) => g.items);
     const activeMenuItem = allItems.find((item) => item.path === location);
@@ -664,6 +695,15 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
             document.body.style.userSelect = "";
         };
     }, [isResizing, setSidebarWidth]);
+
+    if (billingGateLoading || (requiresPlanSelection && location !== "/billing" && location !== "/onboarding")) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-[#030712] text-xs text-slate-400">
+                <Loader2 className="mr-2 size-4 animate-spin text-cyan-400" />
+                Opening plan selection…
+            </div>
+        );
+    }
 
     return (
         <>
@@ -717,22 +757,11 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                                                 <span className="font-serif text-sm font-bold tracking-tight text-white">
                                                     Prava
                                                 </span>
-                                                <span className="text-[8px] font-mono font-bold tracking-widest text-emerald-400 uppercase">
-                                                    OS
-                                                </span>
                                             </div>
                                             <span className="text-[10px] text-slate-400 leading-tight mt-0.5">
                                                 Financial Compliance
                                             </span>
                                         </div>
-                                    </div>
-
-                                    {/* Clean Status Pill */}
-                                    <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5">
-                                        <span className="size-1.5 rounded-full bg-emerald-400" />
-                                        <span className="text-[9px] font-medium text-emerald-400">
-                                            Live
-                                        </span>
                                     </div>
                                 </motion.div>
                             )}

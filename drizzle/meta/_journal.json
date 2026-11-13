@@ -92,6 +92,62 @@
       "when": 1792572718738,
       "tag": "0012_issued_invoice_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1794315162470,
+      "tag": "0013_plan_change_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1794316826488,
+      "tag": "0014_razorpay_billing_and_gifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1794400000000,
+      "tag": "0015_ca_core_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1794600000000,
+      "tag": "0016_ca_evidence_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1794700000000,
+      "tag": "0017_approval_concurrency_and_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1794800000000,
+      "tag": "0018_missing_ca_and_otp_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1794900000000,
+      "tag": "0019_user_local_auth_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1795000000000,
+      "tag": "0020_user_role_ca_enum",
+      "breakpoints": true
     }
   ]
 }

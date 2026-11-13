@@ -186,10 +186,28 @@ export function reviewActionOutcome(decision) {
   return decision === "approve" ? "resolved" : "open";
 }
 
-export function authorizedSubmissionGate(task, preparation) {
+/**
+ * Any material change to a task's reviewed evidence voids earlier professional
+ * approvals. The approval record is preserved but marked invalid so it cannot
+ * be presented as current (see caApproval.js).
+ */
+async function invalidateApprovalsForMaterialChange(businessId, taskId, reason) {
+  if (!taskId) return;
+  const { invalidateCaApprovalsForTask } = await import("./caManagement.js");
+  await invalidateCaApprovalsForTask(businessId, taskId, reason);
+}
+
+export function authorizedSubmissionGate(task, preparation, approval = null) {
   if (task.type !== "gst_return_preparation") return { allowed: false, reason: "Only GST return preparation tasks can enter an authorized submission workflow." };
   if (task.status !== "prepared" || preparation?.status !== "prepared") return { allowed: false, reason: "Resolve required evidence and review items before requesting authorized submission." };
-  if (task.requiresProfessionalReview) return { allowed: false, reason: "Complete the requested professional review before seeking authorized submission." };
+  // A recorded approval that no longer binds the current evidence blocks the
+  // next step even if the workspace no longer flags the task for review.
+  if (approval?.approval && approval.valid === false) {
+    return { allowed: false, reason: approval.reason || "The professional approval is no longer valid for the current evidence." };
+  }
+  if (task.requiresProfessionalReview && !approval?.valid) {
+    return { allowed: false, reason: "Complete the requested professional review before seeking authorized submission." };
+  }
   return { allowed: true };
 }
 
@@ -350,13 +368,21 @@ export function calculateGstPreparation(rows) {
 async function requireMember(userId, businessId) {
   const db = await getDb();
   if (!db) {
-    const { inMemoryBusinesses } = await import("./db.js");
-    const biz = inMemoryBusinesses.find(b => b.id === businessId);
+    const { inMemoryBusinesses, inMemoryBusinessMembers } = await import("./db.js");
+    const biz = inMemoryBusinesses.find(b => Number(b.id) === Number(businessId));
     if (!biz) {
       throw new HttpError(404, "Workspace not found.");
     }
-    // Verify user ownership / membership
-    if (biz.id !== 1 && biz.ownerUserId && biz.ownerUserId !== userId && userId !== 1) {
+    // The development store enforces the same boundary as MySQL: an explicit
+    // owner or an active membership row. No shared-demo or admin bypass.
+    const isOwner = biz.ownerUserId != null && Number(biz.ownerUserId) === Number(userId);
+    const membership = inMemoryBusinessMembers.find(m =>
+      Number(m.businessId) === Number(businessId)
+      && Number(m.userId) === Number(userId)
+      && m.status !== "removed"
+      && m.status !== "revoked",
+    );
+    if (!isOwner && !membership) {
       throw new HttpError(403, "You do not have permission to access this business workspace.");
     }
     return {
@@ -364,7 +390,7 @@ async function requireMember(userId, businessId) {
       name: biz.name,
       gstin: biz.gstin || "",
       gstStatus: biz.gstStatus || "registered",
-      role: biz.ownerUserId === userId ? "owner" : "member",
+      role: isOwner ? "owner" : membership.role,
     };
   }
   const member = await db.select({
@@ -501,13 +527,15 @@ export async function getTaskForUser(userId, taskId) {
   const db = await getDb();
   if (!db) {
     const task = inMemoryTasks.find(t => t.id === Number(taskId) || String(t.id) === String(taskId));
-    if (!task) throw new Error("You do not have access to this task.");
+    if (!task) throw new HttpError(403, "You do not have access to this task.");
+    const membership = await requireMember(userId, task.businessId);
     const id = task.id;
     const prep = inMemoryGstPreparations.find(p => p.taskId === id || String(p.taskId) === String(id)) ?? task.preparation ?? null;
     const sub = inMemoryGstSubmissions.filter(s => s.taskId === id || String(s.taskId) === String(id)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? task.submissionRequest ?? null;
     const rev = inMemoryReviewRequests.filter(r => r.taskId === id || String(r.taskId) === String(id)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? task.reviewRequest ?? null;
     return {
       ...task,
+      workspaceRole: task.workspaceRole ?? membership.role,
       preparation: prep,
       submissionRequest: sub,
       reviewRequest: rev,
@@ -516,11 +544,11 @@ export async function getTaskForUser(userId, taskId) {
   const task = await db.select({ task: operationalTasks, role: businessMembers.role }).from(operationalTasks)
     .innerJoin(businessMembers, eq(operationalTasks.businessId, businessMembers.businessId))
     .where(and(eq(operationalTasks.id, taskId), eq(businessMembers.userId, userId))).limit(1);
-  if (!task[0]) throw new Error("You do not have access to this task.");
+  if (!task[0]) throw new HttpError(403, "You do not have access to this task.");
   const requirements = await db.select().from(taskRequirements).where(eq(taskRequirements.taskId, taskId));
   const preparation = await db.select().from(gstPreparations).where(eq(gstPreparations.taskId, taskId)).limit(1);
-  const submissionRequest = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
-  const review = await db.select().from(reviewRequests).where(eq(reviewRequests.taskId, taskId)).orderBy(desc(reviewRequests.createdAt)).limit(1);
+  const submissionRequest = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
+  const review = await db.select().from(reviewRequests).where(eq(reviewRequests.taskId, taskId)).orderBy(desc(reviewRequests.createdAt), desc(reviewRequests.id)).limit(1);
   return { ...task[0].task, workspaceRole: task[0].role, requirements, preparation: preparation[0] ?? null, reviewRequest: review[0] ?? null, submissionRequest: submissionRequest[0] ?? null };
 }
 
@@ -538,6 +566,7 @@ export async function resolveActionItem(userId, actionId, resolution) {
   if (!db) {
     const item = inMemoryActionItems.find(a => a.id === actionId);
     if (!item) throw new Error("Action item not found.");
+    await requireMember(userId, item.businessId);
     item.status = resolution;
     item.resolvedAt = new Date();
     return { success: true };
@@ -644,6 +673,14 @@ export async function uploadAndProcessDocument(userId, input) {
   }
   if (input.documentType === "bank_statement" && !input.taskId) {
     throw new Error("Attach a bank statement to a cash-reconciliation task.");
+  }
+  // A newly uploaded source document is a material change to the evidence set.
+  if (input.taskId) {
+    await invalidateApprovalsForMaterialChange(
+      input.businessId,
+      input.taskId,
+      "A new source document was uploaded after the previous review.",
+    );
   }
   const bytes = Buffer.from(input.base64, "base64");
   if (bytes.length === 0 || bytes.length > maxDocumentBytes) throw new Error("Documents must be smaller than 15 MB.");
@@ -1168,6 +1205,14 @@ export async function persistReviewedDocumentState(input) {
 export async function reviewDocumentForUser(userId, input) {
   const detail = await getDocumentForUser(userId, input.documentId);
   if (!detail.extraction) throw new Error("This document does not have an invoice extraction to review.");
+  // Correcting extracted financial values changes what was reviewed.
+  if (detail.document.taskId) {
+    await invalidateApprovalsForMaterialChange(
+      detail.document.businessId,
+      detail.document.taskId,
+      "Extracted document values were corrected after the previous review.",
+    );
+  }
   const raw = {
     vendorName: input.vendorName,
     gstin: input.gstin,
@@ -1400,6 +1445,9 @@ export async function requestProfessionalReview(userId, taskId, note) {
       taskId,
       requestedByUserId: userId,
       note: note ?? null,
+      // Keep parity with the persisted row so approval status derivation is
+      // identical in local and database modes.
+      status: "requested",
       createdAt: new Date(),
     };
     inMemoryReviewRequests.push(reviewRecord);
@@ -1432,9 +1480,13 @@ export async function markGstSubmissionPending(userId, taskId) {
 export async function requestAuthorizedGstSubmission(userId, input) {
   const task = await getTaskForUser(userId, input.taskId);
   if (!task) throw new Error("Task not found.");
-  const gate = authorizedSubmissionGate(task, task.preparation);
-  if (!gate.allowed) throw new Error(gate.reason);
   const db = await getDb();
+  // A professional approval is what unlocks the authorization step; a request
+  // is still not a filing, and the next control is a separate workspace admin.
+  const { getCurrentCaApproval } = await import("./caManagement.js");
+  const approvalState = await getCurrentCaApproval(db, task);
+  const gate = authorizedSubmissionGate(task, task.preparation, approvalState);
+  if (!gate.allowed) throw new Error(gate.reason);
   if (!db) {
     const existing = inMemoryGstSubmissions.find(s => s.taskId === input.taskId && s.status !== "cancelled");
     if (existing && ["awaiting_review", "approved", "dispatching", "submitted"].includes(existing.status)) {
@@ -1471,7 +1523,7 @@ export async function requestAuthorizedGstSubmission(userId, input) {
     await audit(task.businessId, userId, "gst.authorized_submission_requested", "gstSubmissionRequest", String(subRecord.id), input.taskId, { assertion: "review_requested_not_submitted", idempotencyKey });
     return getTaskForUser(userId, input.taskId);
   }
-  const existing = await db.select().from(gstSubmissionRequests).where(and(eq(gstSubmissionRequests.taskId, input.taskId), ne(gstSubmissionRequests.status, "cancelled"))).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const existing = await db.select().from(gstSubmissionRequests).where(and(eq(gstSubmissionRequests.taskId, input.taskId), ne(gstSubmissionRequests.status, "cancelled"))).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (existing[0] && ["awaiting_review", "approved", "dispatching", "submitted"].includes(existing[0].status)) throw new Error("This GST preparation already has an active authorized submission request.");
   const idempotencyKey = `gst-${input.taskId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const inserted = await db.insert(gstSubmissionRequests).values({ businessId: task.businessId, taskId: input.taskId, requestedByUserId: userId, requesterNote: input.note || null, idempotencyKey }).$returningId();
@@ -1485,6 +1537,17 @@ export async function approveAuthorizedGstSubmission(userId, input) {
   const task = await getTaskForUser(userId, input.taskId);
   if (!task) throw new Error("Task not found.");
   const db = await getDb();
+
+  // Execution authorization may only rest on a currently valid professional
+  // approval where one is required or has ever been recorded. An approval
+  // invalidated by changed evidence always blocks this step.
+  const { getCurrentCaApproval } = await import("./caManagement.js");
+  const approvalState = await getCurrentCaApproval(db, task);
+  const approvalIsRelevant = Boolean(task.requiresProfessionalReview) || Boolean(approvalState.approval);
+  if (approvalIsRelevant && !approvalState.valid) {
+    throw new Error(approvalState.reason || "A current, valid professional approval is required before execution can be authorized.");
+  }
+
   if (!db) {
     const request = inMemoryGstSubmissions.find(s => s.taskId === input.taskId);
     if (!request) throw new Error("No authorized submission request is awaiting review.");
@@ -1513,7 +1576,7 @@ export async function approveAuthorizedGstSubmission(userId, input) {
     await notifyApproval(request.id, request.requestedByUserId);
     return getTaskForUser(userId, input.taskId);
   }
-  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, input.taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, input.taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (!request[0]) throw new Error("No authorized submission request is awaiting review.");
   const approval = canIndependentlyApproveSubmission({ workspaceRole: task.workspaceRole, requestedByUserId: request[0].requestedByUserId, reviewerUserId: userId, status: request[0].status });
   if (!approval.allowed) throw new Error(approval.reason);
@@ -1545,7 +1608,7 @@ export async function beginAuthorizedGstProviderDispatch(actorUserId, taskId, pr
     await audit(task.businessId, actorUserId, "gst.provider_dispatch_started", "gstSubmissionRequest", String(request.id), taskId, { providerName: providerName.trim(), idempotencyKey: request.idempotencyKey });
     return request.idempotencyKey;
   }
-  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (!request[0] || request[0].status !== "approved") throw new Error("A currently approved submission request is required before provider dispatch.");
   const dispatchedAt = new Date();
   await db.update(gstSubmissionRequests).set({ status: "dispatching", providerName: providerName.trim(), dispatchedAt }).where(eq(gstSubmissionRequests.id, request[0].id));
@@ -1576,7 +1639,7 @@ export async function recordAuthorizedGstProviderFailure(actorUserId, taskId, fa
     await audit(task.businessId, actorUserId, "gst.provider_dispatch_failed", "gstSubmissionRequest", String(request.id), taskId, { providerName: request.providerName, failureCode: safeCode, assertion: "not_submitted" });
     return getTaskForUser(actorUserId, taskId);
   }
-  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (!request[0] || request[0].status !== "dispatching" || !request[0].providerName) throw new Error("A provider dispatch must be active before its failure can be recorded.");
   await db.update(gstSubmissionRequests).set({ status: "failed", failureCode: safeCode }).where(eq(gstSubmissionRequests.id, request[0].id));
   await db.update(operationalTasks).set({ status: "prepared" }).where(eq(operationalTasks.id, taskId));
@@ -1613,7 +1676,7 @@ export async function recordOfficialGstSubmission(actorUserId, taskId, officialR
     await audit(task.businessId, actorUserId, "gst.official_submission_recorded", "gstPreparation", String(taskId), taskId, { officialReference: officialReference.trim(), source: "authorized_integration_only", providerName: request.providerName });
     return getTaskForUser(actorUserId, taskId);
   }
-  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt)).limit(1);
+  const request = await db.select().from(gstSubmissionRequests).where(eq(gstSubmissionRequests.taskId, taskId)).orderBy(desc(gstSubmissionRequests.createdAt), desc(gstSubmissionRequests.id)).limit(1);
   if (!request[0] || request[0].status !== "dispatching" || !request[0].providerName) throw new Error("An authorized provider dispatch must be recorded before an official submission can be confirmed.");
   const submittedAt = new Date();
   await db.update(operationalTasks).set({ status: "submitted", submittedAt }).where(eq(operationalTasks.id, taskId));

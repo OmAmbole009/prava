@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { inMemoryBusinessMembers } from "./db.js";
 import {
   inMemoryTasks,
   inMemoryDocuments,
@@ -19,6 +20,10 @@ describe("Offline / in-memory storage resilience", () => {
     const testTaskId = 9999;
     const testUserId = 999;
     const testBusinessId = 1;
+
+    // Membership is required by the development store; this test is about
+    // storage resilience, not access control.
+    inMemoryBusinessMembers.push({ id: 8999, businessId: testBusinessId, userId: testUserId, role: "member", status: "active" });
 
     // Seed task in memory
     inMemoryTasks.push({

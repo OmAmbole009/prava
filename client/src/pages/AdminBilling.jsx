@@ -102,8 +102,7 @@ export default function AdminBilling() {
                 Plans and subscriptions, <span className="italic font-normal text-muted-foreground">with an audit trail</span>.
               </h1>
               <p className="mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-                Provider checkout stays disabled until verified payment credentials and webhook processing are configured.
-                Changes here only update Prava's internal entitlement records.
+                Configure plan prices here and add the Razorpay server credentials and webhook secret. Paid access is activated only after verified capture; this console remains an audited administrative override.
               </p>
             </div>
             <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-border/80 bg-secondary/50 text-foreground shadow-sm">

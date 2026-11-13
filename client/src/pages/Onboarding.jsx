@@ -94,14 +94,17 @@ export default function Onboarding() {
 
     const createWorkspace = useMutation({
         mutationFn: (body) => api.businesses.create(body),
-        onSuccess: (data) => {
-            void queryClient.invalidateQueries({ queryKey: ["businesses"] });
+        onSuccess: async (data) => {
+            queryClient.setQueryData(["businesses", "list"], (previous) =>
+                previous?.length ? [data, ...previous.filter((business) => business.id !== data.id)] : [data]
+            );
+            await queryClient.invalidateQueries({ queryKey: ["businesses"] });
             toast.success("Business command center initialized successfully.", {
                 description: `Workspace '${data.name}' ready for CA audits and invoice processing.`,
             });
             setIsCompleted(true);
             setIsEditing(false);
-            setLocation("/dashboard");
+            setLocation("/billing");
         },
         onError: (err) => {
             toast.error(err.message || "Could not initialize workspace.");

@@ -18,6 +18,13 @@ import { serveStatic, setupVite } from "./vite.js";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db.js";
 import { productionRuntimeMiddleware, publicServerError } from "./productionRuntime.js";
+import {
+  assertProductionEnvironment,
+  createOriginGuard,
+  createRateLimiter,
+  resolveTrustedOrigins,
+  securityHeadersMiddleware,
+} from "./security.js";
 
 function isPortAvailable(port) {
   return new Promise(resolve => {
@@ -39,29 +46,73 @@ async function findAvailablePort(startPort = 3000) {
 }
 
 async function startServer() {
+  // Refuse to serve traffic with an incomplete production configuration.
+  assertProductionEnvironment();
+
   const app = express();
   const server = createServer(app);
   const startedAt = Date.now();
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
   app.use(productionRuntimeMiddleware);
+  app.use(securityHeadersMiddleware());
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ status: "ok", uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) });
   });
   app.get("/api/ready", async (_req, res) => {
     try {
       const db = await getDb();
-      if (!db) return res.status(503).json({ status: "unavailable" });
+      if (!db) {
+        // Production refuses to start without a database, so reaching here means
+        // the development store is serving deliberately.
+        return process.env.NODE_ENV === "production"
+          ? res.status(503).json({ status: "unavailable" })
+          : res.status(200).json({ status: "ready", storage: "in-memory (development)" });
+      }
       await db.execute(sql`select 1`);
-      return res.status(200).json({ status: "ready" });
+      return res.status(200).json({ status: "ready", storage: "mysql" });
     } catch {
       return res.status(503).json({ status: "unavailable" });
     }
   });
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({
+    limit: "50mb",
+    verify: (req, _res, buffer) => {
+      if (req.originalUrl === "/api/billing/webhooks/razorpay") {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  // Abuse protection: tight limits on credential endpoints, a broad ceiling on
+  // the rest of the API. Payment webhooks are exempt because providers retry.
+  const authLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: "auth" });
+  const writeLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120, prefix: "write" });
+  const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 600, prefix: "api" });
+  app.use([
+    "/api/auth/login",
+    "/api/auth/verify-otp",
+    "/api/auth/resend-otp",
+    "/api/auth/register",
+    "/api/auth/forgot-password",
+    "/api/auth/admin-login",
+    "/api/auth/ca-login",
+    "/api/auth/google",
+  ], authLimiter);
+  app.use("/api", apiLimiter);
+  app.use("/api/documents", writeLimiter);
+  app.use("/api/invoices", writeLimiter);
+
+  // Cookie-authenticated mutations must originate from a trusted origin.
+  app.use("/api", createOriginGuard({
+    allowedOrigins: resolveTrustedOrigins(),
+    exemptPrefixes: ["/billing/webhooks"],
+  }));
+
   // REST API
   app.use("/api", apiRouter);
   // development mode uses Vite, production mode uses static files
@@ -100,6 +151,33 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${port}/`);
   });
+
+  // Drain in-flight requests, then close the database pool. A second signal or a
+  // 15s deadline forces exit so orchestration restarts cannot hang.
+  let shuttingDown = false;
+  const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[Server] ${signal} received; closing listener.`);
+    const deadline = setTimeout(() => {
+      console.error("[Server] Graceful shutdown timed out; exiting.");
+      process.exit(1);
+    }, 15_000);
+    deadline.unref();
+    server.close(async () => {
+      try {
+        const db = await getDb();
+        if (db && typeof db.end === "function") await db.end();
+      } catch (error) {
+        console.error("[Server] Error closing the database pool:", error.message);
+      }
+      clearTimeout(deadline);
+      console.log("[Server] Shutdown complete.");
+      process.exit(0);
+    });
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 startServer().catch(console.error);

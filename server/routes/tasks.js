@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireUser, sendData, sendError } from "../_core/middleware.js";
+import { getBusinessApprovalOverview, getTaskApprovalView } from "../caManagement.js";
 import {
   createOperationalTask,
   approveAuthorizedGstSubmission,
@@ -30,6 +31,33 @@ tasksRouter.get("/", async (req, res) => {
     return sendData(res, tasks);
   } catch (error) {
     return sendError(res, error);
+  }
+});
+
+// Must be declared before "/:taskId" so "approvals" is not parsed as an id.
+tasksRouter.get("/approvals", async (req, res) => {
+  try {
+    const businessId = Number(req.query.businessId);
+    if (!Number.isInteger(businessId) || businessId <= 0) {
+      return res.status(400).json({ error: { message: "businessId is required." } });
+    }
+    const overview = await getBusinessApprovalOverview(req.user.id, businessId, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    return sendData(res, overview);
+  } catch (error) {
+    return sendError(res, error, 403);
+  }
+});
+
+tasksRouter.get("/:taskId/approval", async (req, res) => {
+  try {
+    const taskId = Number(req.params.taskId);
+    const view = await getTaskApprovalView(req.user.id, taskId);
+    return sendData(res, view);
+  } catch (error) {
+    return sendError(res, error, 403);
   }
 });
 
