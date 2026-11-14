@@ -60,6 +60,7 @@ export function registerStorageProxy(app) {
       const file = await getSupabaseFile(key);
       if (!file) return res.status(404).send("File not found in storage");
       res.setHeader("Content-Type", file.contentType);
+      res.setHeader("Content-Disposition", "inline");
       res.setHeader("Cache-Control", "private, max-age=3600");
       res.send(file.buffer);
     } catch (err) {

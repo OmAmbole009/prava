@@ -66,7 +66,7 @@ export function buildContentSecurityPolicy({ isProduction = true } = {}) {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    "frame-ancestors 'self'",
     "upgrade-insecure-requests",
   ].join("; ");
 }
@@ -75,7 +75,7 @@ export function securityHeadersMiddleware({ isProduction = process.env.NODE_ENV 
   const csp = buildContentSecurityPolicy({ isProduction });
   return function securityHeaders(req, res, next) {
     res.setHeader("Content-Security-Policy", csp);
-    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     // Google Identity Services renders its sign-in button in a popup/iframe and

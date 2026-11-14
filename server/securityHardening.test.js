@@ -82,10 +82,10 @@ describe("Security headers", () => {
     const res = mockRes();
     securityHeadersMiddleware({ isProduction: true })(mockReq(), res, () => {});
     const csp = res.headers["content-security-policy"];
-    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
-    expect(res.headers["x-frame-options"]).toBe("DENY");
+    expect(res.headers["x-frame-options"]).toBe("SAMEORIGIN");
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
   });
 
@@ -122,7 +122,7 @@ describe("Security headers", () => {
     expect(directives["connect-src"].split(" ")).not.toContain("wss:");
     expect(directives["connect-src"].split(" ")).not.toContain("*");
     expect(directives["object-src"]).toBe("'none'");
-    expect(directives["frame-ancestors"]).toBe("'none'");
+    expect(directives["frame-ancestors"]).toBe("'self'");
     expect(directives["connect-src"]).toContain("'self'");
     expect(directives["connect-src"]).toContain("https://open.er-api.com");
     expect(directives["connect-src"]).toContain("https://forge.butterfly-effect.dev");

@@ -182,8 +182,11 @@ describe("SMTP error classification", () => {
 });
 
 describe("Provider", () => {
-  it("is always SMTP", () => {
-    expect(resolveEmailProvider()).toBe("smtp");
+  it("explicit EMAIL_PROVIDER=smtp returns smtp", () => {
+    expect(resolveEmailProvider({ EMAIL_PROVIDER: "smtp" })).toBe("smtp");
+  });
+  it("no provider returns null when not in production", () => {
+    expect(resolveEmailProvider({})).toBeNull();
   });
 });
 
@@ -242,15 +245,17 @@ describe("Gmail API transport", () => {
 
   it("is the default provider when the OAuth credentials exist", () => {
     expect(resolveEmailProvider(gmailEnv)).toBe("gmail_api");
-    expect(resolveEmailProvider({})).toBe("smtp");
+    expect(resolveEmailProvider({})).toBeNull();
     expect(resolveEmailProvider({ ...gmailEnv, EMAIL_PROVIDER: "smtp" })).toBe("smtp");
     expect(resolveEmailProvider({ EMAIL_PROVIDER: "gmail_api" })).toBe("gmail_api");
     expect(gmailApiConfig({})).toBeNull();
   });
 
   it("never falls back to SMTP in production", () => {
-    expect(resolveEmailProvider({ NODE_ENV: "production" })).toBe("gmail_api");
-    expect(resolveEmailProvider({ RENDER: "true" })).toBe("gmail_api");
+    expect(resolveEmailProvider({ NODE_ENV: "production", ...gmailEnv })).toBe("gmail_api");
+    expect(resolveEmailProvider({ RENDER: "true", ...gmailEnv })).toBe("gmail_api");
+    expect(resolveEmailProvider({ NODE_ENV: "production" })).toBeNull();
+    expect(resolveEmailProvider({ RENDER: "true" })).toBeNull();
     expect(
       resolveEmailProvider({ NODE_ENV: "production", EMAIL_PROVIDER: "smtp" })
     ).toBe("smtp");
@@ -264,9 +269,9 @@ describe("Gmail API transport", () => {
       production: true,
     });
     expect(describeEmailTransport({ NODE_ENV: "production" })).toMatchObject({
-      provider: "gmail_api",
-      sender: "ambole.rajesh@gmail.com",
+      provider: "unconfigured",
       configured: false,
+      production: true,
     });
   });
 
