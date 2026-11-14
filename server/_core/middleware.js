@@ -44,5 +44,11 @@ export function sendError(res, error, fallbackStatus = 500) {
       : error?.message === NOT_ADMIN_ERR_MSG || error?.message === NOT_CA_ERR_MSG
       ? 403
       : fallbackStatus);
-  return res.status(status).json({ error: { message: error?.message || "Internal server error" } });
+  const payload = { message: error?.message || "Internal server error" };
+  // Machine-readable fields let the client show actionable guidance instead of
+  // a generic failure (e.g. EMAIL_PORT_BLOCKED during OTP login).
+  if (error?.code) payload.code = error.code;
+  if (error?.hint) payload.hint = error.hint;
+  if (error?.details !== undefined) payload.details = error.details;
+  return res.status(status).json({ error: payload });
 }

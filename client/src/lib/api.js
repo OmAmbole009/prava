@@ -23,10 +23,21 @@ export async function apiFetch(url, options = {}) {
   const json = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = json?.error?.message || json?.error || response.statusText || "Request failed";
+    const payload = json?.error;
+    const message =
+      (typeof payload === "object" && payload?.message) ||
+      (typeof payload === "string" ? payload : null) ||
+      response.statusText ||
+      "Request failed";
     const error = new Error(message);
     error.status = response.status;
     error.data = json;
+    // Preserve machine-readable guidance so the UI can explain what to do next.
+    if (typeof payload === "object" && payload) {
+      if (payload.code) error.code = payload.code;
+      if (payload.hint) error.hint = payload.hint;
+      if (payload.details !== undefined) error.details = payload.details;
+    }
     throw error;
   }
 

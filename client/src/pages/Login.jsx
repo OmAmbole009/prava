@@ -49,6 +49,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  // Machine-readable delivery guidance from the API (e.g. EMAIL_PORT_BLOCKED).
+  const [errorCode, setErrorCode] = useState("");
+  const [errorHint, setErrorHint] = useState("");
 
   // OTP Verification Challenge states
   const [challengeToken, setChallengeToken] = useState("");
@@ -82,6 +85,14 @@ export default function Login() {
       }
     } catch {}
   }, []);
+
+  // Clear delivery guidance whenever the error itself is cleared.
+  useEffect(() => {
+    if (!errorMessage) {
+      setErrorCode("");
+      setErrorHint("");
+    }
+  }, [errorMessage]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -167,6 +178,8 @@ export default function Login() {
         error.message ||
         "Invalid email or password. Please verify your credentials and try again.";
       setErrorMessage(msg);
+      setErrorCode(error.code || "");
+      setErrorHint(error.hint || "");
       toast.error(msg);
     },
   });
@@ -203,6 +216,8 @@ export default function Login() {
       const msg =
         error.message || "Failed to resend verification code. Please try again.";
       setErrorMessage(msg);
+      setErrorCode(error.code || "");
+      setErrorHint(error.hint || "");
       toast.error(msg);
     },
   });
@@ -226,6 +241,8 @@ export default function Login() {
       const msg =
         error.message || "Registration failed. Please verify your details.";
       setErrorMessage(msg);
+      setErrorCode(error.code || "");
+      setErrorHint(error.hint || "");
       toast.error(msg);
     },
   });
@@ -249,6 +266,8 @@ export default function Login() {
       const msg =
         error.message || "Unable to initiate password reset. Please check your credentials.";
       setErrorMessage(msg);
+      setErrorCode(error.code || "");
+      setErrorHint(error.hint || "");
       toast.error(msg);
     },
   });
@@ -687,7 +706,44 @@ export default function Login() {
               {errorMessage && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
                   <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                  <div className="flex-1 font-medium">{errorMessage}</div>
+                  <div className="flex-1 space-y-1.5">
+                    <div className="font-medium">{errorMessage}</div>
+                    {errorHint && (
+                      <p className="text-[11px] font-normal leading-relaxed text-destructive/80">
+                        {errorHint}
+                      </p>
+                    )}
+                    {errorCode.startsWith("EMAIL_") && (
+                      <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                        {mode === "login" && loginStep === "credentials" && identifier.trim() && password && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              loginStep1Mutation.mutate({
+                                email: identifier.trim(),
+                                identifier: identifier.trim(),
+                                password,
+                              })
+                            }
+                            disabled={loginStep1Mutation.isPending}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold underline underline-offset-2 disabled:opacity-50"
+                          >
+                            <RefreshCw className={`size-3 ${loginStep1Mutation.isPending ? "animate-spin" : ""}`} />
+                            Retry sending code
+                          </button>
+                        )}
+                        {errorCode === "EMAIL_PORT_BLOCKED" || errorCode === "EMAIL_NOT_CONFIGURED" ? (
+                          <button
+                            type="button"
+                            onClick={handleGoogleSignIn}
+                            className="text-[11px] font-semibold underline underline-offset-2"
+                          >
+                            Sign in with Google instead
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
