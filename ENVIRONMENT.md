@@ -22,10 +22,11 @@ reports every missing value at once and aborts startup.
 | `ADMIN_LOGIN_PASSWORD` | Bootstrap password for the super-administrator portal account |
 | `OTP_EXPIRY_MINUTES` | OTP lifetime (default 5) |
 | `OTP_RESEND_COOLDOWN_SECONDS` | Minimum gap between OTP sends (default 60) |
-| `EMAIL_PROVIDER` | `smtp` for SMTP delivery |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `EMAIL_FROM` | SMTP delivery of OTPs and notifications |
+| `EMAIL_PROVIDER` | `gmail_api` (default when OAuth credentials exist) or `smtp` |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Gmail API over HTTPS; the refresh token must be granted by the sending account with the `gmail.send` scope |
+| `GMAIL_SENDER` | Sending account, defaults to `ambole.rajesh@gmail.com` (mail identity only; the admin login is separate) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `EMAIL_FROM` | SMTP delivery, used when `EMAIL_PROVIDER=smtp` |
 | `SMTP_FROM_NAME`, `SMTP_FROM_EMAIL` | Optional sender name/address for notification emails |
-| `RESEND_API_KEY` | Required when `EMAIL_PROVIDER=resend` |
 | `SMS_PROVIDER`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Optional SMS delivery through Twilio |
 | `SMS_API_KEY` | Optional Fast2SMS credential when `SMS_PROVIDER=fast2sms` |
 | `GOOGLE_CLIENT_ID`, `VITE_GOOGLE_CLIENT_ID` | Google sign-in |

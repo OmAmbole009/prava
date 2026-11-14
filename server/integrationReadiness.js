@@ -34,9 +34,9 @@ export function getIntegrationReadiness() {
   return {
     email: {
       name: "Decision email delivery",
-      ...state(["EMAIL_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"]),
-      boundary: "In-app notices remain active. Email rows stay suppressed until an authenticated SMTP sender is configured.",
-      requirements: ["Verified sender address", "Authenticated SMTP account (App Password)", "Delivery and bounce monitoring"],
+      ...state(["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"]),
+      boundary: "In-app notices remain active. Email rows stay suppressed until the Gmail API authorisation for the sending account is configured.",
+      requirements: ["Gmail OAuth client and refresh token (scope gmail.send)", "Sending account ambole.rajesh@gmail.com", "Delivery and bounce monitoring"],
     },
     gstProvider: {
       name: "Authorized GST provider",

@@ -10,14 +10,14 @@ router.get("/health", (req, res) => {
 });
 
 /**
- * SMTP diagnostic. Reports the handshake result for every candidate port
+ * Email diagnostic. Reports the Gmail API authorisation (or the SMTP handshake)
  * without exposing credentials, so a deployment problem is one request away
  * instead of a guess. Admin-only (see also the startup check in the server log).
  */
 router.get("/email/verify", requireAdmin, async (req, res) => {
   try {
-    const { verifySmtpConnection } = await import("../services/emailService.js");
-    const report = await verifySmtpConnection();
+    const { verifyEmailDelivery } = await import("../services/emailService.js");
+    const report = await verifyEmailDelivery();
     return sendData(res, report, report.ok ? 200 : 503);
   } catch (error) {
     return sendError(res, error);

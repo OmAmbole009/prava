@@ -1,12 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  GMAIL_API_SENDER_DEFAULT,
+  buildGmailRawMessage,
   buildSmtpTransportOptions,
   envValue,
+  gmailApiConfig,
+  gmailSenderAddress,
   isSmtpAuthError,
   isSmtpConnectionError,
+  parseAddress,
+  resetGmailToken,
   resolveEmailProvider,
+  sendViaGmailApi,
   smtpPortCandidates,
   tcpProbe,
+  verifyEmailDelivery,
 } from "./services/emailService.js";
 
 /**
@@ -191,5 +199,170 @@ describe("TCP reachability probe", () => {
     const result = await tcpProbe("", 587, 500);
     expect(result.ok).toBe(false);
     expect(result.code).toBe("EINVAL");
+  });
+});
+
+describe("Gmail API transport", () => {
+  afterEach(() => {
+    resetGmailToken();
+    vi.unstubAllEnvs();
+  });
+
+  const gmailEnv = {
+    GMAIL_CLIENT_ID: "client-id.apps.googleusercontent.com",
+    GMAIL_CLIENT_SECRET: "client-secret",
+    GMAIL_REFRESH_TOKEN: "1//refresh-token",
+  };
+
+  function stubFetch(handlers) {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url, options });
+      if (url.includes("oauth2.googleapis.com")) return handlers.token();
+      if (url.includes("gmail.googleapis.com")) return handlers.send();
+      throw new Error(`Unexpected fetch to ${url}`);
+    };
+    fetchImpl.calls = calls;
+    return fetchImpl;
+  }
+
+  function jsonResponse(body, status = 200) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: `HTTP ${status}`,
+      headers: { get: () => null },
+      json: async () => body,
+    };
+  }
+
+  const tokenOk = () =>
+    jsonResponse({ access_token: "ya29.token", expires_in: 3600 });
+
+  it("is the default provider when the OAuth credentials exist", () => {
+    expect(resolveEmailProvider(gmailEnv)).toBe("gmail_api");
+    expect(resolveEmailProvider({})).toBe("smtp");
+    expect(resolveEmailProvider({ ...gmailEnv, EMAIL_PROVIDER: "smtp" })).toBe("smtp");
+    expect(resolveEmailProvider({ EMAIL_PROVIDER: "gmail_api" })).toBe("gmail_api");
+    expect(gmailApiConfig({})).toBeNull();
+  });
+
+  it("sends as ambole.rajesh@gmail.com by default", () => {
+    expect(GMAIL_API_SENDER_DEFAULT).toBe("ambole.rajesh@gmail.com");
+    expect(gmailSenderAddress({})).toBe("ambole.rajesh@gmail.com");
+    expect(gmailSenderAddress({ GMAIL_SENDER: "ops@prava.io" })).toBe("ops@prava.io");
+    expect(parseAddress('"Prava Security" <ambole.rajesh@gmail.com>')).toEqual({
+      email: "ambole.rajesh@gmail.com",
+      name: "Prava Security",
+    });
+  });
+
+  it("builds a multipart message the Gmail API accepts", () => {
+    const raw = buildGmailRawMessage({
+      from: '"Prava Security" <ambole.rajesh@gmail.com>',
+      to: "user@example.com",
+      subject: "Your Prava verification code",
+      text: "Your code is 123456",
+      html: "<p>Your code is 123456</p>",
+    });
+
+    expect(raw).toContain("From: \"Prava Security\" <ambole.rajesh@gmail.com>");
+    expect(raw).toContain("To: user@example.com");
+    expect(raw).toContain("multipart/alternative");
+    // Every part is base64 encoded, so the plain code never appears on the wire.
+    expect(raw).not.toContain("123456");
+    expect(raw).toMatch(/Content-Transfer-Encoding: base64/);
+    expect(raw).toContain(Buffer.from("Your code is 123456", "utf8").toString("base64"));
+    expect(raw).toContain(Buffer.from("<p>Your code is 123456</p>", "utf8").toString("base64"));
+  });
+
+  it("encodes a non-ASCII subject as RFC 2047", () => {
+    const raw = buildGmailRawMessage({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "Vérification Prava",
+      text: "x",
+      html: "<p>x</p>",
+    });
+    expect(raw).toMatch(/Subject: =\?UTF-8\?B\?/);
+    const encoded = raw.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1];
+    expect(Buffer.from(encoded, "base64").toString("utf8")).toBe("Vérification Prava");
+  });
+
+  it("exchanges the refresh token and posts the raw message", async () => {
+    const fetchImpl = stubFetch({ token: tokenOk, send: () => jsonResponse({ id: "18c1", threadId: "18c1" }) });
+
+    const result = await sendViaGmailApi(
+      { from: "Ignored <omambole2007@gmail.com>", to: "user@example.com", subject: "Code", text: "123456", html: "<p>123456</p>" },
+      gmailEnv,
+      fetchImpl
+    );
+
+    expect(result).toEqual({ id: "18c1", threadId: "18c1", sender: "ambole.rajesh@gmail.com" });
+
+    const [tokenCall, sendCall] = fetchImpl.calls;
+    expect(tokenCall.options.body).toContain("grant_type=refresh_token");
+    expect(tokenCall.options.body).toContain("refresh_token=1%2F%2Frefresh-token");
+
+    expect(sendCall.options.headers.Authorization).toBe("Bearer ya29.token");
+    const payload = JSON.parse(sendCall.options.body);
+    const mime = Buffer.from(payload.raw, "base64url").toString("utf8");
+    // The admin login address must never become the sender.
+    expect(mime).toContain("<ambole.rajesh@gmail.com>");
+    expect(mime).not.toContain("omambole2007@gmail.com");
+  });
+
+  it("reuses the cached access token across sends", async () => {
+    const fetchImpl = stubFetch({ token: tokenOk, send: () => jsonResponse({ id: "1" }) });
+    const message = { from: "a@b.com", to: "user@example.com", subject: "s", text: "t", html: "<p>t</p>" };
+
+    await sendViaGmailApi(message, gmailEnv, fetchImpl);
+    await sendViaGmailApi(message, gmailEnv, fetchImpl);
+
+    expect(fetchImpl.calls.filter((call) => call.url.includes("oauth2"))).toHaveLength(1);
+  });
+
+  it("reports a rejected refresh token instead of claiming success", async () => {
+    const fetchImpl = stubFetch({
+      token: () => jsonResponse({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, 400),
+      send: () => jsonResponse({ id: "never" }),
+    });
+
+    await expect(
+      sendViaGmailApi({ from: "a@b.com", to: "u@example.com", subject: "s", text: "t", html: "<p>t</p>" }, gmailEnv, fetchImpl)
+    ).rejects.toMatchObject({
+      code: "EMAIL_GMAIL_AUTH_FAILED",
+      message: expect.stringContaining("Google refused"),
+    });
+  });
+
+  it("reports a send rejected for missing scope", async () => {
+    const fetchImpl = stubFetch({
+      token: tokenOk,
+      send: () => jsonResponse({ error: { message: "Request had insufficient authentication scopes." } }, 403),
+    });
+
+    await expect(
+      sendViaGmailApi({ from: "a@b.com", to: "u@example.com", subject: "s", text: "t", html: "<p>t</p>" }, gmailEnv, fetchImpl)
+    ).rejects.toMatchObject({ code: "EMAIL_GMAIL_AUTH_FAILED" });
+  });
+
+  it("verifies the Gmail authorisation for the startup check", async () => {
+    vi.stubEnv("GMAIL_CLIENT_ID", gmailEnv.GMAIL_CLIENT_ID);
+    vi.stubEnv("GMAIL_CLIENT_SECRET", gmailEnv.GMAIL_CLIENT_SECRET);
+    vi.stubEnv("GMAIL_REFRESH_TOKEN", gmailEnv.GMAIL_REFRESH_TOKEN);
+    vi.stubEnv("GMAIL_SENDER", "");
+    vi.stubEnv("EMAIL_PROVIDER", "");
+    const originalFetch = global.fetch;
+    global.fetch = stubFetch({ token: tokenOk, send: () => jsonResponse({ id: "1" }) });
+
+    try {
+      const report = await verifyEmailDelivery();
+      expect(report.ok).toBe(true);
+      expect(report.provider).toBe("gmail_api");
+      expect(report.sender).toBe("ambole.rajesh@gmail.com");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

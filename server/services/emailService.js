@@ -96,11 +96,57 @@ const SMTP_DNS_HINT =
   "the value in the Render environment; for Gmail it must be exactly smtp.gmail.com.";
 
 /**
- * SMTP is the only provider. Kept as a function so callers (and tests) have one
- * place that describes the transport in use.
+ * The Gmail account that sends every OTP and verification email. It is the
+ * sending identity only: the Prava administrator account is unrelated and is
+ * never used to send mail.
  */
-export function resolveEmailProvider() {
-  return "smtp";
+export const GMAIL_API_SENDER_DEFAULT = "ambole.rajesh@gmail.com";
+
+const GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GMAIL_SEND_URL =
+  "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+
+const GMAIL_SCOPE_HINT =
+  `Re-authorise ${GMAIL_API_SENDER_DEFAULT} with the https://www.googleapis.com/auth/gmail.send ` +
+  "scope, then store the refresh token in GMAIL_REFRESH_TOKEN. The Gmail API only " +
+  "sends as the account that granted the token, so a token from another account " +
+  "cannot deliver this mail.";
+
+/** Reads GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN, or null. */
+export function gmailApiConfig(env = process.env) {
+  const clientId = envValue(env.GMAIL_CLIENT_ID);
+  const clientSecret = envValue(env.GMAIL_CLIENT_SECRET);
+  const refreshToken = envValue(env.GMAIL_REFRESH_TOKEN);
+  if (!clientId || !clientSecret || !refreshToken) return null;
+  return { clientId, clientSecret, refreshToken, sender: gmailSenderAddress(env) };
+}
+
+export function gmailSenderAddress(env = process.env) {
+  return envValue(env.GMAIL_SENDER) || GMAIL_API_SENDER_DEFAULT;
+}
+
+/**
+ * Gmail API over HTTPS is the preferred transport: Render Free blocks outbound
+ * SMTP ports, but 443 is always open. SMTP stays available when explicitly
+ * selected or when no Gmail OAuth credentials are present.
+ */
+export function resolveEmailProvider(env = process.env) {
+  const explicit = envValue(env.EMAIL_PROVIDER).toLowerCase();
+  if (explicit === "smtp") return "smtp";
+  if (explicit === "gmail_api" || explicit === "gmail") return "gmail_api";
+  return gmailApiConfig(env) ? "gmail_api" : "smtp";
+}
+
+/** Splits `"Name" <address>` into its parts. */
+export function parseAddress(value) {
+  const text = envValue(value);
+  const angle = text.match(/<([^>]+)>/);
+  const email = (angle ? angle[1] : text).trim();
+  const name = text
+    .replace(/<[^>]*>/, "")
+    .replace(/[",]/g, "")
+    .trim();
+  return { email, name };
 }
 
 /**
@@ -280,6 +326,208 @@ async function sendViaSmtp(message) {
   lastError = lastError || new Error("SMTP delivery failed.");
   lastError.attemptedPorts = attempted;
   throw lastError;
+}
+
+/* ─── Gmail API (HTTPS) ──────────────────────────────────────────────────── */
+
+let gmailTokenCache = null;
+
+/** Drops the cached access token (called on 401 so the next send refreshes). */
+export function resetGmailToken() {
+  gmailTokenCache = null;
+}
+
+/**
+ * Exchanges the stored refresh token for a short-lived access token.
+ * Cached until a minute before expiry so a burst of OTPs costs one token call.
+ */
+export async function getGmailAccessToken(env = process.env, fetchImpl = fetch) {
+  const config = gmailApiConfig(env);
+  if (!config) {
+    throw new HttpError(
+      500,
+      "Verification email could not be sent because the Gmail API is not configured on this server.",
+      {
+        code: "EMAIL_NOT_CONFIGURED",
+        hint:
+          "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy. " +
+          GMAIL_SCOPE_HINT,
+      }
+    );
+  }
+
+  if (gmailTokenCache && gmailTokenCache.expiresAt > Date.now() + 60_000) {
+    return gmailTokenCache.accessToken;
+  }
+
+  const response = await fetchImpl(GMAIL_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: config.refreshToken,
+      grant_type: "refresh_token",
+    }).toString(),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.access_token) {
+    const reason =
+      data?.error_description || data?.error || `HTTP ${response.status}`;
+    throw new HttpError(
+      500,
+      "Verification email could not be delivered: Google refused the Gmail API authorisation.",
+      {
+        code: "EMAIL_GMAIL_AUTH_FAILED",
+        hint: `${reason}. ${GMAIL_SCOPE_HINT}`,
+        details: { status: response.status },
+      }
+    );
+  }
+
+  gmailTokenCache = {
+    accessToken: data.access_token,
+    expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000,
+  };
+  return gmailTokenCache.accessToken;
+}
+
+function encodeHeader(value) {
+  const text = String(value ?? "");
+  // RFC 2047 keeps non-ASCII subjects and names intact in transit.
+  return /^[\x20-\x7E]*$/.test(text)
+    ? text
+    : `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`;
+}
+
+function wrapBase64(value) {
+  return value.replace(/(.{76})/g, "$1\r\n");
+}
+
+/**
+ * Builds the RFC 822 message the Gmail API accepts in `raw`.
+ * Kept pure so the wire format can be asserted in tests.
+ */
+export function buildGmailRawMessage({ from, to, subject, text, html }) {
+  const boundary = `prava_${Date.now().toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+
+  const headers = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${encodeHeader(subject)}`,
+    `Date: ${new Date().toUTCString()}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ].join("\r\n");
+
+  const part = (type, body) =>
+    [
+      `--${boundary}`,
+      `Content-Type: ${type}; charset="UTF-8"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrapBase64(Buffer.from(String(body ?? ""), "utf8").toString("base64")),
+    ].join("\r\n");
+
+  const body = [
+    part("text/plain", text),
+    part("text/html", html),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+
+  return `${headers}\r\n\r\n${body}`;
+}
+
+/** From header pinned to the authorised Gmail account. */
+function gmailFromHeader(configuredFrom, sender) {
+  const { email, name } = parseAddress(configuredFrom);
+  if (email && email.toLowerCase() !== sender.toLowerCase()) {
+    console.warn(
+      "[EmailService] The configured From address differs from GMAIL_SENDER; " +
+        "sending as the authorised Gmail account instead."
+    );
+  }
+  const displayName = (name || "Prava Security").replace(/"/g, "").trim();
+  return `"${displayName}" <${sender}>`;
+}
+
+/**
+ * Sends one message through the Gmail API. Resolves only when Google accepted
+ * it, so callers cannot report success for an undelivered OTP.
+ */
+export async function sendViaGmailApi(message, env = process.env, fetchImpl = fetch) {
+  const config = gmailApiConfig(env);
+  if (!config) {
+    throw new HttpError(
+      500,
+      "Verification email could not be sent because the Gmail API is not configured on this server.",
+      {
+        code: "EMAIL_NOT_CONFIGURED",
+        hint:
+          "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy. " +
+          GMAIL_SCOPE_HINT,
+      }
+    );
+  }
+
+  const accessToken = await getGmailAccessToken(env, fetchImpl);
+  const raw = buildGmailRawMessage({
+    from: gmailFromHeader(message.from, config.sender),
+    to: message.to,
+    subject: message.subject,
+    text: message.text,
+    html: message.html,
+  });
+
+  const response = await fetchImpl(GMAIL_SEND_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ raw: Buffer.from(raw, "utf8").toString("base64url") }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    if (response.status === 401) resetGmailToken();
+    const reason =
+      detail?.error?.message || detail?.error_description || response.statusText;
+    throw new HttpError(
+      500,
+      `The Gmail API rejected the message (HTTP ${response.status}).`,
+      {
+        code:
+          response.status === 403
+            ? "EMAIL_GMAIL_AUTH_FAILED"
+            : "EMAIL_PROVIDER_REJECTED",
+        hint:
+          response.status === 403
+            ? `${reason}. ${GMAIL_SCOPE_HINT}`
+            : `${reason}. Confirm GMAIL_REFRESH_TOKEN belongs to ${config.sender} and has not been revoked, then retry.`,
+        details: { status: response.status },
+      }
+    );
+  }
+
+  const data = await response.json().catch(() => ({}));
+  return { id: data?.id, threadId: data?.threadId, sender: config.sender };
+}
+
+/** Delivers through the resolved provider and returns a provider-neutral result. */
+export async function sendMessage(message, env = process.env, fetchImpl = fetch) {
+  const provider = resolveEmailProvider(env);
+  if (provider === "gmail_api") {
+    const result = await sendViaGmailApi(message, env, fetchImpl);
+    return { provider, id: result.id, sender: result.sender };
+  }
+  const result = await sendViaSmtp(message);
+  return { provider: "smtp", port: result.port, id: result.info?.messageId };
 }
 
 /**
@@ -475,10 +723,25 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     return { success: true, provider: "test_mock", id: "test-mock-msg-id" };
   }
 
-  if (!getSmtpTransporter()) {
+  const provider = resolveEmailProvider();
+
+  if (provider === "gmail_api" && !gmailApiConfig()) {
+    throw new HttpError(
+      500,
+      "Verification email could not be sent because the Gmail API is not configured on this server.",
+      {
+        code: "EMAIL_NOT_CONFIGURED",
+        hint:
+          "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy. " +
+          GMAIL_SCOPE_HINT,
+      }
+    );
+  }
+
+  if (provider === "smtp" && !getSmtpTransporter()) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
-        `[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`
+        `[EmailService] No email transport configured in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`
       );
       return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
     }
@@ -494,10 +757,8 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     );
   }
 
-  const port = Number(process.env.SMTP_PORT || 587) || 587;
-
   try {
-    const result = await sendViaSmtp({
+    const result = await sendMessage({
       from: fromAddress,
       to,
       subject,
@@ -505,30 +766,31 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
       html: htmlBody,
     });
     console.log(
-      `[EmailService] Verification email delivered via SMTP (port ${result.port}) to ${maskEmail(to)}`
+      `[EmailService] Verification email accepted by ${result.provider}${
+        result.sender ? ` as ${result.sender}` : ""
+      }${result.port ? ` (port ${result.port})` : ""} for ${maskEmail(to)}${
+        result.id ? ` (id ${result.id})` : ""
+      }`
     );
     return {
       success: true,
-      provider: "smtp",
+      provider: result.provider,
       port: result.port,
-      id: result.info?.messageId,
+      id: result.id,
+      sender: result.sender,
     };
   } catch (err) {
-    console.error(
-      `[EmailService] SMTP delivery failure for ${maskEmail(to)}:`,
-      err.code ? `${err.code}: ${err.message}` : err.message,
-      Array.isArray(err.attemptedPorts) ? `| ports tried: ${err.attemptedPorts.join(", ")}` : ""
-    );
     resetSmtpTransporter();
-
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${err.message}`
-      );
-      return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
-    }
-
-    throw deliveryErrorFor(err, port);
+    const failure =
+      err instanceof HttpError
+        ? err
+        : deliveryErrorFor(err, Number(envValue(process.env.SMTP_PORT) || 587) || 587);
+    console.error(
+      `[EmailService] Delivery failure via ${provider} for ${maskEmail(to)}:`,
+      failure.message,
+      failure.hint ? `| ${failure.hint}` : ""
+    );
+    throw failure;
   }
 }
 
@@ -575,6 +837,50 @@ export function tcpProbe(host, port, timeoutMs = 5000) {
     );
     socket.connect(port, host);
   });
+}
+
+/**
+ * Provider-aware readiness check used by the startup log and the admin route:
+ * validates the Gmail API authorisation, or the SMTP handshake for SMTP.
+ */
+export async function verifyEmailDelivery() {
+  const provider = resolveEmailProvider();
+
+  if (provider === "gmail_api") {
+    const config = gmailApiConfig();
+    if (!config) {
+      return {
+        ok: false,
+        provider,
+        configured: false,
+        message: "Gmail API credentials missing.",
+        hint:
+          "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy. " +
+          GMAIL_SCOPE_HINT,
+      };
+    }
+    try {
+      await getGmailAccessToken();
+      return {
+        ok: true,
+        provider,
+        configured: true,
+        sender: config.sender,
+        message: `Gmail API authorisation verified; email will be sent as ${config.sender}.`,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        provider,
+        configured: true,
+        sender: config.sender,
+        message: error.message,
+        hint: error.hint,
+      };
+    }
+  }
+
+  return verifySmtpConnection();
 }
 
 /**
@@ -750,32 +1056,38 @@ export async function sendTransactionalNotification({
     return { success: true, provider: "test_mock", templateType, id: `test-msg-${Date.now()}` };
   }
 
-  if (!getSmtpTransporter()) {
-    return { success: false, provider: "smtp", templateType, error: "SMTP is not configured." };
-  }
-
-  const port = Number(process.env.SMTP_PORT || 587) || 587;
+  const provider = resolveEmailProvider();
 
   try {
-    const result = await sendViaSmtp({
+    const result = await sendMessage({
       from: fromAddress,
       to,
       subject: rendered.subject,
       text: rendered.text,
       html: rendered.html,
     });
-    return { success: true, provider: "smtp", port: result.port, id: result.info?.messageId, templateType };
+    return {
+      success: true,
+      provider: result.provider,
+      port: result.port,
+      id: result.id,
+      sender: result.sender,
+      templateType,
+    };
   } catch (err) {
     resetSmtpTransporter();
+    const failure =
+      err instanceof HttpError
+        ? err
+        : deliveryErrorFor(err, Number(envValue(process.env.SMTP_PORT) || 587) || 587);
     console.error(
-      `[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`,
-      err.message,
-      Array.isArray(err.attemptedPorts) ? `| ports tried: ${err.attemptedPorts.join(", ")}` : ""
+      `[EmailService] Transactional email failure via ${provider} for ${maskEmail(to)}:`,
+      failure.message,
+      failure.hint ? `| ${failure.hint}` : ""
     );
-    const failure = deliveryErrorFor(err, port);
     return {
       success: false,
-      provider: "smtp",
+      provider,
       templateType,
       error: failure.message,
       hint: failure.hint,

@@ -185,11 +185,11 @@ async function startServer() {
     }
   }
 
-  // Surface SMTP misconfiguration in the deploy log rather than on first login.
+  // Surface email misconfiguration in the deploy log rather than on first login.
   // Deliberately not awaited: a slow mail host must never delay startup.
   if (process.env.NODE_ENV === "production") {
     import("../services/emailService.js")
-      .then(({ verifySmtpConnection }) => verifySmtpConnection())
+      .then(({ verifyEmailDelivery }) => verifyEmailDelivery())
       .then((report) => {
         if (report.ok) {
           console.log(`[EmailService] ${report.message}`);

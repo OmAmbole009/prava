@@ -25,10 +25,19 @@ services:
         value: 5
       - key: OTP_RESEND_COOLDOWN_SECONDS
         value: 60
-      # SMTP is the only email channel. Render drops outbound SMTP on ports
-      # 25/465/587 for free & starter instances; a paid instance opens them.
+      # Gmail API over HTTPS is the default channel: Render Free drops outbound
+      # SMTP on ports 25/465/587, but 443 is always open. All mail is sent as
+      # ambole.rajesh@gmail.com; omambole2007@gmail.com is the admin login only.
       - key: EMAIL_PROVIDER
-        value: smtp
+        value: gmail_api
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_SENDER
+        value: ambole.rajesh@gmail.com
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
