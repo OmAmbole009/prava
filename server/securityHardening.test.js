@@ -112,7 +112,11 @@ describe("Security headers", () => {
     expect(directives["style-src"]).toContain("https://fonts.googleapis.com");
     expect(directives["font-src"]).toContain("https://fonts.gstatic.com");
     expect(directives["script-src"]).toContain("https://accounts.google.com");
-    expect(directives["frame-src"]).toBe("https://accounts.google.com/gsi/");
+    // Document previews render in a same-origin/blob iframe or the configured
+    // signed-storage origin; Google GSI must remain allowed for sign-in.
+    expect(directives["frame-src"]).toContain("https://accounts.google.com/gsi/");
+    expect(directives["frame-src"]).toContain("'self'");
+    expect(directives["frame-src"]).toContain("blob:");
     expect(directives["connect-src"]).toContain("https://accounts.google.com/gsi/");
     expect(directives["connect-src"].split(" ")).not.toContain("https:");
     expect(directives["connect-src"].split(" ")).not.toContain("wss:");
@@ -126,6 +130,19 @@ describe("Security headers", () => {
     // relationship; "same-origin" breaks the postMessage channel and Google
     // aborts to accounts.google.com/gsi/transform.
     expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin-allow-popups");
+  });
+
+  it("allows only the configured Supabase project origin for document previews", () => {
+    const previous = process.env.SUPABASE_URL;
+    try {
+      process.env.SUPABASE_URL = "https://prava-test.supabase.co";
+      const csp = buildContentSecurityPolicy({ isProduction: true });
+      expect(csp).toContain("https://prava-test.supabase.co");
+      expect(csp).not.toContain("https://*.supabase.co");
+    } finally {
+      if (previous === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = previous;
+    }
   });
 });
 

@@ -8,6 +8,11 @@ import {
 } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
 import { assertMysqlDatabaseUrl } from "./_core/databaseConfig.js";
+import {
+  buildSummaryResponse,
+  computeBusinessFinancials,
+  refreshFinancialSummarySafely,
+} from "./financeSummary.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -716,7 +721,15 @@ export async function getLatestFinancialSummaryForUser(userId, businessId) {
       calculatedAt: new Date(),
     };
   }
-  const result = await db
+  // Tenant check first: a user may only read summaries for businesses they belong to.
+  const membership = await db
+    .select({ id: businessMembers.id })
+    .from(businessMembers)
+    .where(and(eq(businessMembers.userId, userId), eq(businessMembers.businessId, businessId)))
+    .limit(1);
+  if (!membership[0]) return undefined;
+
+  const persisted = await db
     .select({
       periodStart: financialSummaries.periodStart,
       periodEnd: financialSummaries.periodEnd,
@@ -730,18 +743,25 @@ export async function getLatestFinancialSummaryForUser(userId, businessId) {
       calculationStatus: financialSummaries.calculationStatus,
       calculatedAt: financialSummaries.calculatedAt,
     })
-    .from(businessMembers)
-    .innerJoin(financialSummaries, eq(businessMembers.businessId, financialSummaries.businessId))
+    .from(financialSummaries)
     .where(
       and(
-        eq(businessMembers.userId, userId),
         eq(financialSummaries.businessId, businessId),
         eq(financialSummaries.calculationStatus, "verified")
       )
     )
     .orderBy(desc(financialSummaries.periodEnd), desc(financialSummaries.calculatedAt))
     .limit(1);
-  return result[0];
+
+  // Always derive the figures from persisted invoices/bills so the dashboard
+  // cannot show zeros while documents exist. The persisted row is refreshed in
+  // the background for other consumers (assistant, CA suite, reports).
+  const financials = await computeBusinessFinancials(db, businessId);
+  if (!financials) return persisted[0];
+  if (!persisted[0]) {
+    await refreshFinancialSummarySafely(db, businessId, "dashboard-read");
+  }
+  return buildSummaryResponse(financials, persisted[0]);
 }
 
 /** Server-only persistence hook for a verified document/ledger pipeline. */

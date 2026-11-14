@@ -20,11 +20,40 @@ const PRODUCTION_CONNECT_SOURCES = [
   "https://forge.butterfly-effect.dev",
 ].join(" ");
 
+/**
+ * Origin that serves signed source-document URLs (PDF/image previews).
+ * Derived from the configured Supabase project so previews are allowed without
+ * opening the policy to arbitrary origins.
+ */
+function documentStorageOrigin(isProduction) {
+  const raw = (process.env.SUPABASE_URL || "").trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && (isProduction || url.protocol !== "http:")) {
+      throw new Error();
+    }
+    if (url.username || url.password) throw new Error();
+    return url.origin;
+  } catch {
+    throw new Error("SUPABASE_URL must be a valid URL without credentials and use HTTPS in production.");
+  }
+}
+
 export function buildContentSecurityPolicy({ isProduction = true } = {}) {
   const scriptSrc = isProduction
     ? `'self' ${GOOGLE_ACCOUNTS}`
     : `'self' 'unsafe-inline' 'unsafe-eval' ${GOOGLE_ACCOUNTS}`;
-  const connectSrc = isProduction ? PRODUCTION_CONNECT_SOURCES : "'self' https: wss:";
+  const storageOrigin = documentStorageOrigin(isProduction);
+  const connectSrc = isProduction
+    ? [PRODUCTION_CONNECT_SOURCES, storageOrigin].filter(Boolean).join(" ")
+    : "'self' https: wss:";
+  // PDFs and images are previewed in a same-origin iframe/blob or directly from
+  // the signed storage URL. Without these entries the browser blocks the
+  // document with ERR_BLOCKED_BY_CSP.
+  const frameSrc = ["'self'", "blob:", GOOGLE_GSI, storageOrigin]
+    .filter(Boolean)
+    .join(" ");
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
@@ -33,7 +62,7 @@ export function buildContentSecurityPolicy({ isProduction = true } = {}) {
     `font-src 'self' data: ${GOOGLE_FONTS_FILES}`,
     "img-src 'self' data: blob: https:",
     `connect-src ${connectSrc}`,
-    `frame-src ${GOOGLE_GSI}`,
+    `frame-src ${frameSrc}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

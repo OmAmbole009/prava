@@ -620,6 +620,16 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
     const [location, setLocation] = useLocation();
     const businesses = useQuery({ queryKey: ["businesses", "list"], queryFn: () => api.businesses.list(), enabled: Boolean(user), retry: false });
     const activeBusiness = businesses.data?.[0];
+    // Ledger telemetry must reflect persisted data, never a hardcoded badge.
+    const financeSummary = useQuery({
+        queryKey: ["finance", "latestSummary", activeBusiness?.id],
+        queryFn: () => api.finance.latestSummary({ businessId: activeBusiness.id }),
+        enabled: Boolean(activeBusiness && location !== "/onboarding"),
+        retry: false,
+    });
+    const pendingDocumentCount = financeSummary.data?.counts?.pendingDocuments ?? 0;
+    const hasLedgerActivity = Boolean(financeSummary.data?.hasActivity);
+
     const billing = useQuery({
         queryKey: ["billing", "snapshot", activeBusiness?.id],
         queryFn: () => api.billing.snapshot({ businessId: activeBusiness.id }),
@@ -1024,11 +1034,23 @@ function DashboardLayoutContent({ children, user, logout, setSidebarWidth }) {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-2.5">
-                        {/* Real-time Ledger Telemetry */}
+                        {/* Ledger telemetry derived from persisted documents */}
                         <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#0B0F19] px-2.5 py-1">
-                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            <span
+                                className={`size-1.5 rounded-full ${
+                                    pendingDocumentCount > 0
+                                        ? "bg-amber-400"
+                                        : hasLedgerActivity
+                                        ? "bg-emerald-400"
+                                        : "bg-slate-500"
+                                }`}
+                            />
                             <span className="text-[10px] font-medium text-slate-300">
-                                Ledger Synced
+                                {pendingDocumentCount > 0
+                                    ? `${pendingDocumentCount} Pending Review`
+                                    : hasLedgerActivity
+                                    ? "Ledger Synced"
+                                    : "No Ledger Entries"}
                             </span>
                         </div>
 

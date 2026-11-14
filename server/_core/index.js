@@ -175,6 +175,14 @@ async function startServer() {
     } catch (error) {
       console.error("[Server] Startup OTP cleanup failed:", error.message);
     }
+
+    // Restore administrator access for allow-listed, already-existing accounts.
+    try {
+      const { runAdminBootstrap } = await import("./adminBootstrap.js");
+      await runAdminBootstrap(dbPool);
+    } catch (error) {
+      console.error("[Server] Administrator bootstrap failed:", error.message);
+    }
   }
 
   const shutdown = async (signal) => {

@@ -63,3 +63,7 @@ services:
         sync: false
       - key: ADMIN_LOGIN_PASSWORD
         sync: false
+      # Comma-separated emails promoted to the admin role at startup. Only
+      # accounts that already exist are promoted; no account is ever created.
+      - key: ADMIN_EMAILS
+        value: omambole2007@gmail.com

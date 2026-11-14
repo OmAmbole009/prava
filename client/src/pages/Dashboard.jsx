@@ -559,6 +559,13 @@ function WorkspaceOverview({ business }) {
   const payables = summaryData?.payablesMinor ?? 0;
   const taxPosition = summaryData?.gstPositionMinor ?? intelData?.gstEstimateMinor ?? 0;
 
+  // Documents that are extracted but not yet approved. They are financially
+  // visible here but deliberately excluded from the finalized figures above.
+  const pending = summaryData?.pending;
+  const pendingCount = summaryData?.counts?.pendingDocuments ?? 0;
+  const pendingReceivables = pending?.receivablesMinor ?? 0;
+  const pendingPayables = pending?.payablesMinor ?? 0;
+
   const assignedCa = caReviewsQuery.data?.assignedCa;
 
   const handleAskWithQuery = (cleanQuery) => {
@@ -1050,6 +1057,45 @@ function WorkspaceOverview({ business }) {
             Full Money Ledger →
           </Button>
         </div>
+
+        {summary.isError && (
+          <div className="flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-xs text-destructive">
+            <span>Live financial figures could not be loaded. Showing the last known values.</span>
+            <button
+              type="button"
+              onClick={() => summary.refetch()}
+              className="font-semibold underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {pendingCount > 0 && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <Clock className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    {pendingCount} document{pendingCount === 1 ? "" : "s"} awaiting review
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Not yet included in finalized totals:{" "}
+                    {fmt(pendingReceivables)} unpaid sales and {fmt(pendingPayables)} vendor bills extracted and pending approval.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocation("/documents")}
+                className="shrink-0 rounded-full border border-amber-500/40 px-3 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+              >
+                Review queue →
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <PlainStatCard

@@ -34,7 +34,20 @@ class ErrorBoundary extends Component {
                             Your workspace records and tax ledgers are safely preserved. Refresh this view, return to your command center, or reach out to your assigned CA.
                         </p>
 
+                        {this.state.error?.message && (
+                            <p className="mx-auto mt-4 max-w-md break-words rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-slate-500">
+                                {String(this.state.error.message).slice(0, 300)}
+                            </p>
+                        )}
+
                         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                            <button
+                                onClick={() => this.setState({ hasError: false, error: null })}
+                                className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-5 py-2.5 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/20 hover:text-white"
+                            >
+                                <RotateCcw size={15} />
+                                Try again
+                            </button>
                             <button
                                 onClick={() => window.location.reload()}
                                 className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-semibold text-[#030712] transition hover:bg-slate-200 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)]"

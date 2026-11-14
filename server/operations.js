@@ -22,6 +22,7 @@ import { extractInvoiceWithQwen, OLLAMA_MODEL } from "./services/ocrService.js";
 import { storageGetSignedUrl, storagePut } from "./storage.js";
 import { notifyApproval } from "./gstAdmin.js";
 import { parseGstInvoiceData } from "./gstInvoiceParser.js";
+import { refreshFinancialSummarySafely } from "./financeSummary.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -1016,6 +1017,10 @@ export async function uploadAndProcessDocument(userId, input) {
     await consumeUsage(input.businessId, "ai_requests");
     await audit(input.businessId, userId, "document.extracted", "document", String(documentId), input.taskId, { status: extractionStatus });
 
+    // Extracted financials must be visible on the Command Center immediately,
+    // not only inside Documents & Vault.
+    await refreshFinancialSummarySafely(db, input.businessId, "document-extraction");
+
     import("./weaviateVectorDb.js").then((m) => m.indexDocumentVector({
       documentId,
       businessId: input.businessId,
@@ -1171,6 +1176,9 @@ export async function deleteInvoiceForUser(userId, documentId) {
   // Delete document record
   await db.delete(documents).where(eq(documents.id, numericId));
 
+  // Removing an invoice changes the financial position.
+  await refreshFinancialSummarySafely(db, row[0].businessId, "document-delete");
+
   return { success: true, message: "Invoice deleted successfully.", documentId: numericId };
 }
 
@@ -1200,6 +1208,70 @@ export async function persistReviewedDocumentState(input) {
       .where(and(eq(taskRequirements.taskId, input.taskId), eq(taskRequirements.requirementKey, requirementKey)));
   }
   return { status, requirementKey, actionOutcome: reviewActionOutcome(input.decision) };
+}
+
+/**
+ * Keeps the accounting entry for a document in step with its reviewed values.
+ * Approval promotes the extraction entry to "approved"; a correction resets it
+ * to "needs_review" so unreviewed figures never reach finalized reporting.
+ * Idempotent: repeated approvals update the same row instead of posting twice.
+ */
+async function syncDocumentAccountingEntry(db, {
+  businessId,
+  taskId,
+  documentId,
+  documentType,
+  raw,
+  validated,
+  decision,
+}) {
+  if (validated.totalMinor === null || validated.totalMinor === undefined) return null;
+  const isCredit = documentType === "credit_note";
+  const isSales = raw.invoiceType === "sales";
+  const entryType = isSales ? (isCredit ? "debit" : "credit") : (isCredit ? "credit" : "debit");
+  const category = isSales
+    ? (isCredit ? "sales_return" : "revenue")
+    : (isCredit ? "purchase_return" : "operating_expense");
+  const partyName = isSales ? (raw.buyerName || raw.vendorName) : raw.vendorName;
+  const accountName = isSales
+    ? (partyName ? `Customer: ${partyName}` : "Customer Receivables")
+    : (partyName ? `Vendor: ${partyName}` : "Commercial Vendor");
+  const reviewStatus = decision === "approve" ? "approved" : "needs_review";
+
+  const existing = await db
+    .select({ id: accountingEntries.id })
+    .from(accountingEntries)
+    .where(eq(accountingEntries.documentId, documentId))
+    .limit(1);
+
+  if (existing[0]) {
+    await db
+      .update(accountingEntries)
+      .set({
+        entryDate: validated.invoiceDate ?? new Date(),
+        accountName,
+        entryType,
+        amountMinor: validated.totalMinor,
+        category,
+        reviewStatus,
+      })
+      .where(eq(accountingEntries.id, existing[0].id));
+    return existing[0].id;
+  }
+
+  await db.insert(accountingEntries).values({
+    businessId,
+    taskId: taskId ?? null,
+    documentId,
+    entryDate: validated.invoiceDate ?? new Date(),
+    accountName,
+    entryType,
+    amountMinor: validated.totalMinor,
+    category,
+    reviewStatus,
+    source: "document_extraction",
+  });
+  return null;
 }
 
 export async function reviewDocumentForUser(userId, input) {
@@ -1310,6 +1382,19 @@ export async function reviewDocumentForUser(userId, input) {
     return getDocumentForUser(userId, input.documentId);
   }
   await persistReviewedDocumentState({ db, documentId: input.documentId, taskId: detail.document.taskId, documentType: detail.document.documentType, decision: input.decision, previousConfidenceBps: detail.extraction.confidenceBps, raw, validated });
+
+  // Keep the ledger entry and the dashboard summary in step with the review.
+  await syncDocumentAccountingEntry(db, {
+    businessId: detail.document.businessId,
+    taskId: detail.document.taskId,
+    documentId: input.documentId,
+    documentType: detail.document.documentType,
+    raw,
+    validated,
+    decision: input.decision,
+  });
+  await refreshFinancialSummarySafely(db, detail.document.businessId, "document-review");
+
   await audit(detail.document.businessId, userId, input.decision === "approve" ? "document.approved" : "document.corrected_needs_review", "document", String(input.documentId), detail.document.taskId ?? undefined, { reviewReasons: validated.reasons });
   return getDocumentForUser(userId, input.documentId);
 }
