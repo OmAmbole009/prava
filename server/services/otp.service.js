@@ -47,19 +47,41 @@ const identifierToChallenge = new Map();
 
 async function prunePersistentExpiredChallenges() {
   const db = await getDb();
-  if (db) {
-    await db.delete(otpChallenges).where(lte(otpChallenges.expiresAt, new Date()));
+  if (!db) {
+    console.warn("[OTP] Persistent challenge cleanup skipped: no database connection available");
+    return;
+  }
+  const cutoff = new Date();
+  try {
+    await db.delete(otpChallenges).where(lte(otpChallenges.expiresAt, cutoff));
+    console.debug(`[OTP] Persistent challenge cleanup completed (expired before ${cutoff.toISOString()})`);
+  } catch (error) {
+    // A cleanup failure must never crash authentication or the whole process.
+    console.error(
+      "[OTP] Persistent challenge cleanup failed:",
+      error.message,
+      error.cause?.message ? `(cause: ${error.cause.message})` : ""
+    );
   }
 }
 
-// Periodic cleanup of expired challenges every 60 seconds
+// Periodic cleanup of expired challenges every 60 seconds.
+// The timer is unref'd so it never keeps the process alive during shutdown,
+// and failures are contained inside prunePersistentExpiredChallenges.
 const cleanupTimer = setInterval(() => {
   pruneExpiredChallenges();
-  void prunePersistentExpiredChallenges().catch(error => {
-    console.error("[OTP] Persistent challenge cleanup failed:", error.message);
-  });
+  void prunePersistentExpiredChallenges();
 }, 60 * 1000);
 if (cleanupTimer.unref) cleanupTimer.unref();
+
+/**
+ * Best-effort one-shot cleanup used at startup so a deployment restart clears
+ * the expired backlog immediately instead of waiting for the first tick.
+ * Never throws: maintenance must not block application readiness.
+ */
+export async function runPersistentCleanupNow() {
+  await prunePersistentExpiredChallenges();
+}
 
 export function pruneExpiredChallenges() {
   const now = Date.now();

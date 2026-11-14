@@ -27,21 +27,50 @@ function getGoogleJWKS() {
 // Local mock test secret for deterministic test suites
 const TEST_GOOGLE_SECRET = new TextEncoder().encode("prava-test-google-oauth-secret-key-256bits");
 
+/**
+ * Normalises a Google OAuth client ID. Dashboard copy/paste frequently leaves
+ * surrounding quotes or whitespace, which makes Google reject the value and the
+ * GIS flow then aborts to accounts.google.com/gsi/transform.
+ */
+export function sanitizeGoogleClientId(raw) {
+  if (raw === undefined || raw === null) return null;
+  const cleaned = String(raw)
+    .trim()
+    .replace(/^["']+/, "")
+    .replace(/["']+$/, "")
+    .trim();
+  return cleaned ? cleaned : null;
+}
+
+function isWebClientId(value) {
+  return Boolean(value && /\.apps\.googleusercontent\.com$/i.test(value));
+}
+
 export function isGoogleOAuthConfigured() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID.trim());
+  return isWebClientId(sanitizeGoogleClientId(process.env.GOOGLE_CLIENT_ID));
 }
 
 export function getGoogleOAuthConfiguration() {
-  const configured = isGoogleOAuthConfigured();
-  const defaultRedirect = process.env.APP_URL
-    ? `${process.env.APP_URL.replace(/\/$/, "")}/api/auth/google/callback`
-    : null;
+  const clientId = sanitizeGoogleClientId(process.env.GOOGLE_CLIENT_ID);
+  const configured = isWebClientId(clientId);
+
+  const appOrigin = (process.env.APP_URL || process.env.APP_ORIGIN || "")
+    .trim()
+    .replace(/\/$/, "");
+  const defaultRedirect = appOrigin ? `${appOrigin}/api/auth/google/callback` : null;
+  const redirectUri =
+    (process.env.GOOGLE_REDIRECT_URI || "").trim() || defaultRedirect || null;
+
   return {
     configured,
-    clientId: configured ? process.env.GOOGLE_CLIENT_ID.trim() : null,
-    redirectUri: process.env.GOOGLE_REDIRECT_URI || defaultRedirect,
+    clientId: configured ? clientId : null,
+    redirectUri,
+    // The redirect (authorization code) flow can only work when the server also
+    // has a client secret to exchange the code. GIS credential flow does not.
+    clientSecretConfigured: Boolean(process.env.GOOGLE_CLIENT_SECRET?.trim()),
   };
 }
+
 
 /**
  * Validates Google ID token / credential server-side.
@@ -72,7 +101,7 @@ export async function verifyGoogleIdToken(idToken) {
     }
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientId = sanitizeGoogleClientId(process.env.GOOGLE_CLIENT_ID);
   const jwks = getGoogleJWKS();
 
   try {
@@ -237,7 +266,7 @@ export async function authenticateWithGoogle(ctx, { credential, code, redirectUr
  * Gracefully handles missing server-side OAuth configuration.
  */
 export async function exchangeGoogleAuthCode({ code, redirectUri }) {
-  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientId = sanitizeGoogleClientId(process.env.GOOGLE_CLIENT_ID);
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
   if (!clientId || !clientSecret) {

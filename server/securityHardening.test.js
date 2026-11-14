@@ -122,7 +122,10 @@ describe("Security headers", () => {
     expect(directives["connect-src"]).toContain("'self'");
     expect(directives["connect-src"]).toContain("https://open.er-api.com");
     expect(directives["connect-src"]).toContain("https://forge.butterfly-effect.dev");
-    expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin");
+    // Google Identity Services needs the popup to retain a window-opener
+    // relationship; "same-origin" breaks the postMessage channel and Google
+    // aborts to accounts.google.com/gsi/transform.
+    expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin-allow-popups");
   });
 });
 

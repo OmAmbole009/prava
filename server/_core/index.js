@@ -155,6 +155,28 @@ async function startServer() {
   // Drain in-flight requests, then close the database pool. A second signal or a
   // 15s deadline forces exit so orchestration restarts cannot hang.
   let shuttingDown = false;
+  let dbPool = null;
+  try {
+    const db = await getDb();
+    if (db) {
+      dbPool = db;
+      console.log("[Server] Database connection pool initialized");
+    }
+  } catch (error) {
+    console.error("[Server] Database initialization error:", error.message);
+  }
+
+  // Clear OTP challenges that expired before this restart. Best-effort: a
+  // maintenance failure must never prevent the server from serving traffic.
+  if (dbPool) {
+    try {
+      const { runPersistentCleanupNow } = await import("../services/otp.service.js");
+      await runPersistentCleanupNow();
+    } catch (error) {
+      console.error("[Server] Startup OTP cleanup failed:", error.message);
+    }
+  }
+
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
@@ -166,8 +188,8 @@ async function startServer() {
     deadline.unref();
     server.close(async () => {
       try {
-        const db = await getDb();
-        if (db && typeof db.end === "function") await db.end();
+        if (dbPool && typeof dbPool.end === "function") await dbPool.end();
+        console.log("[Server] Database pool closed during shutdown");
       } catch (error) {
         console.error("[Server] Error closing the database pool:", error.message);
       }
@@ -178,6 +200,17 @@ async function startServer() {
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
+
+  // Protect against unhandled promise rejections that could crash the process
+  process.on("unhandledRejection", (reason) => {
+    console.error("[Server] Unhandled promise rejection:", reason);
+    // Application-specific logging, could also emit metrics
+  });
+  process.on("uncaughtException", (error) => {
+    console.error("[Server] Uncaught exception:", error);
+    // Exit non-zero for unforeseen fatal errors
+    process.exit(1);
+  });
 }
 
 startServer().catch(console.error);

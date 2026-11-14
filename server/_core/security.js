@@ -49,7 +49,11 @@ export function securityHeadersMiddleware({ isProduction = process.env.NODE_ENV 
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    // Google Identity Services renders its sign-in button in a popup/iframe and
+    // relies on the window-opener relationship (postMessage). "same-origin"
+    // severs that channel, so the Google flow bails out to
+    // https://accounts.google.com/gsi/transform. Allow popups instead.
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
     res.setHeader("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()");
     next();
   };

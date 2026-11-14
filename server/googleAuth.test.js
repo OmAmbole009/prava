@@ -3,6 +3,7 @@ import {
   authenticateWithGoogle,
   createMockGoogleIdToken,
   getGoogleOAuthConfiguration,
+  sanitizeGoogleClientId,
   verifyGoogleIdToken,
 } from "./services/googleAuth.service.js";
 import { inMemoryUsers, getUserByEmail, getUserByOpenId } from "./db.js";
@@ -24,6 +25,31 @@ describe("PHASE 3: Google Authentication & Account Security Tests", () => {
     if (!process.env.GOOGLE_CLIENT_ID) {
       expect(config.configured).toBe(false);
       expect(config.clientId).toBeNull();
+    }
+  });
+
+  it("1b. Normalises pasted Google client IDs and rejects non-web clients", () => {
+    expect(sanitizeGoogleClientId('  "123-abc.apps.googleusercontent.com"  ')).toBe(
+      "123-abc.apps.googleusercontent.com"
+    );
+    expect(sanitizeGoogleClientId("   ")).toBeNull();
+    expect(sanitizeGoogleClientId(undefined)).toBeNull();
+
+    const previous = process.env.GOOGLE_CLIENT_ID;
+    try {
+      process.env.GOOGLE_CLIENT_ID = "not-a-web-client-id";
+      const invalid = getGoogleOAuthConfiguration();
+      expect(invalid.configured).toBe(false);
+      expect(invalid.clientId).toBeNull();
+
+      process.env.GOOGLE_CLIENT_ID = "123-abc.apps.googleusercontent.com";
+      const valid = getGoogleOAuthConfiguration();
+      expect(valid.configured).toBe(true);
+      expect(valid.clientId).toBe("123-abc.apps.googleusercontent.com");
+      expect(valid.clientSecretConfigured).toBeTypeOf("boolean");
+    } finally {
+      if (previous === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID = previous;
     }
   });
 

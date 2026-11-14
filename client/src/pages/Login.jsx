@@ -70,6 +70,19 @@ export default function Login() {
 
   const isSuperAdmin = identifier.trim().toLowerCase() === "omambole2007@gmail.com";
 
+  // Surface OAuth callback failures (/login?error=...) instead of failing silently.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const oauthError = params.get("error");
+      if (oauthError) {
+        setErrorMessage(oauthError);
+        toast.error(oauthError);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    } catch {}
+  }, []);
+
   // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -294,11 +307,21 @@ export default function Login() {
     api.auth.googleConfig().then((cfg) => {
       if (!isMounted || !cfg?.configured || !cfg?.clientId) return;
 
+      // Google rejects malformed client IDs; GIS then aborts to
+      // accounts.google.com/gsi/transform. Validate before initialising.
+      const clientId = String(cfg.clientId)
+        .trim()
+        .replace(/^["']+/, "")
+        .replace(/["']+$/, "");
+      if (!/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i.test(clientId)) {
+        return;
+      }
+
       const renderGis = () => {
         if (window.google?.accounts?.id) {
           try {
             window.google.accounts.id.initialize({
-              client_id: cfg.clientId,
+              client_id: clientId,
               callback: (response) => {
                 if (response?.credential) {
                   googleLoginMutation.mutate({ credential: response.credential });
@@ -360,8 +383,17 @@ export default function Login() {
         return;
       }
 
-      // If configured, trigger standard Google OAuth flow or popup
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(config.redirectUri || window.location.origin + "/api/auth/google/callback")}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
+      // The authorization-code redirect flow also needs a server-side client
+      // secret; without it the callback cannot exchange the code.
+      if (!config.clientSecretConfigured || !config.redirectUri) {
+        toast.error(
+          "Google sign-in is unavailable right now. Please sign in with your email and password.",
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
     } catch (err) {
       toast.error("Unable to connect to Google OAuth service.");
     }
