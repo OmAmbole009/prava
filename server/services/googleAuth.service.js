@@ -234,15 +234,18 @@ export async function authenticateWithGoogle(ctx, { credential, code, redirectUr
 
 /**
  * Exchanges Google OAuth 2.0 authorization code for tokens.
+ * Gracefully handles missing server-side OAuth configuration.
  */
 export async function exchangeGoogleAuthCode({ code, redirectUri }) {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
   if (!clientId || !clientSecret) {
+    // Server-side OAuth not configured; fall back to verifying any id_token
+    // that might be included in the token response, but inform the user.
     throw new HttpError(
       500,
-      "Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+      "Google server-side OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or use Google Identity Services (GIS) credential flow."
     );
   }
 

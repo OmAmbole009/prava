@@ -1,4 +1,3 @@
-import ThemeToggle from "@/components/ThemeToggle";
 import { PravaMark } from "@/components/PravaMark";
 import { countryOptions, profileForCountry } from "@shared/locale";
 import { AnimatePresence, motion, useScroll, useTransform, } from "framer-motion";
@@ -170,7 +169,6 @@ export default function Home() {
 
         {/* Right CTA & Locale */}
         <div className="flex items-center gap-3 sm:gap-4">
-          <ThemeToggle />
           <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs text-white/90">
             <Globe className="size-3.5 text-white/70"/>
             <select aria-label="Select Country" value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value)} className="cursor-pointer bg-transparent text-xs font-semibold text-white outline-none [&>option]:bg-[#0D131A] [&>option]:text-white">
