@@ -144,11 +144,22 @@ export function resolveEmailProvider(env = process.env) {
   const explicit = envValue(env.EMAIL_PROVIDER).toLowerCase();
   if (explicit === "smtp") return "smtp";
   if (explicit === "gmail_api" || explicit === "gmail") return "gmail_api";
-  if (isProductionEnv(env)) return "gmail_api";
-  return gmailApiConfig(env) ? "gmail_api" : "smtp";
+  if (isProductionEnv(env)) {
+    // Production must have Gmail OAuth; we check and report, never silently fall
+    // back to SMTP (which Render Free blocks).
+    if (!gmailApiConfig(env)) return null; // caller will report EMAIL_NOT_CONFIGURED
+    return "gmail_api";
+  }
+  // Development / other environments: Gmail API if credentials present,
+  // otherwise explicitly null so the caller reports EMAIL_NOT_CONFIGURED.
+  if (gmailApiConfig(env)) return "gmail_api";
+  return null;
 }
-
-/** Safe summary of the active transport for startup logs (no secrets). */
+/**
+ * Reports the active email transport for the startup log and admin diagnostics.
+ * Never exposes secrets; only reports provider, sender (when configured),
+ * and a configured flag. Missing credentials surface as configured:false.
+ */
 export function describeEmailTransport(env = process.env) {
   const provider = resolveEmailProvider(env);
   if (provider === "gmail_api") {
@@ -160,10 +171,22 @@ export function describeEmailTransport(env = process.env) {
       production: isProductionEnv(env),
     };
   }
+  if (provider === "smtp") {
+    return {
+      provider: "smtp",
+      configured: Boolean(buildSmtpTransportOptions(env)),
+      production: isProductionEnv(env),
+    };
+  }
+  // provider is null → credentials missing in production; no transport configured elsewhere
   return {
-    provider: "smtp",
-    configured: Boolean(buildSmtpTransportOptions(env)),
+    provider: "unconfigured",
+    configured: false,
     production: isProductionEnv(env),
+    message: isProductionEnv(env)
+      ? "Gmail API credentials (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN) missing in production.\n" +
+        "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy."
+      : "Set EMAIL_PROVIDER=gmail_api (with OAuth credentials) or EMAIL_PROVIDER=smtp (host allows egress).",
   };
 }
 
@@ -556,6 +579,19 @@ export async function sendMessage(message, env = process.env, fetchImpl = fetch)
     const result = await sendViaGmailApi(message, env, fetchImpl);
     return { provider, id: result.id, sender: result.sender };
   }
+  if (provider === null) {
+    throw new HttpError(
+      500,
+      "Verification email could not be sent because the Gmail API is not configured on this server.",
+      {
+        code: "EMAIL_NOT_CONFIGURED",
+        hint:
+          "Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, then redeploy. " +
+          GMAIL_SCOPE_HINT,
+      }
+    );
+  }
+  // provider === "smtp" — only when explicitly set EMAIL_PROVIDER=smtp
   const result = await sendViaSmtp(message);
   return { provider: "smtp", port: result.port, id: result.info?.messageId };
 }
@@ -910,6 +946,18 @@ export async function verifyEmailDelivery() {
     }
   }
 
+  if (provider === null) {
+    // Production without Gmail OAuth → clear error, no silent SMTP fallback
+    return {
+      ok: false,
+      provider: "unconfigured",
+      configured: false,
+      message: "Gmail API credentials are missing in production. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN.",
+      hint: "See deployment instructions for obtaining OAuth 2.0 credentials for ambole.rajesh@gmail.com.",
+    };
+  }
+
+  // provider !== "gmail_api" && provider !== null → some other value (should not happen)
   return verifySmtpConnection();
 }
 
