@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import {
   sendOtpEmail,
   __getLastDispatchedOtpFor,
@@ -12,47 +11,17 @@ export { __getLastDispatchedOtpFor, __clearDispatchedNotifications, __getDispatc
  * Real Multi-Channel Notification Service for Email & SMS Delivery
  */
 
-let smtpTransporter = null;
 const dispatchedNotifications = [];
 
-function getSmtpTransporter() {
-  if (smtpTransporter) return smtpTransporter;
-
-  const host = process.env.SMTP_HOST || (process.env.EMAIL_PROVIDER === "gmail" ? "smtp.gmail.com" : null);
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if ((host || process.env.EMAIL_PROVIDER === "gmail") && user && pass) {
-    const isGmail = (host && host.includes("gmail")) || process.env.EMAIL_PROVIDER === "gmail";
-    smtpTransporter = nodemailer.createTransport(
-      isGmail
-        ? {
-            service: "gmail",
-            auth: {
-              user: user.trim(),
-              pass: pass.replace(/\s+/g, ""),
-            },
-          }
-        : {
-            host,
-            port,
-            secure: port === 465,
-            auth: { user, pass },
-          }
-    );
-    return smtpTransporter;
-  }
-  return null;
-}
-
 /**
- * Sends a real Email containing the 6-digit verification code via emailService.
+ * Sends the 6-digit verification code through the shared email transport
+ * (Gmail API in production). A throw from sendOtpEmail propagates, so the
+ * caller never reports a delivery that did not happen.
  */
 export async function sendEmailOtp({ to, code, purpose = "login" }) {
   const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES) || 5;
   const result = await sendOtpEmail({ to, otp: code, purpose, expiryMinutes });
-  return { success: true, provider: result.provider };
+  return { success: result?.success !== false, provider: result?.provider || "unknown" };
 }
 
 /**

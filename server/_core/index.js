@@ -185,11 +185,20 @@ async function startServer() {
     }
   }
 
-  // Surface email misconfiguration in the deploy log rather than on first login.
-  // Deliberately not awaited: a slow mail host must never delay startup.
+  // Surface the active email transport, and any misconfiguration, in the deploy
+  // log rather than on first login. Deliberately not awaited: a slow mail host
+  // must never delay startup.
   if (process.env.NODE_ENV === "production") {
     import("../services/emailService.js")
-      .then(({ verifyEmailDelivery }) => verifyEmailDelivery())
+      .then(({ describeEmailTransport, verifyEmailDelivery }) => {
+        const transport = describeEmailTransport();
+        console.log(
+          `[EmailService] Active email transport: ${transport.provider}` +
+            (transport.sender ? ` (sender: ${transport.sender})` : "") +
+            (transport.configured ? "" : " [credentials missing]")
+        );
+        return verifyEmailDelivery();
+      })
       .then((report) => {
         if (report.ok) {
           console.log(`[EmailService] ${report.message}`);

@@ -3,6 +3,7 @@ import {
   GMAIL_API_SENDER_DEFAULT,
   buildGmailRawMessage,
   buildSmtpTransportOptions,
+  describeEmailTransport,
   envValue,
   gmailApiConfig,
   gmailSenderAddress,
@@ -245,6 +246,28 @@ describe("Gmail API transport", () => {
     expect(resolveEmailProvider({ ...gmailEnv, EMAIL_PROVIDER: "smtp" })).toBe("smtp");
     expect(resolveEmailProvider({ EMAIL_PROVIDER: "gmail_api" })).toBe("gmail_api");
     expect(gmailApiConfig({})).toBeNull();
+  });
+
+  it("never falls back to SMTP in production", () => {
+    expect(resolveEmailProvider({ NODE_ENV: "production" })).toBe("gmail_api");
+    expect(resolveEmailProvider({ RENDER: "true" })).toBe("gmail_api");
+    expect(
+      resolveEmailProvider({ NODE_ENV: "production", EMAIL_PROVIDER: "smtp" })
+    ).toBe("smtp");
+  });
+
+  it("describes the active transport for the startup log", () => {
+    expect(describeEmailTransport({ NODE_ENV: "production", ...gmailEnv })).toEqual({
+      provider: "gmail_api",
+      sender: "ambole.rajesh@gmail.com",
+      configured: true,
+      production: true,
+    });
+    expect(describeEmailTransport({ NODE_ENV: "production" })).toMatchObject({
+      provider: "gmail_api",
+      sender: "ambole.rajesh@gmail.com",
+      configured: false,
+    });
   });
 
   it("sends as ambole.rajesh@gmail.com by default", () => {

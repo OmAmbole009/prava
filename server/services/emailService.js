@@ -126,15 +126,45 @@ export function gmailSenderAddress(env = process.env) {
 }
 
 /**
- * Gmail API over HTTPS is the preferred transport: Render Free blocks outbound
- * SMTP ports, but 443 is always open. SMTP stays available when explicitly
- * selected or when no Gmail OAuth credentials are present.
+ * Production is Render, where outbound SMTP (25/465/587) is blocked on free and
+ * starter instances. Email therefore goes over the Gmail API on 443.
+ */
+export function isProductionEnv(env = process.env) {
+  return env.NODE_ENV === "production" || envValue(env.RENDER) === "true";
+}
+
+/**
+ * Gmail API over HTTPS is the production transport. Production never falls back
+ * to SMTP: a silent fallback only produces a misleading port timeout, so a
+ * missing credential is reported as a configuration error instead. SMTP is
+ * reached only by an explicit EMAIL_PROVIDER=smtp, which a host that does allow
+ * SMTP egress can opt into.
  */
 export function resolveEmailProvider(env = process.env) {
   const explicit = envValue(env.EMAIL_PROVIDER).toLowerCase();
   if (explicit === "smtp") return "smtp";
   if (explicit === "gmail_api" || explicit === "gmail") return "gmail_api";
+  if (isProductionEnv(env)) return "gmail_api";
   return gmailApiConfig(env) ? "gmail_api" : "smtp";
+}
+
+/** Safe summary of the active transport for startup logs (no secrets). */
+export function describeEmailTransport(env = process.env) {
+  const provider = resolveEmailProvider(env);
+  if (provider === "gmail_api") {
+    const config = gmailApiConfig(env);
+    return {
+      provider,
+      sender: config?.sender || gmailSenderAddress(env),
+      configured: Boolean(config),
+      production: isProductionEnv(env),
+    };
+  }
+  return {
+    provider: "smtp",
+    configured: Boolean(buildSmtpTransportOptions(env)),
+    production: isProductionEnv(env),
+  };
 }
 
 /** Splits `"Name" <address>` into its parts. */
