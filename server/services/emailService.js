@@ -1,3 +1,4 @@
+import net from "node:net";
 import nodemailer from "nodemailer";
 import { HttpError } from "../../shared/_core/errors.js";
 
@@ -77,6 +78,24 @@ function seconds(value, fallback) {
 }
 
 /**
+ * Environment values are often stored with surrounding quotes, which turns a
+ * correct host into an unresolvable one. Normalise before building the
+ * transport instead of failing with a misleading connection timeout.
+ */
+export function envValue(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .trim()
+    .replace(/^["']+/, "")
+    .replace(/["']+$/, "")
+    .trim();
+}
+
+const SMTP_DNS_HINT =
+  "SMTP_HOST could not be resolved. Check for typos and for stray quotes around " +
+  "the value in the Render environment; for Gmail it must be exactly smtp.gmail.com.";
+
+/**
  * SMTP is the only provider. Kept as a function so callers (and tests) have one
  * place that describes the transport in use.
  */
@@ -93,7 +112,7 @@ export function resolveEmailProvider() {
  * SMTP_PORT_FALLBACKS="465"  -> explicit list
  */
 export function smtpPortCandidates(env = process.env) {
-  const primary = Number(env.SMTP_PORT || 587) || 587;
+  const primary = Number(envValue(env.SMTP_PORT) || 587) || 587;
   if (env.SMTP_PORT_FALLBACKS !== undefined && String(env.SMTP_PORT_FALLBACKS).trim() === "") {
     return [primary];
   }
@@ -147,22 +166,21 @@ export function isSmtpAuthError(error) {
  * configuration problem rather than a network one.
  */
 export function buildSmtpTransportOptions(env = process.env, portOverride = null) {
-  const user = env.SMTP_USER?.trim();
-  // App passwords are often pasted with spaces in groups of four.
-  const pass = env.SMTP_PASS ? String(env.SMTP_PASS).replace(/\s+/g, "") : null;
+  const user = envValue(env.SMTP_USER);
+  // App passwords are often pasted with spaces in groups of four, or quoted.
+  const pass = envValue(env.SMTP_PASS).replace(/\s+/g, "");
   if (!user || !pass) return null;
 
   const isGmailUser = user.toLowerCase().endsWith("@gmail.com");
-  const host = (
-    env.SMTP_HOST ||
-    (isGmailUser || env.EMAIL_PROVIDER === "gmail" ? "smtp.gmail.com" : "")
-  ).trim();
+  const host =
+    envValue(env.SMTP_HOST) ||
+    (isGmailUser || env.EMAIL_PROVIDER === "gmail" ? "smtp.gmail.com" : "");
   if (!host) return null;
 
-  const primaryPort = Number(env.SMTP_PORT || 587) || 587;
+  const primaryPort = Number(envValue(env.SMTP_PORT) || 587) || 587;
   const port = portOverride || primaryPort;
   // 465 is implicit TLS; 587 and 2525 upgrade with STARTTLS.
-  const secure = port === 465 || env.SMTP_SECURE === "true";
+  const secure = port === 465 || envValue(env.SMTP_SECURE).toLowerCase() === "true";
   const isPrimary = port === primaryPort;
 
   return {
@@ -211,32 +229,51 @@ function resetSmtpTransporter() {
  */
 async function sendViaSmtp(message) {
   const ports = smtpPortCandidates();
+  // Bounded retries: only for a socket that dropped, never for a timeout, so a
+  // blocked port cannot multiply the delay.
+  const attemptsPerPort = Math.min(
+    3,
+    Math.max(1, Number(envValue(process.env.SMTP_RETRY_ATTEMPTS) || 1) || 1)
+  );
   const attempted = [];
   let lastError = null;
 
   for (const port of ports) {
-    const transporter = getSmtpTransporter(port);
-    if (!transporter) {
-      throw new Error("SMTP transport could not be created from the configured settings.");
-    }
-    attempted.push(port);
-    try {
-      const info = await transporter.sendMail(message);
-      return { info, port, attempted };
-    } catch (error) {
-      lastError = error;
-      resetSmtpTransporter();
-      if (isSmtpAuthError(error)) {
-        error.attemptedPorts = attempted;
-        throw error;
+    if (!attempted.includes(port)) attempted.push(port);
+
+    for (let attempt = 1; attempt <= attemptsPerPort; attempt += 1) {
+      const transporter = getSmtpTransporter(port);
+      if (!transporter) {
+        throw new Error("SMTP transport could not be created from the configured settings.");
       }
-      if (!isSmtpConnectionError(error)) {
-        error.attemptedPorts = attempted;
-        throw error;
+      try {
+        const info = await transporter.sendMail(message);
+        return { info, port, attempted };
+      } catch (error) {
+        lastError = error;
+        resetSmtpTransporter();
+
+        if (isSmtpAuthError(error) || !isSmtpConnectionError(error)) {
+          error.attemptedPorts = attempted;
+          throw error;
+        }
+
+        const transientSocket = ["ESOCKET", "ECONNECTION"].includes(
+          String(error.code || "")
+        );
+        if (transientSocket && attempt < attemptsPerPort) {
+          console.warn(
+            `[EmailService] SMTP socket dropped on port ${port} (attempt ${attempt}/${attemptsPerPort}); retrying.`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+          continue;
+        }
+
+        console.warn(
+          `[EmailService] SMTP port ${port} unreachable (${error.code || error.message}); trying the next port.`
+        );
+        break;
       }
-      console.warn(
-        `[EmailService] SMTP port ${port} unreachable (${error.code || error.message}); trying the next port.`
-      );
     }
   }
 
@@ -328,6 +365,8 @@ function buildEmailHtml({
 }
 
 function deliveryErrorFor(error, port) {
+  const attempted = Array.isArray(error?.attemptedPorts) ? error.attemptedPorts : [port];
+
   if (isSmtpAuthError(error)) {
     return new HttpError(
       500,
@@ -336,7 +375,19 @@ function deliveryErrorFor(error, port) {
     );
   }
 
-  const attempted = Array.isArray(error?.attemptedPorts) ? error.attemptedPorts : [port];
+  const errorCode = String(error?.code || "");
+  if (errorCode === "ENOTFOUND" || errorCode === "EDNS") {
+    return new HttpError(
+      500,
+      "Verification email could not be delivered: the SMTP host could not be resolved.",
+      {
+        code: "EMAIL_SMTP_UNREACHABLE",
+        hint: SMTP_DNS_HINT,
+        details: { attemptedPorts: attempted },
+      }
+    );
+  }
+
   const blocked = attempted.some((value) => BLOCKED_SMTP_PORTS.includes(value));
 
   if (isSmtpConnectionError(error)) {
@@ -496,13 +547,45 @@ export async function sendPasswordResetOtpEmail({ to, otp, expiryMinutes = 5 }) 
 }
 
 /**
- * Verifies SMTP configuration and handshake across every candidate port.
+ * Raw TCP reachability probe. This separates "the network drops this port"
+ * from "the SMTP handshake or credentials failed", which look identical in a
+ * nodemailer timeout.
+ */
+export function tcpProbe(host, port, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    if (!host || !port) {
+      resolve({ port, ok: false, code: "EINVAL", message: "Missing host or port" });
+      return;
+    }
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish({ port, ok: true }));
+    socket.once("timeout", () =>
+      finish({ port, ok: false, code: "ETIMEDOUT", message: "TCP connect timed out" })
+    );
+    socket.once("error", (error) =>
+      finish({ port, ok: false, code: error.code, message: error.message })
+    );
+    socket.connect(port, host);
+  });
+}
+
+/**
+ * Verifies SMTP reachability and handshake across every candidate port.
+ * Runs a TCP probe first so a blocked port is reported as such.
  * Returns a structured report and never throws.
  */
 export async function verifySmtpConnection() {
   const options = buildSmtpTransportOptions();
   const ports = smtpPortCandidates();
-  const host = options?.host || process.env.SMTP_HOST || "smtp.gmail.com";
+  const host = options?.host || "smtp.gmail.com";
 
   if (!options) {
     return {
@@ -515,8 +598,35 @@ export async function verifySmtpConnection() {
     };
   }
 
-  const attempts = [];
+  // Phase 1: can we even open a TCP socket?
+  const tcp = [];
   for (const port of ports) {
+    const probe = await tcpProbe(host, port, 5000);
+    tcp.push(probe);
+    if (probe.ok) break;
+  }
+  const reachable = tcp.find((probe) => probe.ok);
+
+  if (!reachable) {
+    const dnsFailure = tcp.some((probe) => probe.code === "ENOTFOUND");
+    return {
+      ok: false,
+      configured: true,
+      provider: "smtp",
+      host,
+      ports,
+      tcp,
+      blockedPort: true,
+      hint: dnsFailure ? SMTP_DNS_HINT : SMTP_PORT_BLOCK_HINT,
+      message: dnsFailure
+        ? `SMTP host ${host} could not be resolved.`
+        : `No TCP connection to ${host} on ports ${ports.join(", ")}. The network is blocking SMTP egress.`,
+    };
+  }
+
+  // Phase 2: SMTP handshake and authentication on the reachable port.
+  const attempts = [];
+  for (const port of [reachable.port]) {
     const transporter = getSmtpTransporter(port);
     if (!transporter) continue;
     try {
@@ -542,7 +652,7 @@ export async function verifySmtpConnection() {
         error: err.message,
         authFailure: isSmtpAuthError(err),
       });
-      // A rejected login will fail on every port; stop early.
+      // A rejected login fails identically on every port; stop early.
       if (isSmtpAuthError(err)) break;
     }
   }

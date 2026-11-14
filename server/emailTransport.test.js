@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSmtpTransportOptions,
+  envValue,
   isSmtpAuthError,
   isSmtpConnectionError,
   resolveEmailProvider,
   smtpPortCandidates,
+  tcpProbe,
 } from "./services/emailService.js";
 
 /**
@@ -96,6 +98,24 @@ describe("SMTP transport options", () => {
     expect(options.socketTimeout).toBe(5_000);
   });
 
+  it("strips quotes pasted into Render environment values", () => {
+    expect(envValue('"smtp.gmail.com"')).toBe("smtp.gmail.com");
+    expect(envValue("  '587'  ")).toBe("587");
+    expect(envValue(undefined)).toBe("");
+
+    const options = buildSmtpTransportOptions({
+      SMTP_USER: '"founder@gmail.com"',
+      SMTP_PASS: '"abcd efgh ijkl mnop"',
+      SMTP_HOST: '"smtp.gmail.com"',
+      SMTP_PORT: '"465"',
+    });
+    expect(options.host).toBe("smtp.gmail.com");
+    expect(options.port).toBe(465);
+    expect(options.secure).toBe(true);
+    expect(options.auth.user).toBe("founder@gmail.com");
+    expect(options.auth.pass).toBe("abcdefghijklmnop");
+  });
+
   it("returns null without credentials or a resolvable host", () => {
     expect(buildSmtpTransportOptions({})).toBeNull();
     expect(buildSmtpTransportOptions({ SMTP_USER: "a@b.com" })).toBeNull();
@@ -155,5 +175,21 @@ describe("SMTP error classification", () => {
 describe("Provider", () => {
   it("is always SMTP", () => {
     expect(resolveEmailProvider()).toBe("smtp");
+  });
+});
+
+describe("TCP reachability probe", () => {
+  it("reports a refused connection quickly instead of hanging", async () => {
+    // Port 1 on loopback is closed, so the probe resolves with an error code.
+    const result = await tcpProbe("127.0.0.1", 1, 2000);
+    expect(result.ok).toBe(false);
+    expect(result.port).toBe(1);
+    expect(typeof result.code).toBe("string");
+  });
+
+  it("rejects a missing host without throwing", async () => {
+    const result = await tcpProbe("", 587, 500);
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("EINVAL");
   });
 });
