@@ -732,15 +732,13 @@ export default function Login() {
                             Retry sending code
                           </button>
                         )}
-                        {errorCode === "EMAIL_PORT_BLOCKED" || errorCode === "EMAIL_NOT_CONFIGURED" ? (
-                          <button
-                            type="button"
-                            onClick={handleGoogleSignIn}
-                            className="text-[11px] font-semibold underline underline-offset-2"
-                          >
-                            Sign in with Google instead
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          onClick={handleGoogleSignIn}
+                          className="text-[11px] font-semibold underline underline-offset-2"
+                        >
+                          Sign in with Google instead
+                        </button>
                       </div>
                     )}
                   </div>

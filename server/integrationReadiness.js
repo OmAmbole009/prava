@@ -34,9 +34,9 @@ export function getIntegrationReadiness() {
   return {
     email: {
       name: "Decision email delivery",
-      ...state(["EMAIL_FROM", "RESEND_API_KEY"]),
-      boundary: "In-app notices remain active. Email rows stay suppressed until an authenticated sender is configured.",
-      requirements: ["Verified sender address", "Authenticated email provider key", "Delivery and bounce monitoring"],
+      ...state(["EMAIL_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"]),
+      boundary: "In-app notices remain active. Email rows stay suppressed until an authenticated SMTP sender is configured.",
+      requirements: ["Verified sender address", "Authenticated SMTP account (App Password)", "Delivery and bounce monitoring"],
     },
     gstProvider: {
       name: "Authorized GST provider",

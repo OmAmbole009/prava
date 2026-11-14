@@ -185,6 +185,26 @@ async function startServer() {
     }
   }
 
+  // Surface SMTP misconfiguration in the deploy log rather than on first login.
+  // Deliberately not awaited: a slow mail host must never delay startup.
+  if (process.env.NODE_ENV === "production") {
+    import("../services/emailService.js")
+      .then(({ verifySmtpConnection }) => verifySmtpConnection())
+      .then((report) => {
+        if (report.ok) {
+          console.log(`[EmailService] ${report.message}`);
+        } else {
+          console.error(
+            `[EmailService] Startup email check failed: ${report.message}`,
+            report.hint ? `| ${report.hint}` : ""
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("[EmailService] Startup email check error:", error.message);
+      });
+  }
+
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;

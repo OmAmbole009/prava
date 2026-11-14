@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSmtpTransportOptions,
+  isSmtpAuthError,
+  isSmtpConnectionError,
   resolveEmailProvider,
+  smtpPortCandidates,
 } from "./services/emailService.js";
 
 /**
- * Regression cover for the production SMTP connection timeout.
- *
- * The old code used nodemailer's `service: "gmail"` preset for Gmail users. That
- * preset forces port 465 + implicit TLS and drops every timeout option, so
- * SMTP_PORT/SMTP_SECURE were ignored and a blocked port hung indefinitely.
+ * SMTP is the only delivery channel. These tests pin the transport behaviour
+ * that the production timeout depended on.
  */
 
 describe("SMTP transport options", () => {
@@ -28,6 +28,8 @@ describe("SMTP transport options", () => {
     expect(options.requireTLS).toBe(true);
     // App passwords are pasted with spaces; they must be stripped.
     expect(options.auth.pass).toBe("abcdefghijklmnop");
+    // nodemailer's gmail preset would silently drop every timeout below.
+    expect(options.service).toBeUndefined();
   });
 
   it("uses implicit TLS on port 465", () => {
@@ -41,6 +43,20 @@ describe("SMTP transport options", () => {
     expect(options.requireTLS).toBe(false);
   });
 
+  it("allows a port override for fallback attempts", () => {
+    const options = buildSmtpTransportOptions(
+      {
+        SMTP_USER: "founder@gmail.com",
+        SMTP_PASS: "secret",
+        SMTP_HOST: "smtp.gmail.com",
+        SMTP_PORT: "587",
+      },
+      465
+    );
+    expect(options.port).toBe(465);
+    expect(options.secure).toBe(true);
+  });
+
   it("always sets connect, greeting and socket timeouts", () => {
     const options = buildSmtpTransportOptions({
       SMTP_USER: "ops@prava.in",
@@ -48,11 +64,22 @@ describe("SMTP transport options", () => {
       SMTP_HOST: "smtp.example.com",
       SMTP_PORT: "2525",
     });
-    expect(options.connectionTimeout).toBe(10_000);
+    expect(options.connectionTimeout).toBe(12_000);
     expect(options.greetingTimeout).toBe(10_000);
     expect(options.socketTimeout).toBe(20_000);
-    // No `service` preset: that is what silently discarded the values above.
-    expect(options.service).toBeUndefined();
+  });
+
+  it("fails fast on fallback ports", () => {
+    const options = buildSmtpTransportOptions(
+      {
+        SMTP_USER: "ops@prava.in",
+        SMTP_PASS: "secret",
+        SMTP_HOST: "smtp.example.com",
+        SMTP_PORT: "587",
+      },
+      2525
+    );
+    expect(options.connectionTimeout).toBe(5_000);
   });
 
   it("respects explicit timeout overrides", () => {
@@ -78,25 +105,55 @@ describe("SMTP transport options", () => {
   });
 });
 
-describe("Provider selection", () => {
-  it("prefers an explicit EMAIL_PROVIDER", () => {
-    expect(resolveEmailProvider({ EMAIL_PROVIDER: "resend" })).toBe("resend");
+describe("Port fallback chain", () => {
+  it("retries Gmail on 465 when 587 is unreachable", () => {
     expect(
-      resolveEmailProvider({ EMAIL_PROVIDER: "smtp", RESEND_API_KEY: "re_x" })
-    ).toBe("smtp");
+      smtpPortCandidates({ SMTP_USER: "founder@gmail.com", SMTP_PORT: "587" })
+    ).toEqual([587, 465]);
   });
 
-  it("falls back to Resend when SMTP credentials are absent", () => {
-    expect(resolveEmailProvider({ RESEND_API_KEY: "re_x" })).toBe("resend");
-  });
-
-  it("defaults to SMTP when SMTP credentials exist", () => {
+  it("starts from 465 when that is configured", () => {
     expect(
-      resolveEmailProvider({ SMTP_USER: "a@b.com", SMTP_PASS: "x" })
-    ).toBe("smtp");
+      smtpPortCandidates({ SMTP_USER: "founder@gmail.com", SMTP_PORT: "465" })
+    ).toEqual([465, 587]);
   });
 
-  it("defaults to SMTP when nothing is configured", () => {
-    expect(resolveEmailProvider({})).toBe("smtp");
+  it("includes 2525 for non-Gmail providers", () => {
+    expect(
+      smtpPortCandidates({ SMTP_HOST: "smtp.mailprovider.com", SMTP_PORT: "587" })
+    ).toEqual([587, 465, 2525]);
+  });
+
+  it("can be disabled or overridden", () => {
+    expect(
+      smtpPortCandidates({ SMTP_PORT: "587", SMTP_PORT_FALLBACKS: "" })
+    ).toEqual([587]);
+    expect(
+      smtpPortCandidates({ SMTP_PORT: "587", SMTP_PORT_FALLBACKS: "2525" })
+    ).toEqual([587, 2525]);
+  });
+});
+
+describe("SMTP error classification", () => {
+  it("recognises credential rejection", () => {
+    expect(isSmtpAuthError({ responseCode: 535 })).toBe(true);
+    expect(
+      isSmtpAuthError({
+        message: "Invalid login: 535-5.7.8 Username and Password not accepted",
+      })
+    ).toBe(true);
+    expect(isSmtpAuthError({ code: "ETIMEDOUT", message: "Connection timeout" })).toBe(false);
+  });
+
+  it("recognises connection failures that deserve another port", () => {
+    expect(isSmtpConnectionError({ code: "ETIMEDOUT" })).toBe(true);
+    expect(isSmtpConnectionError({ code: "ECONNECTION", message: "Connection timeout" })).toBe(true);
+    expect(isSmtpConnectionError({ responseCode: 535, message: "Invalid login" })).toBe(false);
+  });
+});
+
+describe("Provider", () => {
+  it("is always SMTP", () => {
+    expect(resolveEmailProvider()).toBe("smtp");
   });
 });

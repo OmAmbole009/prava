@@ -2,14 +2,21 @@ import nodemailer from "nodemailer";
 import { HttpError } from "../../shared/_core/errors.js";
 
 /**
- * Enterprise Email Delivery Service for Prava OTP Authentication.
- * SMTP transport as primary, with Resend API as secondary option.
+ * Prava email delivery — SMTP only.
  *
- * Strict Security Rules:
- * - NEVER log or print OTP codes to console or files.
- * - Require explicit API keys / credentials when in non-test environments.
- * - Throw clear configuration errors when email credentials are missing.
- * - Mask all identifiers in logs to prevent partial email/phone exposure.
+ * Transport rules:
+ * - SMTP is the single delivery channel. There is no second provider.
+ * - Connections always use explicit host/port/secure settings with connect,
+ *   greeting and socket timeouts. nodemailer's `service: "gmail"` preset is
+ *   deliberately not used: it forces port 465 and discards every timeout.
+ * - If a port cannot be reached the same message is retried on the other ports
+ *   the provider supports (465 implicit TLS, 2525 plain STARTTLS), because a
+ *   filtered port looks identical to "wrong credentials" to the sender.
+ *
+ * Security rules:
+ * - OTP codes are never logged.
+ * - Recipients are masked in every log line.
+ * - Credentials are never returned to callers or included in errors.
  */
 
 /** In-memory record for test suite verification only */
@@ -48,16 +55,21 @@ function maskPhone(phone) {
   return `${digits.slice(0, 3)}******${digits.slice(-4)}`;
 }
 
-// SMTP transporter cache
-let smtpTransporter = null;
-
-/** Ports Render (and most PaaS providers) drop on free/starter plans. */
+/** Ports that PaaS firewalls commonly drop (they blackhole, causing timeouts). */
 const BLOCKED_SMTP_PORTS = [25, 465, 587];
+
 const SMTP_PORT_BLOCK_HINT =
-  "Outbound SMTP ports 25, 465 and 587 are blocked on this hosting plan, so the " +
-  "connection times out no matter what credentials are configured. Use an HTTPS " +
-  "email API (EMAIL_PROVIDER=resend with RESEND_API_KEY) or a provider that listens " +
-  "on an unblocked port such as 2525.";
+  "The network is silently dropping connections to this port (a timeout, not a " +
+  "rejected login). Free and starter Render instances block outbound SMTP on " +
+  "ports 25, 465 and 587, so no SMTP account can connect from them; running the " +
+  "service on a paid instance opens those ports. Otherwise configure an SMTP " +
+  "provider that publishes an unblocked port such as 2525.";
+
+const SMTP_AUTH_HINT =
+  "Google rejects normal account passwords. SMTP_USER must be the full Gmail " +
+  "address and SMTP_PASS must be a 16-character App Password from " +
+  "Google Account → Security → App passwords (2-Step Verification must be on). " +
+  "Spaces in the App Password are removed automatically.";
 
 function seconds(value, fallback) {
   const parsed = Number(value);
@@ -65,27 +77,76 @@ function seconds(value, fallback) {
 }
 
 /**
- * Chooses the delivery provider. Resend is picked automatically whenever SMTP
- * credentials are absent but an API key is present, so a deployment cannot end
- * up on a transport it cannot use.
+ * SMTP is the only provider. Kept as a function so callers (and tests) have one
+ * place that describes the transport in use.
  */
-export function resolveEmailProvider(env = process.env) {
-  const configured = (env.EMAIL_PROVIDER || "").trim().toLowerCase();
-  if (configured) return configured;
-  const hasSmtp = Boolean(env.SMTP_USER?.trim() && env.SMTP_PASS?.trim());
-  if (hasSmtp) return "smtp";
-  if (env.RESEND_API_KEY?.trim()) return "resend";
+export function resolveEmailProvider() {
   return "smtp";
 }
 
 /**
- * Builds nodemailer transport options.
+ * Ports to try, in order. Connection failures move to the next port; auth
+ * failures do not, because they would fail identically everywhere.
  *
- * Deliberately does NOT use nodemailer's `service: "gmail"` preset: that preset
- * forces port 465 + implicit TLS and silently discards every timeout option, so
- * a blocked port hangs indefinitely and SMTP_PORT/SMTP_SECURE are ignored.
+ * SMTP_PORT_FALLBACKS unset  -> provider-appropriate defaults
+ * SMTP_PORT_FALLBACKS=""     -> disable fallbacks (single port)
+ * SMTP_PORT_FALLBACKS="465"  -> explicit list
  */
-export function buildSmtpTransportOptions(env = process.env) {
+export function smtpPortCandidates(env = process.env) {
+  const primary = Number(env.SMTP_PORT || 587) || 587;
+  if (env.SMTP_PORT_FALLBACKS !== undefined && String(env.SMTP_PORT_FALLBACKS).trim() === "") {
+    return [primary];
+  }
+
+  const configured = String(env.SMTP_PORT_FALLBACKS || "")
+    .split(",")
+    .map((value) => Number(String(value).trim()))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (configured.length) {
+    return [primary, ...configured.filter((port) => port !== primary)];
+  }
+
+  const user = String(env.SMTP_USER || "").toLowerCase();
+  const host = String(env.SMTP_HOST || "").toLowerCase();
+  const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
+  // Gmail only listens on 465/587; other providers often publish 2525.
+  const fallbacks = isGmail ? [465, 587] : [465, 2525, 587];
+  return [primary, ...fallbacks.filter((port) => port !== primary)];
+}
+
+/** Connection-level failures are worth another port; auth failures are not. */
+export function isSmtpConnectionError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    ["ECONNECTION", "ETIMEDOUT", "ESOCKET", "EDNS", "EHOSTUNREACH", "ECONNREFUSED", "ENOTFOUND"].includes(code) ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("connection") ||
+    message.includes("closed unexpectedly")
+  );
+}
+
+/** Credential rejection (535 / "Username and Password not accepted"). */
+export function isSmtpAuthError(error) {
+  const responseCode = Number(error?.responseCode || 0);
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    responseCode === 535 ||
+    message.includes("invalid login") ||
+    message.includes("username and password not accepted") ||
+    message.includes("authentication") ||
+    message.includes("badcredentials")
+  );
+}
+
+/**
+ * Builds nodemailer transport options for one port.
+ * Returns null when host/credentials are missing so callers can report a
+ * configuration problem rather than a network one.
+ */
+export function buildSmtpTransportOptions(env = process.env, portOverride = null) {
   const user = env.SMTP_USER?.trim();
   // App passwords are often pasted with spaces in groups of four.
   const pass = env.SMTP_PASS ? String(env.SMTP_PASS).replace(/\s+/g, "") : null;
@@ -98,70 +159,90 @@ export function buildSmtpTransportOptions(env = process.env) {
   ).trim();
   if (!host) return null;
 
-  const port = Number(env.SMTP_PORT || 587) || 587;
-  const secure = env.SMTP_SECURE === "true" || port === 465;
+  const primaryPort = Number(env.SMTP_PORT || 587) || 587;
+  const port = portOverride || primaryPort;
+  // 465 is implicit TLS; 587 and 2525 upgrade with STARTTLS.
+  const secure = port === 465 || env.SMTP_SECURE === "true";
+  const isPrimary = port === primaryPort;
 
   return {
     host,
     port,
     secure,
     auth: { user, pass },
-    // Implicit TLS on 465; upgrades to TLS via STARTTLS on 587.
     requireTLS: !secure && env.SMTP_REQUIRE_TLS !== "false",
-    connectionTimeout: seconds(env.SMTP_CONNECTION_TIMEOUT_SEC, 10) * 1000,
-    greetingTimeout: seconds(env.SMTP_GREETING_TIMEOUT_SEC, 10) * 1000,
+    // Give the configured port the full budget; fallbacks fail fast.
+    connectionTimeout:
+      seconds(env.SMTP_CONNECTION_TIMEOUT_SEC, isPrimary ? 12 : 5) * 1000,
+    greetingTimeout: seconds(env.SMTP_GREETING_TIMEOUT_SEC, isPrimary ? 10 : 5) * 1000,
     socketTimeout: seconds(env.SMTP_SOCKET_TIMEOUT_SEC, 20) * 1000,
     tls: { servername: host, minVersion: "TLSv1.2" },
   };
 }
 
-/**
- * Creates (and caches) the SMTP transporter with full timeout configuration.
- */
-function getSmtpTransporter() {
-  if (smtpTransporter) return smtpTransporter;
-  const options = buildSmtpTransportOptions();
+// Cached transporter, tagged with the port it was built for.
+let smtpTransporter = null;
+
+function getSmtpTransporter(portOverride = null) {
+  if (smtpTransporter && smtpTransporter.__port === (portOverride || null)) {
+    return smtpTransporter;
+  }
+  const options = buildSmtpTransportOptions(process.env, portOverride);
   if (!options) return null;
-  smtpTransporter = nodemailer.createTransport(options);
-  return smtpTransporter;
+  const transporter = nodemailer.createTransport(options);
+  transporter.__port = portOverride || null;
+  smtpTransporter = transporter;
+  return transporter;
 }
 
-/**
- * Drops the cached transporter so a later attempt opens a fresh connection
- * instead of reusing a socket that already failed or timed out.
- */
+/** Drops the cached transport so a failed socket is never reused. */
 function resetSmtpTransporter() {
   try {
     smtpTransporter?.close?.();
   } catch {
-    // Ignore: the transport is already unusable.
+    // The transport is already unusable.
   }
   smtpTransporter = null;
 }
 
 /**
- * HTTPS delivery through Resend. Works on hosts that block SMTP ports entirely.
- * Returns the provider result, or null when no API key is configured.
+ * Sends one message over SMTP, retrying connection-level failures on the
+ * remaining ports. Throws the last error if every port fails.
  */
-async function sendViaResend({ apiKey, from, to, subject, text, html, label = "email" }) {
-  if (!apiKey) return null;
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: [to], subject, text, html }),
-  });
+async function sendViaSmtp(message) {
+  const ports = smtpPortCandidates();
+  const attempted = [];
+  let lastError = null;
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    const rawMessage = errorData.message || res.statusText || "Resend API error";
-    throw new HttpError(500, `Failed to deliver ${label} via Resend (${rawMessage}).`);
+  for (const port of ports) {
+    const transporter = getSmtpTransporter(port);
+    if (!transporter) {
+      throw new Error("SMTP transport could not be created from the configured settings.");
+    }
+    attempted.push(port);
+    try {
+      const info = await transporter.sendMail(message);
+      return { info, port, attempted };
+    } catch (error) {
+      lastError = error;
+      resetSmtpTransporter();
+      if (isSmtpAuthError(error)) {
+        error.attemptedPorts = attempted;
+        throw error;
+      }
+      if (!isSmtpConnectionError(error)) {
+        error.attemptedPorts = attempted;
+        throw error;
+      }
+      console.warn(
+        `[EmailService] SMTP port ${port} unreachable (${error.code || error.message}); trying the next port.`
+      );
+    }
   }
 
-  const data = await res.json();
-  return { success: true, provider: "resend", id: data.id };
+  lastError = lastError || new Error("SMTP delivery failed.");
+  lastError.attemptedPorts = attempted;
+  throw lastError;
 }
 
 /**
@@ -246,24 +327,53 @@ function buildEmailHtml({
 </html>`.trim();
 }
 
+function deliveryErrorFor(error, port) {
+  if (isSmtpAuthError(error)) {
+    return new HttpError(
+      500,
+      "Verification email could not be sent because the mail server rejected the login.",
+      { code: "EMAIL_SMTP_AUTH_FAILED", hint: SMTP_AUTH_HINT, details: { port } }
+    );
+  }
+
+  const attempted = Array.isArray(error?.attemptedPorts) ? error.attemptedPorts : [port];
+  const blocked = attempted.some((value) => BLOCKED_SMTP_PORTS.includes(value));
+
+  if (isSmtpConnectionError(error)) {
+    return new HttpError(
+      500,
+      `Verification email could not be delivered: the server could not connect to the mail provider${
+        attempted.length > 1 ? ` (tried ports ${attempted.join(", ")})` : ` on port ${port}`
+      }.`,
+      {
+        code: blocked ? "EMAIL_PORT_BLOCKED" : "EMAIL_SMTP_UNREACHABLE",
+        hint: SMTP_PORT_BLOCK_HINT,
+        details: { attemptedPorts: attempted },
+      }
+    );
+  }
+
+  return new HttpError(
+    500,
+    "Verification email could not be delivered by the mail provider.",
+    {
+      code: "EMAIL_SMTP_FAILED",
+      hint:
+        "The mail server accepted the connection but rejected the message. Check that the sender address " +
+        "(SMTP_FROM / EMAIL_FROM) belongs to the authenticated SMTP account, then retry.",
+    }
+  );
+}
+
 /**
- * Dispatches an email containing the secure 6-digit OTP code.
- *
- * Primary Transport: SMTP (configured via SMTP_HOST, SMTP_USER, SMTP_PASS)
- * Secondary Transport: Resend API (if EMAIL_PROVIDER=resend and RESEND_API_KEY set)
- *
- * Security Rules Enforced:
- * - OTP codes are NEVER logged to console or files
- * - Identifiers are masked in all log messages
- * - Provider fallback logic: SMTP (default) -> Resend (if configured)
- * - Structured error messages without exposing secrets
+ * Dispatches an email containing the secure 6-digit OTP code over SMTP.
  *
  * @param {Object} options
  * @param {string} options.to - Recipient email address
  * @param {string} options.otp - 6-digit OTP code (NEVER logged)
  * @param {string} options.purpose - Purpose ("login" | "password_reset")
  * @param {number} [options.expiryMinutes=5] - Expiry in minutes
- * @returns {Promise<Object>} Dispatch result with provider and message ID
+ * @returns {Promise<Object>} Dispatch result with provider, port and message ID
  */
 export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes = 5 }) {
   if (!to || !to.includes("@")) {
@@ -282,7 +392,6 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     timestamp: Date.now(),
   });
 
-  const provider = resolveEmailProvider();
   const fromAddress =
     process.env.SMTP_FROM ||
     process.env.EMAIL_FROM ||
@@ -310,222 +419,66 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     expiryMinutes,
   });
 
-  // In test environment, skip external network call to keep tests fast, hermetic, and offline
+  // In test environment, skip external network call to keep tests fast and offline
   if (isTestEnv) {
     return { success: true, provider: "test_mock", id: "test-mock-msg-id" };
   }
 
-  // 1. SMTP TRANSPORT (PRIMARY - always first choice)
-  if (provider === "smtp" || provider === "gmail" || provider === "email") {
-    const transporter = getSmtpTransporter();
-    if (!transporter) {
-      if (process.env.NODE_ENV !== "production") {
-        // Development: warn and use mock, but don't expose credentials
-        console.warn(
-          `[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`
-        );
-        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
-      }
-      throw new HttpError(
-        500,
-        "Verification email could not be sent because email delivery is not configured on this server.",
-        {
-          code: "EMAIL_NOT_CONFIGURED",
-          hint:
-            "An administrator must configure email delivery: set RESEND_API_KEY (HTTPS API, works on Render) or valid SMTP_HOST, SMTP_USER and SMTP_PASS. Until then, use Google sign-in or contact your administrator.",
-        }
+  if (!getSmtpTransporter()) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`
       );
+      return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
     }
-
-    try {
-      const info = await transporter.sendMail({
-        from: fromAddress,
-        to,
-        subject,
-        text: textBody,
-        html: htmlBody,
-      });
-      // SUCCESS: log delivery without exposing OTP code or full identifier
-      console.log(
-        `[EmailService] Verification email delivered via SMTP to ${maskEmail(to)}`
-      );
-      return {
-        success: true,
-        provider: "smtp",
-        id: info.messageId,
-      };
-    } catch (err) {
-      // SMTP ERROR: structured logging without exposing secrets
-      const errorMsg = err.message || "Unknown SMTP error";
-      const smtpPort = Number(process.env.SMTP_PORT || 587);
-      const blockedPort = BLOCKED_SMTP_PORTS.includes(smtpPort);
-      console.error(
-        `[EmailService] SMTP delivery failure for ${maskEmail(to)}:`,
-        errorMsg,
-        blockedPort ? `| ${SMTP_PORT_BLOCK_HINT}` : ""
-      );
-
-      // Never reuse a transport whose socket already failed or timed out.
-      resetSmtpTransporter();
-
-      // Automatic HTTPS fallback: SMTP egress is blocked on many PaaS plans, so
-      // a configured Resend key is used rather than failing the sign-in.
-      const resendKey = process.env.RESEND_API_KEY?.trim();
-      if (resendKey) {
-        try {
-          const fallback = await sendViaResend({
-            apiKey: resendKey,
-            from: fromAddress,
-            to,
-            subject,
-            text: textBody,
-            html: htmlBody,
-            label: "verification email",
-          });
-          console.warn(
-            `[EmailService] Verification email delivered via Resend fallback after SMTP failure for ${maskEmail(to)}.`
-          );
-          return { ...fallback, fallbackFrom: "smtp" };
-        } catch (fallbackError) {
-          console.error(
-            `[EmailService] Resend fallback failed for ${maskEmail(to)}:`,
-            fallbackError.message
-          );
-        }
+    throw new HttpError(
+      500,
+      "Verification email could not be sent because SMTP is not configured on this server.",
+      {
+        code: "EMAIL_NOT_CONFIGURED",
+        hint:
+          "Set SMTP_HOST, SMTP_PORT, SMTP_USER (full email address), SMTP_PASS (App Password) " +
+          "and SMTP_FROM in the service environment, then redeploy.",
       }
-
-      if (process.env.NODE_ENV !== "production") {
-        // Development: warn with notice, allow mock fallback
-        console.warn(
-          `[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${errorMsg}`
-        );
-        return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
-      }
-
-      if (blockedPort && !resendKey) {
-        throw new HttpError(
-          500,
-          `Verification email could not be delivered: the server cannot reach the email provider on port ${smtpPort}.`,
-          {
-            code: "EMAIL_PORT_BLOCKED",
-            hint:
-              "The hosting provider blocks outbound SMTP traffic on ports 25, 465 and 587. Set RESEND_API_KEY on the server so verification codes are sent over HTTPS, or upgrade to a plan with SMTP egress. You can sign in with Google in the meantime.",
-            details: { port: smtpPort },
-          }
-        );
-      }
-
-      throw new HttpError(
-        500,
-        "Verification email could not be delivered. Please check the email configuration and try again later.",
-        {
-          code: "EMAIL_DELIVERY_FAILED",
-          hint:
-            "Confirm SMTP credentials, or set RESEND_API_KEY so delivery falls back to the HTTPS API. You can also try Google sign-in.",
-        }
-      );
-    }
+    );
   }
 
-  // 2. RESEND API (SECONDARY - only if explicitly configured)
-  if (provider === "resend") {
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) {
-      throw new HttpError(
-        500,
-        "Verification email could not be sent because email delivery is not configured on this server.",
-        {
-          code: "EMAIL_NOT_CONFIGURED",
-          hint:
-            "EMAIL_PROVIDER is set to resend but RESEND_API_KEY is missing. An administrator must add the key, or configure SMTP credentials instead.",
-        }
+  const port = Number(process.env.SMTP_PORT || 587) || 587;
+
+  try {
+    const result = await sendViaSmtp({
+      from: fromAddress,
+      to,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
+    console.log(
+      `[EmailService] Verification email delivered via SMTP (port ${result.port}) to ${maskEmail(to)}`
+    );
+    return {
+      success: true,
+      provider: "smtp",
+      port: result.port,
+      id: result.info?.messageId,
+    };
+  } catch (err) {
+    console.error(
+      `[EmailService] SMTP delivery failure for ${maskEmail(to)}:`,
+      err.code ? `${err.code}: ${err.message}` : err.message,
+      Array.isArray(err.attemptedPorts) ? `| ports tried: ${err.attemptedPorts.join(", ")}` : ""
+    );
+    resetSmtpTransporter();
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${err.message}`
       );
+      return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
     }
 
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [to],
-          subject,
-          text: textBody,
-          html: htmlBody,
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        // Extract raw error message without exposing OTP or credentials
-        const rawMessage =
-          errorData.message ||
-          res.statusText ||
-          "Resend API error";
-
-        // Structured log: mask identifier, include error type but not OTP
-        console.error(
-          `[EmailService] Resend delivery error for ${maskEmail(to)}:`,
-          rawMessage
-        );
-
-        if (process.env.NODE_ENV !== "production") {
-          console.warn(
-            `[EmailService] Resend fallback notice for ${maskEmail(to)}: ${rawMessage}`
-          );
-          return { success: true, provider: "resend_sandbox_fallback", id: "dev-sandbox-otp" };
-        }
-
-        throw new HttpError(
-          500,
-          "Verification email could not be delivered by the email provider.",
-          {
-            code: "EMAIL_DELIVERY_FAILED",
-            hint: `The provider rejected the request (${rawMessage}). Check that the sender address is verified, then retry.`,
-          }
-        );
-      }
-
-      const data = await res.json();
-      // Structured success log: mask identifier, include Resend message ID only
-      console.log(
-        `[EmailService] Verification email successfully dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`
-      );
-      return {
-        success: true,
-        provider: "resend",
-        id: data.id,
-      };
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      // Network-level error: log without exposing secrets
-      console.error(
-        `[EmailService] Network exception sending email via Resend to ${maskEmail(to)}:`,
-        err.message
-      );
-      throw new HttpError(
-        500,
-        "Unable to dispatch verification email due to a network error.",
-        {
-          code: "EMAIL_DELIVERY_FAILED",
-          hint: "The server could not reach the email provider. Retry in a moment; if it persists, contact your administrator.",
-        }
-      );
-    }
+    throw deliveryErrorFor(err, port);
   }
-
-  // Fallback: unsupported provider
-  throw new HttpError(
-    500,
-    "Verification email could not be sent because the configured email provider is not supported.",
-    {
-      code: "EMAIL_NOT_CONFIGURED",
-      hint: `EMAIL_PROVIDER is "${provider}". Expected "smtp", "gmail", "email" or "resend".`,
-    }
-  );
 }
 
 /**
@@ -543,68 +496,81 @@ export async function sendPasswordResetOtpEmail({ to, otp, expiryMinutes = 5 }) 
 }
 
 /**
- * Verifies SMTP configuration and connection handshake.
- * Returns structured health report without throwing.
- * Does NOT expose OTP codes, passwords, or full credentials in the response.
+ * Verifies SMTP configuration and handshake across every candidate port.
+ * Returns a structured report and never throws.
  */
 export async function verifySmtpConnection() {
   const options = buildSmtpTransportOptions();
+  const ports = smtpPortCandidates();
   const host = options?.host || process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = options?.port || Number(process.env.SMTP_PORT || 587);
-  const secure = options?.secure || false;
-  const blockedPort = BLOCKED_SMTP_PORTS.includes(port);
 
   if (!options) {
     return {
       ok: false,
       configured: false,
-      message: "SMTP credentials missing. Please set SMTP_USER and SMTP_PASS in environment.",
+      provider: "smtp",
+      host,
+      ports,
+      message: "SMTP credentials missing. Set SMTP_USER (full email address) and SMTP_PASS (App Password).",
     };
   }
 
-  const transporter = getSmtpTransporter();
-  if (!transporter) {
-    return {
-      ok: false,
-      configured: false,
-      message: "Could not create SMTP transport with provided settings.",
-    };
+  const attempts = [];
+  for (const port of ports) {
+    const transporter = getSmtpTransporter(port);
+    if (!transporter) continue;
+    try {
+      await transporter.verify();
+      attempts.push({ port, ok: true });
+      return {
+        ok: true,
+        configured: true,
+        provider: "smtp",
+        host,
+        port,
+        ports,
+        attempts,
+        message: `SMTP connection verified successfully to ${host}:${port}.`,
+      };
+    } catch (err) {
+      resetSmtpTransporter();
+      attempts.push({
+        port,
+        ok: false,
+        code: err.code,
+        responseCode: err.responseCode,
+        error: err.message,
+        authFailure: isSmtpAuthError(err),
+      });
+      // A rejected login will fail on every port; stop early.
+      if (isSmtpAuthError(err)) break;
+    }
   }
 
-  try {
-    await transporter.verify();
-    return {
-      ok: true,
-      configured: true,
-      host,
-      port,
-      secure,
-      message: `SMTP connection verified successfully to ${host}:${port}.`,
-    };
-  } catch (err) {
-    // Log the error internally without exposing full details
-    console.error(
-      `[EmailService] SMTP verification failed for ${host}:${port}`,
-      err.message
-    );
-    return {
-      ok: false,
-      configured: true,
-      host,
-      port,
-      error: err.message,
-      blockedPort,
-      hint: blockedPort ? SMTP_PORT_BLOCK_HINT : undefined,
-      message: blockedPort
-        ? `SMTP verification failed on port ${port}. ${SMTP_PORT_BLOCK_HINT}`
-        : `SMTP verification failed: connection or authentication error. Please check your SMTP settings.`,
-    };
-  }
+  const authFailure = attempts.some((attempt) => attempt.authFailure);
+  const blockedPort = attempts.some(
+    (attempt) => !attempt.ok && BLOCKED_SMTP_PORTS.includes(attempt.port)
+  );
+
+  return {
+    ok: false,
+    configured: true,
+    provider: "smtp",
+    host,
+    ports,
+    attempts,
+    authFailure,
+    blockedPort,
+    hint: authFailure ? SMTP_AUTH_HINT : blockedPort ? SMTP_PORT_BLOCK_HINT : undefined,
+    message: authFailure
+      ? "SMTP connection reached the server but the login was rejected."
+      : `SMTP verification failed: could not connect to ${host} on any of ${ports.join(", ")}.`,
+  };
 }
 
 /**
  * Dispatches enterprise transactional emails with Prava branded templates.
- * Supports SMTP as primary transport.
+ * SMTP is the only transport.
  */
 export async function sendTransactionalNotification({
   to,
@@ -661,8 +627,6 @@ export async function sendTransactionalNotification({
       process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "notifications@prava.in"
     }>`;
 
-  // Record dispatched notification for test verification
-  // Note: OTP codes and secrets are NOT included in the recorded notification
   testDispatchedNotifications.push({
     to,
     templateType,
@@ -676,132 +640,38 @@ export async function sendTransactionalNotification({
     return { success: true, provider: "test_mock", templateType, id: `test-msg-${Date.now()}` };
   }
 
-  const provider = resolveEmailProvider();
-
-  // 1. SMTP Transport (Primary)
-  if (provider === "smtp" || provider === "gmail" || provider === "email") {
-    const transporter = getSmtpTransporter();
-    if (transporter) {
-      try {
-        const info = await transporter.sendMail({
-          from: fromAddress,
-          to,
-          subject: rendered.subject,
-          text: rendered.text,
-          html: rendered.html,
-        });
-        return { success: true, provider: "smtp", id: info.messageId, templateType };
-      } catch (err) {
-        console.error(
-          `[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`,
-          err.message
-        );
-        resetSmtpTransporter();
-
-        const resendKey = process.env.RESEND_API_KEY?.trim();
-        if (resendKey) {
-          try {
-            const fallback = await sendViaResend({
-              apiKey: resendKey,
-              from: fromAddress,
-              to,
-              subject: rendered.subject,
-              text: rendered.text,
-              html: rendered.html,
-              label: "transactional email",
-            });
-            return { ...fallback, templateType, fallbackFrom: "smtp" };
-          } catch (fallbackError) {
-            console.error(
-              `[EmailService] Resend fallback failed for ${maskEmail(to)}:`,
-              fallbackError.message
-            );
-          }
-        }
-
-        return {
-          success: true,
-          provider: "smtp_error_logged",
-          error: "SMTP delivery failed - check server logs for details",
-          templateType,
-        };
-      }
-    }
-
-    return { success: true, provider: "dev_sandbox_logged", templateType };
+  if (!getSmtpTransporter()) {
+    return { success: false, provider: "smtp", templateType, error: "SMTP is not configured." };
   }
 
-  // 2. Resend API (Secondary - only if explicitly configured)
-  if (provider === "resend") {
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) {
-      throw new HttpError(
-        500,
-        "Email delivery is not configured. Please set RESEND_API_KEY in your .env configuration, or set EMAIL_PROVIDER=smtp for SMTP."
-      );
-    }
+  const port = Number(process.env.SMTP_PORT || 587) || 587;
 
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [to],
-          subject: rendered.subject,
-          text: rendered.text,
-          html: rendered.html,
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const rawMessage =
-          errorData.message || res.statusText || "Resend API error";
-
-        console.error(
-          `[EmailService] Resend transactional error for ${maskEmail(to)}:`,
-          rawMessage
-        );
-
-        throw new HttpError(
-          500,
-          `Failed to deliver transactional email.`
-        );
-      }
-
-      const data = await res.json();
-      console.log(
-        `[EmailService] Transactional email dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`
-      );
-      return {
-        success: true,
-        provider: "resend",
-        id: data.id,
-        templateType,
-      };
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      console.error(
-        `[EmailService] Network exception sending transactional email via Resend to ${maskEmail(to)}:`,
-        err.message
-      );
-      throw new HttpError(
-        500,
-        "Unable to dispatch transactional email due to a network error."
-      );
-    }
+  try {
+    const result = await sendViaSmtp({
+      from: fromAddress,
+      to,
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html,
+    });
+    return { success: true, provider: "smtp", port: result.port, id: result.info?.messageId, templateType };
+  } catch (err) {
+    resetSmtpTransporter();
+    console.error(
+      `[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`,
+      err.message,
+      Array.isArray(err.attemptedPorts) ? `| ports tried: ${err.attemptedPorts.join(", ")}` : ""
+    );
+    const failure = deliveryErrorFor(err, port);
+    return {
+      success: false,
+      provider: "smtp",
+      templateType,
+      error: failure.message,
+      hint: failure.hint,
+      code: failure.code,
+    };
   }
-
-  throw new HttpError(
-    500,
-    "Verification email could not be sent because the configured email provider is not supported.",
-    {
-      code: "EMAIL_NOT_CONFIGURED",
-      hint: `EMAIL_PROVIDER is "${provider}". Expected "smtp", "gmail", "email" or "resend".`,
-    }
-  );
 }
+
+export { maskEmail, maskPhone, BLOCKED_SMTP_PORTS };

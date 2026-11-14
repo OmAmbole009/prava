@@ -25,13 +25,10 @@ services:
         value: 5
       - key: OTP_RESEND_COOLDOWN_SECONDS
         value: 60
-      # Render blocks outbound SMTP on ports 25/465/587 (free & starter). Leave
-      # EMAIL_PROVIDER unset to auto-detect, and provide RESEND_API_KEY so email
-      # falls back to the HTTPS API instead of timing out.
+      # SMTP is the only email channel. Render drops outbound SMTP on ports
+      # 25/465/587 for free & starter instances; a paid instance opens them.
       - key: EMAIL_PROVIDER
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
+        value: smtp
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

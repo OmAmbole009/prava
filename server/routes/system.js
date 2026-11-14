@@ -9,6 +9,21 @@ router.get("/health", (req, res) => {
   return sendData(res, { ok: true });
 });
 
+/**
+ * SMTP diagnostic. Reports the handshake result for every candidate port
+ * without exposing credentials, so a deployment problem is one request away
+ * instead of a guess. Admin-only (see also the startup check in the server log).
+ */
+router.get("/email/verify", requireAdmin, async (req, res) => {
+  try {
+    const { verifySmtpConnection } = await import("../services/emailService.js");
+    const report = await verifySmtpConnection();
+    return sendData(res, report, report.ok ? 200 : 503);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 router.post("/notify-owner", requireAdmin, async (req, res) => {
   try {
     const schema = z.object({

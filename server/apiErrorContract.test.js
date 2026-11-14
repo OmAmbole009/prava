@@ -27,12 +27,12 @@ describe("Error payload contract", () => {
   it("keeps code and hint on HttpError", () => {
     const error = new HttpError(500, "Delivery blocked", {
       code: "EMAIL_PORT_BLOCKED",
-      hint: "Set RESEND_API_KEY",
+      hint: "Use a paid instance or an unblocked SMTP port",
       details: { port: 587 },
     });
     expect(error.statusCode).toBe(500);
     expect(error.code).toBe("EMAIL_PORT_BLOCKED");
-    expect(error.hint).toBe("Set RESEND_API_KEY");
+    expect(error.hint).toBe("Use a paid instance or an unblocked SMTP port");
     expect(error.details).toEqual({ port: 587 });
   });
 
@@ -46,14 +46,14 @@ describe("Error payload contract", () => {
   it("serialises code and hint into the API error body", () => {
     const res = mockRes();
     sendError(res, new HttpError(500, "Verification email could not be delivered.", {
-      code: "EMAIL_DELIVERY_FAILED",
-      hint: "Confirm SMTP credentials or set RESEND_API_KEY.",
+      code: "EMAIL_SMTP_AUTH_FAILED",
+      hint: "Use a 16-character App Password.",
     }), 500);
 
     expect(res.statusCode).toBe(500);
     expect(res.body.error.message).toBe("Verification email could not be delivered.");
-    expect(res.body.error.code).toBe("EMAIL_DELIVERY_FAILED");
-    expect(res.body.error.hint).toContain("RESEND_API_KEY");
+    expect(res.body.error.code).toBe("EMAIL_SMTP_AUTH_FAILED");
+    expect(res.body.error.hint).toContain("App Password");
   });
 
   it("omits absent fields instead of sending nulls", () => {
