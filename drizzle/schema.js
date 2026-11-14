@@ -1,5 +1,6 @@
 import {
   bigint,
+  foreignKey,
   index,
   int,
   mysqlEnum,
@@ -606,7 +607,7 @@ export const gstSubmissionNotifications = mysqlTable(
   "gstSubmissionNotifications",
   {
     id: int("id").autoincrement().primaryKey(),
-    submissionRequestId: int("submissionRequestId").notNull().references(() => gstSubmissionRequests.id),
+    submissionRequestId: int("submissionRequestId").notNull(),
     recipientUserId: int("recipientUserId").notNull().references(() => users.id),
     channel: mysqlEnum("channel", ["in_app", "email"]).notNull(),
     status: mysqlEnum("status", ["queued", "delivered", "suppressed", "failed"]).default("queued").notNull(),
@@ -615,7 +616,15 @@ export const gstSubmissionNotifications = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     deliveredAt: timestamp("deliveredAt"),
   },
-  table => [index("gst_submission_notifications_request_idx").on(table.submissionRequestId), index("gst_submission_notifications_recipient_idx").on(table.recipientUserId, table.createdAt)]
+  table => [
+    foreignKey({
+      name: "gst_notif_submission_req_fk",
+      columns: [table.submissionRequestId],
+      foreignColumns: [gstSubmissionRequests.id],
+    }),
+    index("gst_submission_notifications_request_idx").on(table.submissionRequestId),
+    index("gst_submission_notifications_recipient_idx").on(table.recipientUserId, table.createdAt),
+  ]
 );
 
 export const reconciliationItems = mysqlTable(
