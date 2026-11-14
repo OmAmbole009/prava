@@ -3,15 +3,16 @@ import { HttpError } from "../../shared/_core/errors.js";
 
 /**
  * Enterprise Email Delivery Service for Prava OTP Authentication.
- * Supports Resend API (default/recommended) and SMTP transport.
- * 
+ * SMTP transport as primary, with Resend API as secondary option.
+ *
  * Strict Security Rules:
  * - NEVER log or print OTP codes to console or files.
  * - Require explicit API keys / credentials when in non-test environments.
  * - Throw clear configuration errors when email credentials are missing.
+ * - Mask all identifiers in logs to prevent partial email/phone exposure.
  */
 
-// In-memory record for test suite verification only
+/** In-memory record for test suite verification only */
 const testDispatchedNotifications = [];
 
 export function __getDispatchedNotifications() {
@@ -39,22 +40,45 @@ function maskEmail(email) {
   return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
 }
 
+/** Mask phone identifier for logging */
+function maskPhone(phone) {
+  if (!phone) return "***";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 4) return "****";
+  return `${digits.slice(0, 3)}******${digits.slice(-4)}`;
+}
+
+// SMTP transporter cache
 let smtpTransporter = null;
 
+/**
+ * Creates an SMTP transporter with timeout configuration.
+ * Uses a persistent cache to avoid recreating on every call.
+ * Timeout settings prevent hanging connections in production.
+ */
 function getSmtpTransporter() {
   if (smtpTransporter) return smtpTransporter;
 
   const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, "") : null;
-  const isGmailUser = Boolean(user && user.toLowerCase().endsWith("@gmail.com"));
+  const pass = process.env.SMTP_PASS
+    ? process.env.SMTP_PASS.replace(/\s+/g, "")
+    : null;
+  const isGmailUser =
+    Boolean(user && user.toLowerCase().endsWith("@gmail.com"));
   const host =
     process.env.SMTP_HOST ||
-    (isGmailUser || process.env.EMAIL_PROVIDER === "gmail" ? "smtp.gmail.com" : null);
+    (isGmailUser || process.env.EMAIL_PROVIDER === "gmail"
+      ? "smtp.gmail.com"
+      : null);
   const port = Number(process.env.SMTP_PORT || (isGmailUser ? 587 : 587));
-  const isSecure = process.env.SMTP_SECURE === "true" || port === 465;
+  const isSecure =
+    process.env.SMTP_SECURE === "true" || port === 465;
 
   if (host && user && pass) {
-    const isGmail = host.includes("gmail") || process.env.EMAIL_PROVIDER === "gmail" || isGmailUser;
+    const isGmail =
+      host.includes("gmail") ||
+      process.env.EMAIL_PROVIDER === "gmail" ||
+      isGmailUser;
     smtpTransporter = nodemailer.createTransport(
       isGmail
         ? {
@@ -66,6 +90,18 @@ function getSmtpTransporter() {
             port,
             secure: isSecure,
             auth: { user, pass },
+            // Timeout configuration to prevent hanging connections
+            // These values are in seconds: connect, auth, timeout
+            // @see https://nodemailer.com/settings/
+            timeout: Number(process.env.SMTP_TIMEOUT_SEC || 30),
+            // SMTP greeting timeout
+            connectionTimeout: Number(
+              process.env.SMTP_CONNECTION_TIMEOUT_SEC || 10
+            ),
+            // Socket timeout
+            socketTimeout: Number(
+              process.env.SMTP_SOCKET_TIMEOUT_SEC || 30
+            ),
           }
     );
     return smtpTransporter;
@@ -73,9 +109,18 @@ function getSmtpTransporter() {
   return null;
 }
 
-function buildEmailHtml({ title, heading, message, otp, expiryMinutes }) {
-  return `
-<!DOCTYPE html>
+/**
+ * Builds the email HTML body using Prava's branded template.
+ * The OTP code is included in the HTML but NEVER logged to console.
+ */
+function buildEmailHtml({
+  title,
+  heading,
+  message,
+  otp,
+  expiryMinutes,
+}) {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -143,18 +188,27 @@ function buildEmailHtml({ title, heading, message, otp, expiryMinutes }) {
     </tr>
   </table>
 </body>
-</html>
-  `.trim();
+</html>`.trim();
 }
 
 /**
  * Dispatches an email containing the secure 6-digit OTP code.
  *
+ * Primary Transport: SMTP (configured via SMTP_HOST, SMTP_USER, SMTP_PASS)
+ * Secondary Transport: Resend API (if EMAIL_PROVIDER=resend and RESEND_API_KEY set)
+ *
+ * Security Rules Enforced:
+ * - OTP codes are NEVER logged to console or files
+ * - Identifiers are masked in all log messages
+ * - Provider fallback logic: SMTP (default) -> Resend (if configured)
+ * - Structured error messages without exposing secrets
+ *
  * @param {Object} options
  * @param {string} options.to - Recipient email address
- * @param {string} options.otp - 6-digit OTP code
+ * @param {string} options.otp - 6-digit OTP code (NEVER logged)
  * @param {string} options.purpose - Purpose ("login" | "password_reset")
  * @param {number} [options.expiryMinutes=5] - Expiry in minutes
+ * @returns {Promise<Object>} Dispatch result with provider and message ID
  */
 export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes = 5 }) {
   if (!to || !to.includes("@")) {
@@ -168,7 +222,7 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
   testDispatchedNotifications.push({
     type: "email",
     to: to.toLowerCase().trim(),
-    code: String(otp).trim(),
+    code: String(otp).trim(), // Stored only for test verification, never logged in production
     purpose,
     timestamp: Date.now(),
   });
@@ -177,15 +231,21 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
   const fromAddress =
     process.env.SMTP_FROM ||
     process.env.EMAIL_FROM ||
-    (process.env.SMTP_USER ? `"Prava Security" <${process.env.SMTP_USER}>` : '"Prava Security" <no-reply@prava.io>');
+    (process.env.SMTP_USER
+      ? `"Prava Security" <${process.env.SMTP_USER}>`
+      : '"Prava Security" <no-reply@prava.io>');
 
   const isPasswordReset = purpose === "password_reset";
-  const heading = isPasswordReset ? "Prava Password Reset Request" : "Prava Login Verification";
+  const heading = isPasswordReset
+    ? "Prava Password Reset Request"
+    : "Prava Login Verification";
   const message = isPasswordReset
     ? "We received a request to reset the password for your Prava account. Please enter the following 6-digit verification code to authorize the reset:"
     : "We detected a sign-in attempt to your Prava account. Please enter the following 6-digit verification code to complete your sign-in:";
 
-  const subject = `Your Prava Verification Code: ${otp} (${isPasswordReset ? "Password Reset" : "Login"})`;
+  // OTP code is intentionally NOT included in subject line to avoid logging it
+  const subject = `Your Prava Verification Code: ${isPasswordReset ? "Password Reset" : "Login"}`;
+  // OTP code included only in email body, never in console logs
   const textBody = `Prava Security Verification\n\n${heading}\n\n${message}\n\nYour 6-Digit Code: ${otp}\n\nThis code will expire in ${expiryMinutes} minutes. Never share this code with anyone.\n\nBest regards,\nPrava Security Team`;
   const htmlBody = buildEmailHtml({
     title: heading,
@@ -200,12 +260,15 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
     return { success: true, provider: "test_mock", id: "test-mock-msg-id" };
   }
 
-  // 1. SMTP Transport (Primary Default)
+  // 1. SMTP TRANSPORT (PRIMARY - always first choice)
   if (provider === "smtp" || provider === "gmail" || provider === "email") {
     const transporter = getSmtpTransporter();
     if (!transporter) {
       if (process.env.NODE_ENV !== "production") {
-        console.warn(`[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`);
+        // Development: warn and use mock, but don't expose credentials
+        console.warn(
+          `[EmailService] SMTP credentials not set in .env. Dispatched mock OTP challenge to: ${maskEmail(to)}`
+        );
         return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
       }
       throw new HttpError(
@@ -222,29 +285,46 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
         text: textBody,
         html: htmlBody,
       });
-      console.log(`[EmailService] Verification email delivered to ${maskEmail(to)} via SMTP (Message ID: ${info.messageId})`);
+      // SUCCESS: log delivery without exposing OTP code or full identifier
+      console.log(
+        `[EmailService] Verification email delivered via SMTP to ${maskEmail(to)}`
+      );
       return {
         success: true,
         provider: "smtp",
         id: info.messageId,
       };
     } catch (err) {
-      console.error(`[EmailService] SMTP delivery failure for ${maskEmail(to)}:`, err.message);
+      // SMTP ERROR: structured logging without exposing secrets
+      const errorMsg = err.message || "Unknown SMTP error";
+      console.error(
+        `[EmailService] SMTP delivery failure for ${maskEmail(to)}:`,
+        errorMsg
+      );
+
       if (process.env.NODE_ENV !== "production") {
-        console.warn(`[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${err.message}`);
+        // Development: warn with notice, allow mock fallback
+        console.warn(
+          `[EmailService] SMTP transmission notice for ${maskEmail(to)}: ${errorMsg}`
+        );
         return { success: true, provider: "smtp_dev_fallback", id: "dev-smtp-otp" };
       }
-      throw new HttpError(500, `Failed to deliver verification email via SMTP (${err.message}).`);
+
+      // Production: throw HttpError with generic message (no stack traces or credentials)
+      throw new HttpError(
+        500,
+        "Failed to deliver verification email via SMTP. Please check SMTP configuration and try again later."
+      );
     }
   }
 
-  // 2. Resend API (Secondary option if explicitly configured)
+  // 2. RESEND API (SECONDARY - only if explicitly configured)
   if (provider === "resend") {
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
       throw new HttpError(
         500,
-        "Email delivery is not configured. Please set RESEND_API_KEY in your .env configuration."
+        "Email delivery is not configured. Please set RESEND_API_KEY in your .env configuration, or set EMAIL_PROVIDER=smtp for SMTP."
       );
     }
 
@@ -266,12 +346,22 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const rawMessage = errorData.message || res.statusText || "Resend API error";
+        // Extract raw error message without exposing OTP or credentials
+        const rawMessage =
+          errorData.message ||
+          res.statusText ||
+          "Resend API error";
 
-        console.error(`[EmailService] Resend delivery error for ${maskEmail(to)}:`, rawMessage);
+        // Structured log: mask identifier, include error type but not OTP
+        console.error(
+          `[EmailService] Resend delivery error for ${maskEmail(to)}:`,
+          rawMessage
+        );
 
         if (process.env.NODE_ENV !== "production") {
-          console.warn(`[EmailService] Resend fallback notice for ${maskEmail(to)}: ${rawMessage}`);
+          console.warn(
+            `[EmailService] Resend fallback notice for ${maskEmail(to)}: ${rawMessage}`
+          );
           return { success: true, provider: "resend_sandbox_fallback", id: "dev-sandbox-otp" };
         }
 
@@ -279,7 +369,10 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
       }
 
       const data = await res.json();
-      console.log(`[EmailService] Verification email successfully dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`);
+      // Structured success log: mask identifier, include Resend message ID only
+      console.log(
+        `[EmailService] Verification email successfully dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`
+      );
       return {
         success: true,
         provider: "resend",
@@ -287,12 +380,23 @@ export async function sendOtpEmail({ to, otp, purpose = "login", expiryMinutes =
       };
     } catch (err) {
       if (err instanceof HttpError) throw err;
-      console.error(`[EmailService] Network exception sending email via Resend to ${maskEmail(to)}:`, err.message);
-      throw new HttpError(500, "Unable to dispatch verification email due to a network error.");
+      // Network-level error: log without exposing secrets
+      console.error(
+        `[EmailService] Network exception sending email via Resend to ${maskEmail(to)}:`,
+        err.message
+      );
+      throw new HttpError(
+        500,
+        "Unable to dispatch verification email due to a network error."
+      );
     }
   }
 
-  throw new HttpError(500, `Unsupported EMAIL_PROVIDER "${provider}". Expected "smtp".`);
+  // Fallback: unsupported provider
+  throw new HttpError(
+    500,
+    `Unsupported EMAIL_PROVIDER "${provider}". Expected "smtp", "gmail", "email", or "resend".`
+  );
 }
 
 /**
@@ -312,6 +416,7 @@ export async function sendPasswordResetOtpEmail({ to, otp, expiryMinutes = 5 }) 
 /**
  * Verifies SMTP configuration and connection handshake.
  * Returns structured health report without throwing.
+ * Does NOT expose OTP codes, passwords, or full credentials in the response.
  */
 export async function verifySmtpConnection() {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
@@ -348,21 +453,31 @@ export async function verifySmtpConnection() {
       message: `SMTP connection verified successfully to ${host}:${port}.`,
     };
   } catch (err) {
+    // Log the error internally without exposing full details
+    console.error(
+      `[EmailService] SMTP verification failed for ${host}:${port}`,
+      err.message
+    );
     return {
       ok: false,
       configured: true,
       host,
       port,
       error: err.message,
-      message: `SMTP verification failed: ${err.message}`,
+      message: `SMTP verification failed: connection or authentication error. Please check your SMTP settings.`,
     };
   }
 }
 
 /**
  * Dispatches enterprise transactional emails with Prava branded templates.
+ * Supports SMTP as primary transport.
  */
-export async function sendTransactionalNotification({ to, templateType, templateData = {} }) {
+export async function sendTransactionalNotification({
+  to,
+  templateType,
+  templateData = {},
+}) {
   if (!to || !to.includes("@")) {
     throw new HttpError(400, "Valid recipient email address is required.");
   }
@@ -408,9 +523,13 @@ export async function sendTransactionalNotification({ to, templateType, template
       throw new HttpError(400, `Unknown transactional email template "${templateType}".`);
   }
 
-  const fromAddress = `${process.env.SMTP_FROM_NAME || "Prava Financial Cloud"} <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "notifications@prava.in"}>`;
+  const fromAddress =
+    `${process.env.SMTP_FROM_NAME || "Prava Financial Cloud"} <${
+      process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "notifications@prava.in"
+    }>`;
 
   // Record dispatched notification for test verification
+  // Note: OTP codes and secrets are NOT included in the recorded notification
   testDispatchedNotifications.push({
     to,
     templateType,
@@ -424,22 +543,105 @@ export async function sendTransactionalNotification({ to, templateType, template
     return { success: true, provider: "test_mock", templateType, id: `test-msg-${Date.now()}` };
   }
 
-  const transporter = getSmtpTransporter();
-  if (transporter) {
+  const provider = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
+
+  // 1. SMTP Transport (Primary)
+  if (provider === "smtp" || provider === "gmail" || provider === "email") {
+    const transporter = getSmtpTransporter();
+    if (transporter) {
+      try {
+        const info = await transporter.sendMail({
+          from: fromAddress,
+          to,
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+        });
+        return { success: true, provider: "smtp", id: info.messageId, templateType };
+      } catch (err) {
+        console.error(
+          `[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`,
+          err.message
+        );
+        return {
+          success: true,
+          provider: "smtp_error_logged",
+          error: "SMTP delivery failed - check server logs for details",
+          templateType,
+        };
+      }
+    }
+
+    return { success: true, provider: "dev_sandbox_logged", templateType };
+  }
+
+  // 2. Resend API (Secondary - only if explicitly configured)
+  if (provider === "resend") {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      throw new HttpError(
+        500,
+        "Email delivery is not configured. Please set RESEND_API_KEY in your .env configuration, or set EMAIL_PROVIDER=smtp for SMTP."
+      );
+    }
+
     try {
-      const info = await transporter.sendMail({
-        from: fromAddress,
-        to,
-        subject: rendered.subject,
-        text: rendered.text,
-        html: rendered.html,
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [to],
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+        }),
       });
-      return { success: true, provider: "smtp", id: info.messageId, templateType };
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const rawMessage =
+          errorData.message || res.statusText || "Resend API error";
+
+        console.error(
+          `[EmailService] Resend transactional error for ${maskEmail(to)}:`,
+          rawMessage
+        );
+
+        throw new HttpError(
+          500,
+          `Failed to deliver transactional email.`
+        );
+      }
+
+      const data = await res.json();
+      console.log(
+        `[EmailService] Transactional email dispatched to ${maskEmail(to)} via Resend (ID: ${data.id})`
+      );
+      return {
+        success: true,
+        provider: "resend",
+        id: data.id,
+        templateType,
+      };
     } catch (err) {
-      console.error(`[EmailService] Transactional email SMTP error for ${maskEmail(to)}:`, err.message);
-      return { success: true, provider: "smtp_error_logged", error: err.message };
+      if (err instanceof HttpError) throw err;
+      console.error(
+        `[EmailService] Network exception sending transactional email via Resend to ${maskEmail(to)}:`,
+        err.message
+      );
+      throw new HttpError(
+        500,
+        "Unable to dispatch transactional email due to a network error."
+      );
     }
   }
 
-  return { success: true, provider: "dev_sandbox_logged", templateType };
+  throw new HttpError(
+    500,
+    `Unsupported EMAIL_PROVIDER "${provider}". Expected "smtp", "gmail", "email", or "resend".`
+  );
 }

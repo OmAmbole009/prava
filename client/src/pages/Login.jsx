@@ -89,6 +89,7 @@ export default function Login() {
       document.cookie = "app_session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "manus-cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     } catch {}
+
     void queryClient.clear();
     api.auth.logout().catch(() => {});
   }, []);
@@ -106,9 +107,12 @@ export default function Login() {
     void queryClient.invalidateQueries({ queryKey: ["businesses"] });
 
     if (data.role === "admin") {
-      toast.success("Administrator access authenticated. Opening Admin Console…", {
-        description: `Logged in as Super Admin (${data.user?.name || "Om Ambole"})`,
-      });
+      toast.success(
+        "Administrator access authenticated. Opening Admin Console…",
+        {
+          description: `Logged in as Super Admin (${data.user?.name || "Om Ambole"})`,
+        }
+      );
       window.location.href = data.redirectTo || "/admin/billing";
     } else {
       toast.success(
@@ -134,11 +138,21 @@ export default function Login() {
       setLoginStep("otp");
       setResendCooldown(60);
       setOtpCode("");
-      toast.info(data.message || `Verification code sent to ${data.maskedTarget}. Please check your inbox.`);
+      toast.info(
+        data.message || `Verification code sent to ${data.maskedTarget}. Please check your inbox.`
+      );
     },
     onError: (error) => {
+      // Clear any stale OTP state when password auth fails
+      setChallengeToken("");
+      setMaskedTarget("");
+      setOtpMethod("email");
+      setLoginStep("credentials");
+      setOtpCode("");
+
       const msg =
-        error.message || "Invalid email or password. Please verify your credentials and try again.";
+        error.message ||
+        "Invalid email or password. Please verify your credentials and try again.";
       setErrorMessage(msg);
       toast.error(msg);
     },
@@ -149,9 +163,15 @@ export default function Login() {
     mutationFn: (body) => api.auth.verifyOtp(body),
     onSuccess: handleAuthComplete,
     onError: (error) => {
-      const msg = error.message || "Invalid or expired verification code.";
-      setErrorMessage(msg);
-      toast.error(msg);
+      // Reset to credentials step on OTP verification failure
+      setLoginStep("credentials");
+      setOtpCode("");
+      setErrorMessage(
+        error.message || "Invalid or expired verification code."
+      );
+      toast.error(
+        error.message || "Invalid or expired verification code."
+      );
     },
   });
 
@@ -162,10 +182,13 @@ export default function Login() {
       setErrorMessage("");
       setResendCooldown(60);
       setOtpCode("");
-      toast.success(data.message || "A new verification code has been dispatched to your email.");
+      toast.success(
+        data.message || "A new verification code has been dispatched to your email."
+      );
     },
     onError: (error) => {
-      const msg = error.message || "Failed to resend verification code.";
+      const msg =
+        error.message || "Failed to resend verification code. Please try again.";
       setErrorMessage(msg);
       toast.error(msg);
     },
@@ -182,10 +205,13 @@ export default function Login() {
       setLoginStep("otp");
       setResendCooldown(60);
       setOtpCode("");
-      toast.success(data.message || `Account created! Verification code sent to ${data.maskedTarget}.`);
+      toast.success(
+        data.message || `Account created! Verification code sent to ${data.maskedTarget}.`
+      );
     },
     onError: (error) => {
-      const msg = error.message || "Registration failed. Please verify your details.";
+      const msg =
+        error.message || "Registration failed. Please verify your details.";
       setErrorMessage(msg);
       toast.error(msg);
     },
@@ -202,10 +228,13 @@ export default function Login() {
       setForgotStep("verify");
       setOtpCode("");
       setResendCooldown(60);
-      toast.info(data.message || "Password reset verification code dispatched.");
+      toast.info(
+        data.message || "Password reset verification code dispatched."
+      );
     },
     onError: (error) => {
-      const msg = error.message || "Unable to initiate password reset.";
+      const msg =
+        error.message || "Unable to initiate password reset. Please check your credentials.";
       setErrorMessage(msg);
       toast.error(msg);
     },
@@ -221,7 +250,8 @@ export default function Login() {
       toast.success("Verification confirmed! Please set your new password.");
     },
     onError: (error) => {
-      const msg = error.message || "Invalid or expired verification code.";
+      const msg =
+        error.message || "Invalid or expired verification code. Please request a new one.";
       setErrorMessage(msg);
       toast.error(msg);
     },
@@ -306,7 +336,9 @@ export default function Login() {
       }
     }).catch(() => {});
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [mode, loginStep]);
 
   const handleGoogleSignIn = async () => {
@@ -314,9 +346,12 @@ export default function Login() {
     try {
       const config = await api.auth.googleConfig();
       if (!config?.configured || !config?.clientId) {
-        toast.info("Google OAuth configuration is currently in development mode. Please configure GOOGLE_CLIENT_ID in your environment variables for live production OAuth.", {
-          duration: 6000,
-        });
+        toast.info(
+          "Google OAuth configuration is currently in development mode. Please configure GOOGLE_CLIENT_ID in your environment variables for live production OAuth.",
+          {
+            duration: 6000,
+          }
+        );
         return;
       }
 
@@ -433,6 +468,29 @@ export default function Login() {
       confirmPassword,
     });
   };
+
+  // Cleanup stale auth state when mode or loginStep changes
+  useEffect(() => {
+    // When switching away from OTP step, clear OTP-related state
+    if (loginStep !== "otp") {
+      setChallengeToken("");
+      setMaskedTarget("");
+      setOtpMethod("email");
+      setOtpCode("");
+      setResendCooldown(0);
+    }
+    // When switching away from forgot password reset, clear related state
+    if (forgotStep !== "reset") {
+      setPasswordResetToken("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    // When switching away from credentials step, clear error/success messages
+    if (loginStep !== "credentials" && forgotStep !== "request") {
+      setErrorMessage("");
+      setSuccessMessage("");
+    }
+  }, [loginStep, forgotStep]);
 
   return (
     <div className="relative flex min-h-screen flex-col bg-[#030405] text-[#F5F7FA] overflow-hidden selection:bg-blue-600/30 selection:text-white">
@@ -556,7 +614,8 @@ export default function Login() {
                       ? "Register Business"
                       : isSuperAdmin
                       ? "Administrator Console"
-                      : "Business Sign In"}
+                      : "Business Sign In"
+                  }
                   </h2>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {mode === "forgot"
@@ -571,7 +630,8 @@ export default function Login() {
                       ? "Configure your corporate profile to launch autonomous tax workflows"
                       : isSuperAdmin
                       ? "Elevated system operator credentials detected"
-                      : "Enter your registered email or mobile number with your password"}
+                      : "Enter your registered email or mobile number with your password"
+                  }
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs font-medium text-muted-foreground shrink-0">
@@ -585,7 +645,8 @@ export default function Login() {
                   <span>
                     {loginStep === "otp" || (mode === "forgot" && forgotStep === "verify")
                       ? "Step 2 // OTP"
-                      : "Step 1 // Auth"}
+                      : "Step 1 // Auth"
+                  }
                   </span>
                 </div>
               </div>
@@ -639,7 +700,7 @@ export default function Login() {
               )}
 
               {/* ----------------------------------------------------------- */}
-              {/* FLOW A: LOGIN (STEP 1 - PASSWORD / STEP 2 - OTP)            */}
+              {/* FLOW A: LOGIN (STEP 1 - PASSWORD / STEP 2 - OTP) */}
               {/* ----------------------------------------------------------- */}
               {mode === "login" && loginStep === "credentials" && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
@@ -747,7 +808,6 @@ export default function Login() {
                     </p>
                   </div>
 
-
                   <div className="space-y-1.5">
                     <Label htmlFor="login-otp" className="text-xs font-medium text-foreground">
                       Enter 6-Digit One-Time Code
@@ -796,7 +856,7 @@ export default function Login() {
               )}
 
               {/* ----------------------------------------------------------- */}
-              {/* FLOW B: REGISTER NEW BUSINESS                              */}
+              {/* FLOW B: REGISTER NEW BUSINESS */}
               {/* ----------------------------------------------------------- */}
               {mode === "register" && loginStep === "credentials" && (
                 <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
@@ -898,7 +958,7 @@ export default function Login() {
               )}
 
               {/* ----------------------------------------------------------- */}
-              {/* FLOW C: FORGOT PASSWORD                                    */}
+              {/* FLOW C: FORGOT PASSWORD */}
               {/* ----------------------------------------------------------- */}
               {mode === "forgot" && (
                 <div className="space-y-4">
@@ -1096,16 +1156,11 @@ export default function Login() {
               {/* Distinct CA Login Gate */}
               <div className="mt-5 border-t border-border/60 pt-4 text-center">
                 <p className="text-xs text-muted-foreground">
-                  Practicing Chartered Accountant with ICAI credentials?
+                  Practicing Chartered Accountant with ICAI credentials?{" "}
+                  <a href="/ca/login" className="font-bold text-primary hover:underline">
+                    Login to CA Portal
+                  </a>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setLocation("/ca/login")}
-                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline"
-                >
-                  <GraduationCap className="size-4" />
-                  Access Dedicated CA Portal with Audit Sign-Off →
-                </button>
               </div>
             </div>
           </div>
