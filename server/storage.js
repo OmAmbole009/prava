@@ -5,6 +5,7 @@ import {
   getSupabaseFile,
   probeSupabaseStorage,
   isProductionRuntime,
+  describeSupabaseEnvironment,
 } from "./supabaseStorage.js";
 
 function normalizeKey(relKey) {
@@ -43,6 +44,8 @@ export async function getStorageHealth({ force = false } = {}) {
     durable: probe.canWrite,
     bucket: config.bucket,
     supabaseUrl: config.url ? config.url.replace(/https?:\/\//, "").split(".")[0] : null,
+    // Names and shapes only: lets a deploy be diagnosed without dashboard access.
+    environment: describeSupabaseEnvironment(),
     probe,
   };
 }

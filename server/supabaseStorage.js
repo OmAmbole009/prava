@@ -31,17 +31,120 @@ export function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
 }
 
+// Hosting dashboards are often filled in with a different but equivalent name
+// (`SUPABASE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, ...). Accepting the common
+// spellings avoids a deploy that silently has no storage at all.
+const URL_ENV_KEYS = [
+  "SUPABASE_URL",
+  "SUPABASE_PROJECT_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "VITE_SUPABASE_URL",
+];
+const KEY_ENV_KEYS = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SERVICE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_KEY",
+  "SUPABASE_SERVICE_ROLE",
+  "SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_ANON_KEY",
+];
+const BUCKET_ENV_KEYS = ["SUPABASE_BUCKET", "SUPABASE_STORAGE_BUCKET"];
+
+function readFirstEnv(names) {
+  for (const name of names) {
+    const value = cleanEnvValue(process.env[name]);
+    if (value) return { value, name };
+  }
+  return { value: "", name: null };
+}
+
 export function getSupabaseConfig() {
-  const url = cleanEnvValue(process.env.SUPABASE_URL);
-  const key = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY) || cleanEnvValue(process.env.SUPABASE_ANON_KEY);
-  const bucket = cleanEnvValue(process.env.SUPABASE_BUCKET) || "prava-documents";
+  const urlEntry = readFirstEnv(URL_ENV_KEYS);
+  const keyEntry = readFirstEnv(KEY_ENV_KEYS);
+  const bucketEntry = readFirstEnv(BUCKET_ENV_KEYS);
+  const url = urlEntry.value;
+  const key = keyEntry.value;
+  const bucket = bucketEntry.value || "prava-documents";
   const isConfigured = Boolean(
     url &&
     key &&
     !url.includes("your-project") &&
     !key.includes("your-")
   );
-  return { url, key, bucket, isConfigured };
+  return {
+    url,
+    key,
+    bucket,
+    isConfigured,
+    urlSource: urlEntry.name,
+    keySource: keyEntry.name,
+    bucketSource: bucketEntry.name,
+  };
+}
+
+/**
+ * Describes what the running process can actually see about Supabase without
+ * ever exposing a secret value. Hosting dashboards silently keep values on the
+ * wrong service, under a mistyped name, or un-saved, and without this the only
+ * symptom is a permanent "not configured" error in the UI.
+ */
+export function describeSupabaseEnvironment() {
+  const { url, key, bucket, isConfigured, urlSource, keySource } = getSupabaseConfig();
+  let urlHost = null;
+  if (url) {
+    try {
+      urlHost = new URL(url).host;
+    } catch {
+      urlHost = "(invalid URL)";
+    }
+  }
+  return {
+    nodeEnv: process.env.NODE_ENV || null,
+    // Names only, never values: this answers "did the host inject them at all?".
+    visibleKeys: Object.keys(process.env)
+      .filter((name) => /^SUPABASE/i.test(name))
+      .sort(),
+    urlPresent: Boolean(url),
+    urlSource,
+    keySource,
+    urlHost,
+    serviceKeyPresent: Boolean(key),
+    serviceKeyLength: key.length,
+    serviceKeyKind: !key
+      ? "missing"
+      : key.startsWith("sb_secret")
+      ? "sb_secret"
+      : key.startsWith("sb_")
+      ? "sb_publishable"
+      : key.startsWith("eyJ")
+      ? "jwt"
+      : "other",
+    bucket,
+    isConfigured,
+  };
+}
+
+function storageConfigHint(env = describeSupabaseEnvironment()) {
+  if (env.visibleKeys.length === 0) {
+    return (
+      "The running server sees no SUPABASE_* environment variables at all. " +
+      "Add SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET to the Environment tab of this exact " +
+      "Render service, save, then redeploy so the process restarts with them."
+    );
+  }
+  const missing = [];
+  if (!env.urlPresent) missing.push("SUPABASE_URL");
+  if (!env.serviceKeyPresent) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!missing.length) {
+    return `The server sees ${env.visibleKeys.join(
+      ", "
+    )} but they still look like placeholder values. Replace them with the real Supabase project values and redeploy.`;
+  }
+  return `The server sees ${env.visibleKeys.join(", ")} but ${missing.join(
+    " and "
+  )} is empty or missing. Fix the name/value on this Render service and redeploy.`;
 }
 
 export function getSupabaseClient() {
@@ -118,11 +221,13 @@ export async function uploadToSupabase(relKey, data, contentType = "application/
     if (isProductionRuntime()) {
       // A container filesystem is wiped on every deploy, so writing here would
       // report success while guaranteeing the document is lost. Fail loudly.
+      const environment = describeSupabaseEnvironment();
       throw new StorageUnavailableError(
         "Document storage is not configured on the server, so uploads would not be kept.",
         {
           code: "STORAGE_NOT_CONFIGURED",
-          hint: "Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET on the server, then redeploy.",
+          hint: storageConfigHint(environment),
+          details: { environment },
         }
       );
     }
@@ -190,11 +295,13 @@ export async function getSupabaseSignedUrl(relKey, expiresInSeconds = 3600) {
   }
 
   if (isProductionRuntime()) {
+    const environment = describeSupabaseEnvironment();
     throw new StorageUnavailableError(
       "Document storage is not configured on the server, so this file cannot be retrieved.",
       {
         code: "STORAGE_NOT_CONFIGURED",
-        hint: "Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET on the server, then redeploy.",
+        hint: storageConfigHint(environment),
+        details: { environment },
       }
     );
   }

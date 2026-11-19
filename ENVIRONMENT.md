@@ -41,6 +41,12 @@ reports every missing value at once and aborts startup.
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-only.** Document upload/download. Never expose to the browser. |
 | `SUPABASE_BUCKET` | Private bucket name (for example `prava-documents`) |
 
+Common alternative spellings are also read, so a dashboard typo does not
+silently disable storage: `SUPABASE_PROJECT_URL` / `NEXT_PUBLIC_SUPABASE_URL` /
+`VITE_SUPABASE_URL` for the URL, and `SUPABASE_SERVICE_KEY` /
+`SUPABASE_SECRET_KEY` / `SUPABASE_KEY` / `SUPABASE_ANON_KEY` for the key. The
+canonical names above win when several are present.
+
 On a deployed server these three (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SUPABASE_BUCKET`) must be set and working. The container filesystem is wiped on
 every deploy, so uploads are refused with a `STORAGE_NOT_CONFIGURED` /

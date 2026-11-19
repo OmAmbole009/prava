@@ -227,6 +227,7 @@ async function startServer() {
         }
         console.error(
           `[Storage] Document storage is NOT durable: ${health.probe?.error || "unknown error"}.`,
+          `Visible Supabase env vars: ${health.environment?.visibleKeys?.join(", ") || "none"}.`,
           "Uploads will be refused rather than written to the ephemeral container filesystem."
         );
       })
