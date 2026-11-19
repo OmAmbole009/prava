@@ -3,6 +3,8 @@ import {
   getSupabaseSignedUrl,
   getSupabaseConfig,
   getSupabaseFile,
+  probeSupabaseStorage,
+  isProductionRuntime,
 } from "./supabaseStorage.js";
 
 function normalizeKey(relKey) {
@@ -27,14 +29,22 @@ export async function storageGetSignedUrl(relKey) {
   return getSupabaseSignedUrl(relKey, 3600);
 }
 
-export async function getStorageHealth() {
+/**
+ * Reports whether uploaded documents are actually durable. `durable` is only
+ * true when a live write/sign/delete probe against the configured bucket
+ * succeeds, so "configured but broken" can never look healthy.
+ */
+export async function getStorageHealth({ force = false } = {}) {
   const config = getSupabaseConfig();
+  const probe = await probeSupabaseStorage({ force });
   return {
-    provider: config.isConfigured ? "supabase" : "local_cache",
+    provider: config.isConfigured ? "supabase" : isProductionRuntime() ? "unconfigured" : "local_cache",
     configured: config.isConfigured,
+    durable: probe.canWrite,
     bucket: config.bucket,
     supabaseUrl: config.url ? config.url.replace(/https?:\/\//, "").split(".")[0] : null,
+    probe,
   };
 }
 
-export { getSupabaseFile };
+export { getSupabaseFile, probeSupabaseStorage };

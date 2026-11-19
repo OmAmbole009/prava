@@ -214,6 +214,27 @@ async function startServer() {
       });
   }
 
+  // Documents are the tenant's evidence trail, so prove at boot that they can
+  // actually be persisted. A container filesystem is wiped on every deploy;
+  // without this check a broken bucket only surfaces days later as dead links.
+  if (process.env.NODE_ENV === "production") {
+    import("../storage.js")
+      .then(({ getStorageHealth }) => getStorageHealth())
+      .then((health) => {
+        if (health.durable) {
+          console.log(`[Storage] Durable document storage ready (bucket: ${health.bucket}).`);
+          return;
+        }
+        console.error(
+          `[Storage] Document storage is NOT durable: ${health.probe?.error || "unknown error"}.`,
+          "Uploads will be refused rather than written to the ephemeral container filesystem."
+        );
+      })
+      .catch((error) => {
+        console.error("[Storage] Startup storage check error:", error.message);
+      });
+  }
+
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;

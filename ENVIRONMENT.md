@@ -41,6 +41,14 @@ reports every missing value at once and aborts startup.
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-only.** Document upload/download. Never expose to the browser. |
 | `SUPABASE_BUCKET` | Private bucket name (for example `prava-documents`) |
 
+On a deployed server these three (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`SUPABASE_BUCKET`) must be set and working. The container filesystem is wiped on
+every deploy, so uploads are refused with a `STORAGE_NOT_CONFIGURED` /
+`STORAGE_UPLOAD_FAILED` error instead of being written locally. `GET
+/api/storage/status` (add `?force=1` to skip the 60s cache) writes, signs and
+deletes a probe object and reports `durable: true` only when that round trip
+succeeds.
+
 ## Intelligence and OCR
 
 | Variable | Purpose |

@@ -114,7 +114,11 @@ export default function Documents() {
       queryClient.invalidateQueries({ queryKey: ["finance"] });
       queryClient.invalidateQueries({ queryKey: ["caEngine"] });
     },
-    onError: (error) => toast.error(error.message || "Failed to process document"),
+    onError: (error) =>
+      toast.error(error.message || "Failed to process document", {
+        description: error.hint,
+        duration: 10000,
+      }),
   });
 
   const handleFileUpload = async (file) => {
