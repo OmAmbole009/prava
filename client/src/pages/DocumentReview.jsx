@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import PdfPreview from "@/components/PdfPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -527,11 +528,7 @@ export default function DocumentReview() {
 
               <div className="flex-1 bg-black/90 relative overflow-hidden flex items-center justify-center">
                 {document.mimeType === "application/pdf" ? (
-                  <iframe
-                    src={`${sourceUrl}#toolbar=1&navpanes=0`}
-                    title="Source Document Preview"
-                    className="w-full h-full border-0 min-h-[550px]"
-                  />
+                  <PdfPreview url={sourceUrl} fileName={document.originalName} />
                 ) : (
                   <div className="p-4 flex items-center justify-center max-h-[700px] overflow-auto">
                     <img
