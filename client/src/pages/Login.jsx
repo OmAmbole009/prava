@@ -346,6 +346,13 @@ export default function Login() {
         return;
       }
 
+      // The server checked with Google whether this deployment is registered.
+      // Rendering the button anyway would only send users to Google's
+      // "Access blocked" page, so leave the email/password path as the way in.
+      if (cfg.redirectUriRegistered === false) {
+        return;
+      }
+
       const renderGis = () => {
         if (window.google?.accounts?.id) {
           try {
@@ -413,6 +420,16 @@ export default function Login() {
           "Google sign-in is misconfigured: the server's Google client ID is not a valid web client ID. Please sign in with your email and password.";
         setErrorMessage(msg);
         toast.error(msg, { duration: 8000 });
+        return;
+      }
+
+      // Google refused this deployment's redirect URI, so starting the flow
+      // would end on Google's "Access blocked" page. Say what is missing.
+      if (config.redirectUriRegistered === false) {
+        const callback = config.redirectUri || `${window.location.origin}/api/auth/google/callback`;
+        const msg = `Google sign-in is not enabled for ${window.location.origin} yet. In Google Cloud Console, open the OAuth client ${clientId} and add ${window.location.origin} to "Authorized JavaScript origins" and ${callback} to "Authorized redirect URIs", then redeploy. You can still sign in with your email and password.`;
+        setErrorMessage(msg);
+        toast.error(msg, { duration: 12000 });
         return;
       }
 

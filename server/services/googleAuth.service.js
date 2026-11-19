@@ -73,6 +73,69 @@ export function getGoogleOAuthConfiguration() {
 
 
 /**
+ * Asks Google whether the configured redirect URI is registered for the
+ * OAuth client. An unregistered URI makes Google refuse the request, which
+ * strands the user on accounts.google.com/signin/oauth/error. There is no API
+ * to read an OAuth client's configuration, so we start a real authorization
+ * request and read the result: `redirect_uri_mismatch` means "not registered".
+ *
+ * Returns true (registered), false (Google rejected the URI) or null (we could
+ * not tell, e.g. Google was unreachable) so callers never block on failure.
+ */
+const REGISTRATION_TTL_MS = 5 * 60 * 1000;
+const registrationCache = new Map();
+
+export function buildGoogleAuthorizationUrl(clientId, redirectUri) {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    prompt: "select_account",
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+export async function checkGoogleRedirectRegistration({ clientId, redirectUri }) {
+  if (!clientId || !redirectUri) return null;
+
+  const cacheKey = `${clientId}|${redirectUri}`;
+  const cached = registrationCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  let value = null;
+  try {
+    const response = await fetch(buildGoogleAuthorizationUrl(clientId, redirectUri), {
+      method: "GET",
+      redirect: "manual",
+      signal: AbortSignal.timeout(3000),
+    });
+    const location = response.headers.get("location") || "";
+    if (location.includes("signin/oauth/error")) {
+      const authError = new URL(location, "https://accounts.google.com").searchParams.get("authError") || "";
+      let decoded = "";
+      try {
+        decoded = Buffer.from(authError, "base64").toString("utf8");
+      } catch {
+        decoded = "";
+      }
+      value = !(decoded.includes("redirect_uri_mismatch") || decoded.includes("invalid_client"));
+    } else if (response.status >= 300 && response.status < 400 && location) {
+      // Google accepted the parameters and moved on to sign-in/consent.
+      value = true;
+    }
+  } catch {
+    value = null;
+  }
+
+  // Only remember a definite answer; an unknown result is retried next time.
+  if (value !== null) {
+    registrationCache.set(cacheKey, { value, expiresAt: Date.now() + REGISTRATION_TTL_MS });
+  }
+  return value;
+}
+
+/**
  * Validates Google ID token / credential server-side.
  * Never trusts unverified claims or untrusted frontend assertions.
  */

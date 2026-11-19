@@ -13,6 +13,7 @@ import { signInLocalAdministrator, adminLoginSchema } from "../adminLogin.js";
 import { signInCa, caLoginSchema } from "../caAuth.js";
 import {
   authenticateWithGoogle,
+  checkGoogleRedirectRegistration,
   getGoogleOAuthConfiguration,
 } from "../services/googleAuth.service.js";
 import { sendData, sendError } from "../_core/middleware.js";
@@ -115,8 +116,16 @@ authRouter.post("/ca-login", async (req, res) => {
 });
 
 // Google OAuth Endpoints
-authRouter.get("/google/config", (req, res) => {
-  return sendData(res, getGoogleOAuthConfiguration());
+authRouter.get("/google/config", async (req, res) => {
+  const config = getGoogleOAuthConfiguration();
+  // Tell the client whether Google will actually accept this deployment, so
+  // the login page can explain it instead of bouncing users to Google's
+  // "Access blocked" page.
+  const redirectUriRegistered =
+    config.configured && config.redirectUri
+      ? await checkGoogleRedirectRegistration(config)
+      : null;
+  return sendData(res, { ...config, redirectUriRegistered });
 });
 
 authRouter.post("/google", async (req, res) => {
