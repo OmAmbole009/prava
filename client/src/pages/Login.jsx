@@ -423,13 +423,15 @@ export default function Login() {
         return;
       }
 
-      // Google refused this deployment's redirect URI, so starting the flow
-      // would end on Google's "Access blocked" page. Say what is missing.
+      // Google refused this deployment, so starting the flow would end on
+      // Google's "Access blocked" page. Say precisely what is wrong.
       if (config.redirectUriRegistered === false) {
         const callback = config.redirectUri || `${window.location.origin}/api/auth/google/callback`;
-        const msg = `Google sign-in is not enabled for ${window.location.origin} yet. In Google Cloud Console, open the OAuth client ${clientId} and add ${window.location.origin} to "Authorized JavaScript origins" and ${callback} to "Authorized redirect URIs", then redeploy. You can still sign in with your email and password.`;
+        const msg = config.clientNotFound
+          ? `Google does not recognise the client ID this server is configured with (${clientId}). Google reports "The OAuth client was not found", which means GOOGLE_CLIENT_ID on the server is wrong, or the client was deleted. Set GOOGLE_CLIENT_ID to the client ID from Google Cloud Console, Credentials, then redeploy. You can still sign in with your email and password.`
+          : `Google sign-in is not enabled for ${window.location.origin} yet. In Google Cloud Console, open the OAuth client ${clientId} and add ${window.location.origin} to "Authorized JavaScript origins" and ${callback} to "Authorized redirect URIs", then redeploy. You can still sign in with your email and password.`;
         setErrorMessage(msg);
-        toast.error(msg, { duration: 12000 });
+        toast.error(msg, { duration: 14000 });
         return;
       }
 

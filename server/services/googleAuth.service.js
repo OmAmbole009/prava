@@ -73,14 +73,18 @@ export function getGoogleOAuthConfiguration() {
 
 
 /**
- * Asks Google whether the configured redirect URI is registered for the
- * OAuth client. An unregistered URI makes Google refuse the request, which
- * strands the user on accounts.google.com/signin/oauth/error. There is no API
- * to read an OAuth client's configuration, so we start a real authorization
- * request and read the result: `redirect_uri_mismatch` means "not registered".
+ * Asks Google whether the configured OAuth client and redirect URI are usable.
+ * Either problem makes Google refuse the request, which strands the user on
+ * accounts.google.com/signin/oauth/error. There is no API to read an OAuth
+ * client's configuration, so we start a real authorization request and read
+ * Google's answer:
  *
- * Returns true (registered), false (Google rejected the URI) or null (we could
- * not tell, e.g. Google was unreachable) so callers never block on failure.
+ *   redirect_uri_mismatch -> the client exists but this URI is not registered
+ *   invalid_client        -> no such client: GOOGLE_CLIENT_ID is wrong/stale
+ *
+ * Returns { state } with state "registered", "redirect_uri_mismatch",
+ * "client_not_found" or "unknown" (Google unreachable) so callers never block
+ * on failure.
  */
 const REGISTRATION_TTL_MS = 5 * 60 * 1000;
 const registrationCache = new Map();
@@ -96,14 +100,14 @@ export function buildGoogleAuthorizationUrl(clientId, redirectUri) {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
-export async function checkGoogleRedirectRegistration({ clientId, redirectUri }) {
-  if (!clientId || !redirectUri) return null;
+export async function checkGoogleOAuthClient({ clientId, redirectUri }) {
+  if (!clientId || !redirectUri) return { state: "unknown" };
 
   const cacheKey = `${clientId}|${redirectUri}`;
   const cached = registrationCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  let value = null;
+  let value = { state: "unknown" };
   try {
     const response = await fetch(buildGoogleAuthorizationUrl(clientId, redirectUri), {
       method: "GET",
@@ -119,17 +123,23 @@ export async function checkGoogleRedirectRegistration({ clientId, redirectUri })
       } catch {
         decoded = "";
       }
-      value = !(decoded.includes("redirect_uri_mismatch") || decoded.includes("invalid_client"));
+      if (decoded.includes("invalid_client")) {
+        value = { state: "client_not_found" };
+      } else if (decoded.includes("redirect_uri_mismatch")) {
+        value = { state: "redirect_uri_mismatch" };
+      } else {
+        value = { state: "registered" };
+      }
     } else if (response.status >= 300 && response.status < 400 && location) {
       // Google accepted the parameters and moved on to sign-in/consent.
-      value = true;
+      value = { state: "registered" };
     }
   } catch {
-    value = null;
+    value = { state: "unknown" };
   }
 
-  // Only remember a definite answer; an unknown result is retried next time.
-  if (value !== null) {
+  // Only remember a definite answer; "unknown" is retried next time.
+  if (value.state !== "unknown") {
     registrationCache.set(cacheKey, { value, expiresAt: Date.now() + REGISTRATION_TTL_MS });
   }
   return value;
