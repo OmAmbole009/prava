@@ -28,6 +28,19 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
+/**
+ * Google rejects malformed client IDs (quotes, whitespace, truncated or
+ * non-web client values) with "Error 401: invalid_client", so never hand a
+ * bad value to GIS or to the authorization endpoint.
+ */
+function normalizeGoogleClientId(raw) {
+  const value = String(raw ?? "")
+    .trim()
+    .replace(/^["']+/, "")
+    .replace(/["']+$/, "");
+  return /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i.test(value) ? value : null;
+}
+
 export default function Login() {
   const [, setLocation] = useLocation();
 
@@ -328,11 +341,8 @@ export default function Login() {
 
       // Google rejects malformed client IDs; GIS then aborts to
       // accounts.google.com/gsi/transform. Validate before initialising.
-      const clientId = String(cfg.clientId)
-        .trim()
-        .replace(/^["']+/, "")
-        .replace(/["']+$/, "");
-      if (!/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i.test(clientId)) {
+      const clientId = normalizeGoogleClientId(cfg.clientId);
+      if (!clientId) {
         return;
       }
 
@@ -397,6 +407,15 @@ export default function Login() {
         return;
       }
 
+      const clientId = normalizeGoogleClientId(config.clientId);
+      if (!clientId) {
+        const msg =
+          "Google sign-in is misconfigured: the server's Google client ID is not a valid web client ID. Please sign in with your email and password.";
+        setErrorMessage(msg);
+        toast.error(msg, { duration: 8000 });
+        return;
+      }
+
       if (window.google?.accounts?.id) {
         window.google.accounts.id.prompt();
         return;
@@ -412,7 +431,25 @@ export default function Login() {
         return;
       }
 
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
+      // Google only accepts a redirect URI registered for this client, and it
+      // also checks the origin of the page that starts the flow. Sending the
+      // user to Google when the configured redirect URI belongs to another
+      // origin can only produce Google's "Access blocked" page, so explain the
+      // configuration problem here instead.
+      let redirectOrigin = null;
+      try {
+        redirectOrigin = new URL(config.redirectUri).origin;
+      } catch {
+        redirectOrigin = null;
+      }
+      if (redirectOrigin !== window.location.origin) {
+        const msg = `Google sign-in is not configured for ${window.location.origin}. Add this origin and its /api/auth/google/callback URL to the Google OAuth client, or sign in with your email and password.`;
+        setErrorMessage(msg);
+        toast.error(msg, { duration: 9000 });
+        return;
+      }
+
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
     } catch (err) {
       toast.error("Unable to connect to Google OAuth service.");
     }
